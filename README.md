@@ -12,19 +12,20 @@
 4. Code Runner：保存并运行代码
 5. Sentry Agent：分析运行错误
 6. Coder Agent：根据错误自动修复，最多 3 次
+7. 自定义 AI 模块：在流程结束前执行插件 Agent
 
 ## 安装依赖
 
 如果还没有安装 `rich`、`streamlit` 或 `python-dotenv`，请执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install rich streamlit python-dotenv
+.\.venv\Scripts\python.exe -m pip install rich streamlit python-dotenv pyyaml
 ```
 
 如果 OpenAI SDK 也没有安装，请执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install openai langgraph rich streamlit python-dotenv
+.\.venv\Scripts\python.exe -m pip install openai langgraph rich streamlit python-dotenv pyyaml
 ```
 
 ## 配置 DeepSeek
@@ -62,6 +63,48 @@ OFFLINE_MODE=true
 - `exec`
 
 代码运行超时时间由 `CODE_RUN_TIMEOUT` 控制，默认 10 秒。
+
+## 自定义 AI 模块
+
+项目支持通过 `plugins/` 目录扩展自定义 Agent。默认包含两个插件：
+
+- `DocAgent`：根据最终代码生成项目说明文档。
+- `SecurityAgent`：检查生成代码中是否包含危险操作。
+
+插件开关由 `config/agents.yaml` 控制：
+
+```yaml
+plugins:
+  - module: plugins.doc_agent
+    class: DocAgent
+    enabled: true
+  - module: plugins.security_agent
+    class: SecurityAgent
+    enabled: true
+```
+
+如果要关闭某个模块，把 `enabled` 改成 `false` 即可。
+
+新增插件时，可以继承 `plugins/base_plugin.py` 中的 `BasePluginAgent`：
+
+```python
+from plugins.base_plugin import BasePluginAgent
+
+
+class MyAgent(BasePluginAgent):
+    name = "MyAgent"
+    description = "我的自定义模块"
+
+    def run(self, state):
+        return {
+            "name": self.name,
+            "description": self.description,
+            "status": "success",
+            "content": "插件输出内容",
+        }
+```
+
+然后把插件模块和类名加入 `config/agents.yaml`。LangGraph 会在流程结束前自动运行 `enabled=true` 的插件，Web UI 会在“自定义 AI 模块”页签展示结果。
 
 ## 运行
 

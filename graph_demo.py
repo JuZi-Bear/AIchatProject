@@ -72,6 +72,19 @@ def show_full_state(state):
     show_text("success", "✅ True" if state["success"] else "❌ False", "green" if state["success"] else "red")
 
 
+def show_plugin_results(state):
+    console.print(Rule("[bold magenta]自定义 AI 模块结果[/bold magenta]"))
+
+    plugin_results = state.get("plugin_results", [])
+    if not plugin_results:
+        show_text("插件结果", "未启用自定义 AI 模块", "magenta")
+        return
+
+    for result in plugin_results:
+        title = f"{result.get('name', 'Plugin')} - {result.get('status', 'unknown')}"
+        show_text(title, result.get("content", "无内容"), "magenta")
+
+
 def main():
     requirement = choose_requirement()
 
@@ -87,6 +100,7 @@ def main():
 
     show_final_summary(state)
     show_full_state(state)
+    show_plugin_results(state)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ warnings.filterwarnings("ignore", category=LangChainPendingDeprecationWarning)
 from langgraph.graph import END, START, StateGraph
 
 from agents import coder_agent, product_agent, sentry_agent, tester_agent
+from plugin_loader import run_enabled_plugins
 from utils.code_runner import run_code, save_code
 
 
@@ -19,6 +20,7 @@ class AgentState(TypedDict):
     stdout: str
     error_log: str
     sentry_result: str
+    plugin_results: list
     retry_count: int
     success: bool
 
@@ -62,12 +64,17 @@ def runner_node(state):
     return state
 
 
+def plugin_node(state):
+    state["plugin_results"] = run_enabled_plugins(state)
+    return state
+
+
 def should_continue(state):
     if state["success"]:
-        return "end"
+        return "plugins"
 
     if state["retry_count"] >= 3:
-        return "end"
+        return "plugins"
 
     return "repair"
 
@@ -80,6 +87,7 @@ def build_graph():
     graph.add_node("tester_node", tester_node)
     graph.add_node("sentry_node", sentry_node)
     graph.add_node("runner_node", runner_node)
+    graph.add_node("plugin_node", plugin_node)
 
     graph.add_edge(START, "product_node")
     graph.add_edge("product_node", "coder_node")
@@ -89,11 +97,12 @@ def build_graph():
         "runner_node",
         should_continue,
         {
-            "end": END,
+            "plugins": "plugin_node",
             "repair": "sentry_node",
         },
     )
     graph.add_edge("sentry_node", "coder_node")
+    graph.add_edge("plugin_node", END)
 
     return graph.compile()
 
@@ -108,6 +117,7 @@ def run_graph_demo(requirement, progress_callback=None):
         "stdout": "",
         "error_log": "",
         "sentry_result": "",
+        "plugin_results": [],
         "retry_count": 0,
         "success": False,
     }

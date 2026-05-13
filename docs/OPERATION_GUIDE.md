@@ -19,14 +19,14 @@ cd D:\AIchatProject
 安装依赖：
 
 ```powershell
-python -m pip install openai langgraph rich streamlit python-dotenv
+python -m pip install openai langgraph rich streamlit python-dotenv pyyaml
 ```
 
 如果使用项目虚拟环境：
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python -m pip install openai langgraph rich streamlit python-dotenv
+python -m pip install openai langgraph rich streamlit python-dotenv pyyaml
 ```
 
 ## 2. API 与运行配置
@@ -80,6 +80,29 @@ OFFLINE_MODE=true
 ```text
 CODE_RUN_TIMEOUT=10
 ```
+
+### 自定义 AI 模块配置
+
+项目会读取 `config/agents.yaml`，并在 LangGraph 流程结束前运行 `enabled=true` 的插件。
+
+默认配置：
+
+```yaml
+plugins:
+  - module: plugins.doc_agent
+    class: DocAgent
+    enabled: true
+  - module: plugins.security_agent
+    class: SecurityAgent
+    enabled: true
+```
+
+- `DocAgent`：根据最终代码生成项目说明文档。
+- `SecurityAgent`：检查生成代码中是否包含危险操作。
+
+关闭插件时，将对应插件的 `enabled` 改成 `false`。
+
+新增插件时，在 `plugins/` 目录新建文件，继承 `BasePluginAgent` 并实现 `run(state)` 方法，再把模块名和类名加入 `config/agents.yaml`。
 
 ## 3. 一键启动
 
@@ -141,6 +164,7 @@ Web UI 支持：
 - 演示案例选择
 - Agent 状态卡片
 - 工作流展示
+- 自定义 AI 模块展示
 - stdout / error_log
 - Markdown 报告
 

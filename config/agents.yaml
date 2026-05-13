@@ -1,0 +1,7 @@
+plugins:
+  - module: plugins.doc_agent
+    class: DocAgent
+    enabled: true
+  - module: plugins.security_agent
+    class: SecurityAgent
+    enabled: true

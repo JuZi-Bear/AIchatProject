@@ -226,6 +226,14 @@ def render_sidebar():
 
 def build_markdown_report(state):
     success_text = "成功" if state["success"] else "失败"
+    plugin_results = state.get("plugin_results", [])
+    plugin_report = "\n\n".join(
+        f"### {item.get('name', 'Plugin')}\n\n"
+        f"- 状态：{item.get('status', 'unknown')}\n"
+        f"- 说明：{item.get('description', '')}\n\n"
+        f"{item.get('content', '无内容')}"
+        for item in plugin_results
+    )
 
     return f"""# AI Multi-Agent Pipeline 运行报告
 
@@ -255,6 +263,10 @@ def build_markdown_report(state):
 ## Sentry Agent
 
 {state["sentry_result"]}
+
+## 自定义 AI 模块
+
+{plugin_report or "未启用自定义 AI 模块"}
 
 ## stdout
 
@@ -297,6 +309,20 @@ def render_report(report):
         file_name="ai_pipeline_report.md",
         mime="text/markdown",
     )
+
+
+def render_plugin_results(plugin_results):
+    if not plugin_results:
+        st.info("未启用自定义 AI 模块。")
+        return
+
+    for result in plugin_results:
+        status = result.get("status", "unknown")
+        title = f"{result.get('name', 'Plugin')} · {status}"
+        with st.container(border=True):
+            st.markdown(f"**{title}**")
+            st.caption(result.get("description", ""))
+            st.markdown(result.get("content", "无内容"))
 
 
 def main():
@@ -344,8 +370,8 @@ def main():
     with result_box:
         result_placeholder = st.empty()
 
-    tab_product, tab_coder, tab_tester, tab_sentry, tab_report = st.tabs(
-        ["Product Agent", "Coder Agent", "Tester Agent", "Sentry Agent", "Markdown 报告"]
+    tab_product, tab_coder, tab_tester, tab_sentry, tab_plugins, tab_report = st.tabs(
+        ["Product Agent", "Coder Agent", "Tester Agent", "Sentry Agent", "自定义 AI 模块", "Markdown 报告"]
     )
 
     with tab_product:
@@ -359,6 +385,9 @@ def main():
 
     with tab_sentry:
         sentry_placeholder = st.empty()
+
+    with tab_plugins:
+        plugin_placeholder = st.empty()
 
     with tab_report:
         report_placeholder = st.empty()
@@ -405,6 +434,10 @@ def main():
             with result_placeholder.container():
                 show_result_panel(state)
 
+        if node_name == "plugin_node":
+            with plugin_placeholder.container():
+                render_plugin_results(state.get("plugin_results", []))
+
     with st.spinner("LangGraph 正在运行..."):
         state = run_graph_demo(requirement.strip(), progress_callback=on_progress)
 
@@ -416,6 +449,9 @@ def main():
 
     with result_placeholder.container():
         show_result_panel(state)
+
+    with plugin_placeholder.container():
+        render_plugin_results(state.get("plugin_results", []))
 
     with report_placeholder.container():
         render_report(report)
