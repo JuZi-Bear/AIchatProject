@@ -1,4 +1,9 @@
 from typing import TypedDict
+import warnings
+
+from langchain_core._api.deprecation import LangChainPendingDeprecationWarning
+
+warnings.filterwarnings("ignore", category=LangChainPendingDeprecationWarning)
 
 from langgraph.graph import END, START, StateGraph
 
@@ -19,13 +24,11 @@ class AgentState(TypedDict):
 
 
 def product_node(state):
-    print("product_node called")
     state["product_result"] = product_agent(state["requirement"])
     return state
 
 
 def coder_node(state):
-    print("coder_node called")
     if state["error_log"] and not state["success"]:
         state["code"] = coder_agent(
             state["product_result"],
@@ -40,20 +43,17 @@ def coder_node(state):
 
 
 def tester_node(state):
-    print("tester_node called")
     state["tester_result"] = tester_agent(state["code"])
     return state
 
 
 def sentry_node(state):
-    print("sentry_node called")
     state["sentry_result"] = sentry_agent(state["code"], state["error_log"])
     state["retry_count"] = state["retry_count"] + 1
     return state
 
 
 def runner_node(state):
-    print("runner_node called")
     save_code(state["code"])
     run_result = run_code()
     state["stdout"] = run_result["stdout"]
@@ -121,7 +121,4 @@ def run_graph_demo(requirement, progress_callback=None):
     else:
         result = app.invoke(state)
 
-    print("final success:", result["success"])
-    print("final stdout:", result["stdout"])
-    print("final error_log:", result["error_log"])
     return result

@@ -25,7 +25,8 @@ python -m pip install openai langgraph rich streamlit python-dotenv
 如果使用项目虚拟环境：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install openai langgraph rich streamlit python-dotenv
+.\.venv\Scripts\Activate.ps1
+python -m pip install openai langgraph rich streamlit python-dotenv
 ```
 
 ## 2. API 与运行配置
@@ -68,6 +69,8 @@ OFFLINE_MODE=true
 
 开启后系统会使用 `offline_demo.py` 中的预置演示响应，仍然可以展示完整的 Agent 流程和自动修复闭环。
 
+如果没有配置 `DEEPSEEK_API_KEY`，系统也会自动进入离线演示模式，避免比赛现场因为 API Key 缺失而中断。
+
 如果没有开启离线模式，但 DeepSeek API 临时调用失败，系统也会自动使用预置演示响应，避免比赛现场流程中断。
 
 ### 代码运行超时
@@ -90,9 +93,13 @@ start_demo.bat
 
 ```text
 1. Start CLI Demo: python graph_demo.py
-2. Start Web UI: streamlit run webui.py
+2. Start Web UI: python -m streamlit run webui.py
 3. Exit
 ```
+
+`start_demo.bat` 会在项目根目录下优先激活 `.venv` 虚拟环境，然后统一使用 `python` 启动命令，避免直接调用全局 `streamlit` 命令。
+
+如果 `.venv` 是从其他电脑复制过来的，可能会因为 Python 安装路径不同而失效。此时请重新创建虚拟环境并安装依赖。
 
 ## 4. CLI 启动方式
 
@@ -103,7 +110,8 @@ python graph_demo.py
 如果使用虚拟环境：
 
 ```powershell
-.\.venv\Scripts\python.exe graph_demo.py
+.\.venv\Scripts\Activate.ps1
+python graph_demo.py
 ```
 
 启动后选择演示案例：
@@ -118,7 +126,7 @@ python graph_demo.py
 ## 5. Web UI 启动方式
 
 ```powershell
-streamlit run webui.py
+python -m streamlit run webui.py
 ```
 
 浏览器打开：
@@ -239,7 +247,7 @@ CODE_RUN_TIMEOUT=15
 处理：
 
 ```powershell
-streamlit run webui.py --server.port 8502
+python -m streamlit run webui.py --server.port 8502
 ```
 
 ### Web UI 没有自动打开浏览器

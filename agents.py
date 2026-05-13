@@ -23,6 +23,10 @@ def is_offline_mode():
     return get_config("OFFLINE_MODE", "false").lower() in ("1", "true", "yes", "on")
 
 
+def should_use_offline_demo():
+    return is_offline_mode() or not get_config("DEEPSEEK_API_KEY")
+
+
 def create_deepseek_client():
     """Create a DeepSeek client with the OpenAI-compatible API."""
     api_key = get_config("DEEPSEEK_API_KEY")
@@ -68,7 +72,7 @@ def product_agent(requirement):
 3. 开发步骤
 """
 
-    if is_offline_mode():
+    if should_use_offline_demo():
         return product_demo(requirement)
 
     try:
@@ -119,7 +123,7 @@ Sentry Agent 的分析和修复建议：
 3. 只输出 Python 代码，不要使用 Markdown 代码块，不要解释
 """
 
-    if is_offline_mode():
+    if should_use_offline_demo():
         return coder_demo(product_plan, error_log)
 
     try:
@@ -153,7 +157,7 @@ def sentry_agent(code, error_log):
 本项目的代码会被自动运行，不能依赖人工在终端输入。
 """
 
-    if is_offline_mode():
+    if should_use_offline_demo():
         return sentry_demo(error_log)
 
     try:
@@ -181,7 +185,7 @@ def tester_agent(code):
 5. 检查结论：通过 / 需要修改
 """
 
-    if is_offline_mode():
+    if should_use_offline_demo():
         return tester_demo(code)
 
     try:
