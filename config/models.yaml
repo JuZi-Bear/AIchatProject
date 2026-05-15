@@ -1,0 +1,21 @@
+models:
+  - name: DeepSeek
+    provider: deepseek
+    model: deepseek-chat
+    base_url: https://api.deepseek.com
+    env_key: DEEPSEEK_API_KEY
+    enabled: true
+
+  - name: Qwen
+    provider: qwen
+    model: qwen-plus
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    env_key: QWEN_API_KEY
+    enabled: false
+
+  - name: GLM
+    provider: zhipu
+    model: glm-4-flash
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    env_key: GLM_API_KEY
+    enabled: false

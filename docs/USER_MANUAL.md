@@ -124,11 +124,17 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ## 6. 安装项目依赖
 
-在项目目录执行：
+推荐直接运行自动安装脚本：
+
+```powershell
+.\install.bat
+```
+
+也可以手动安装：
 
 ```powershell
 python -m pip install --upgrade pip
-python -m pip install openai langgraph rich streamlit python-dotenv
+python -m pip install -r requirements.txt
 ```
 
 如果网络较慢，可以多执行一次安装命令。
@@ -136,7 +142,7 @@ python -m pip install openai langgraph rich streamlit python-dotenv
 安装后检查核心依赖：
 
 ```powershell
-python -c "import openai, langgraph, rich, streamlit, dotenv; print('依赖安装成功')"
+python -c "import openai, langchain, langgraph, rich, streamlit, dotenv, yaml; print('依赖安装成功')"
 ```
 
 ## 7. 配置环境变量
@@ -150,11 +156,10 @@ copy .env.example .env
 打开 `.env`，填写配置：
 
 ```text
-DEEPSEEK_API_KEY=你的 DeepSeek API Key
+DEEPSEEK_API_KEY=your_deepseek_api_key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 OFFLINE_MODE=false
-CODE_RUN_TIMEOUT=10
 ```
 
 字段说明：
@@ -163,7 +168,12 @@ CODE_RUN_TIMEOUT=10
 - `DEEPSEEK_BASE_URL`：DeepSeek API 地址，默认 `https://api.deepseek.com`。
 - `DEEPSEEK_MODEL`：模型名称，默认 `deepseek-chat`。
 - `OFFLINE_MODE`：是否启用离线演示模式。
-- `CODE_RUN_TIMEOUT`：生成代码的最长运行时间，单位是秒。
+
+如需调整代码运行超时时间，可以额外加入：
+
+```text
+CODE_RUN_TIMEOUT=10
+```
 
 ## 8. 在线模式与离线模式
 
@@ -223,7 +233,7 @@ python graph_demo.py
 本机访问：
 
 ```powershell
-streamlit run webui.py
+python -m streamlit run webui.py
 ```
 
 浏览器打开：
@@ -250,7 +260,7 @@ Web UI 支持：
 在演示电脑执行：
 
 ```powershell
-streamlit run webui.py --server.address 0.0.0.0 --server.port 8501
+python -m streamlit run webui.py --server.address 0.0.0.0 --server.port 8501
 ```
 
 ### 11.2 查询演示电脑 IP
@@ -294,7 +304,7 @@ http://192.168.1.23:8501
 
 ```text
 1. Start CLI Demo: python graph_demo.py
-2. Start Web UI: streamlit run webui.py
+2. Start Web UI: python -m streamlit run webui.py
 3. Exit
 ```
 
@@ -346,7 +356,7 @@ output/web_report.md
 - [ ] `python graph_demo.py` 可以启动 CLI 菜单。
 - [ ] 简单成功案例可以运行完成。
 - [ ] 翻车修复案例可以触发自动修复。
-- [ ] `streamlit run webui.py` 可以打开 Web UI。
+- [ ] `python -m streamlit run webui.py` 可以打开 Web UI。
 - [ ] 局域网访问地址可以在另一台设备打开。
 
 ## 16. 常见问题
@@ -372,6 +382,12 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 python -m pip install streamlit
 ```
 
+或者直接重新安装全部依赖：
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
 ### No module named dotenv
 
 执行：
@@ -395,7 +411,7 @@ OFFLINE_MODE=true
 换一个端口启动：
 
 ```powershell
-streamlit run webui.py --server.port 8502
+python -m streamlit run webui.py --server.port 8502
 ```
 
 ### 其他设备打不开 Web UI
@@ -405,7 +421,7 @@ streamlit run webui.py --server.port 8502
 推荐启动方式：
 
 ```powershell
-streamlit run webui.py --server.address 0.0.0.0 --server.port 8501
+python -m streamlit run webui.py --server.address 0.0.0.0 --server.port 8501
 ```
 
 ## 17. 比赛现场推荐流程
@@ -414,8 +430,7 @@ streamlit run webui.py --server.address 0.0.0.0 --server.port 8501
 2. 进入项目目录，激活虚拟环境。
 3. 检查 `.env` 配置。
 4. 先运行 `python graph_demo.py` 测试 CLI。
-5. 再运行 `streamlit run webui.py` 测试 Web UI。
+5. 再运行 `python -m streamlit run webui.py` 测试 Web UI。
 6. 如果网络不稳定，立刻开启 `OFFLINE_MODE=true`。
 7. 演示时先跑简单案例，再跑翻车修复案例。
 8. 最后展示 Web UI、Markdown 报告和答辩材料。
-

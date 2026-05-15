@@ -1,0 +1,8 @@
+max_retry_count: 3
+offline_mode: false
+require_human_approval: true
+default_model_provider: deepseek
+demo_mode: true
+save_reports: true
+save_runs: true
+

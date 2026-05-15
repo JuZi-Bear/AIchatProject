@@ -6,6 +6,7 @@ from rich.syntax import Syntax
 from agents import coder_agent, product_agent, sentry_agent, tester_agent
 from demo_cases import DEMO_CASES
 from utils.code_runner import run_code, save_code
+from utils.error_utils import summarize_error
 
 
 MAX_FIX_TIMES = 3
@@ -20,12 +21,7 @@ def clean_input(text):
 
 def get_error_summary(stderr):
     """Return the first useful line from stderr."""
-    lines = stderr.strip().splitlines()
-
-    if not lines:
-        return "没有 stderr，可能是运行超时或未知错误。"
-
-    return lines[-1]
+    return summarize_error(stderr)
 
 
 def show_stage(title, style):

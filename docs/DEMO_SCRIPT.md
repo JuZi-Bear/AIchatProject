@@ -4,7 +4,7 @@
 
 本项目演示一个 AI 多智能体自动开发流水线：
 
-用户需求 → Product Agent → Coder Agent → Tester Agent → Code Runner → Sentry Agent → 自动修复
+用户需求 → Product Agent → Coder Agent → Tester Agent 生成 pytest → 人工审批 → Code Runner → Sentry Agent → 自动修复
 
 运行命令：
 
@@ -28,6 +28,7 @@ LangGraph 演示会在最终结果里重点展示：
 - 修复次数
 - 最终 stdout
 - 最终 error_log
+- pytest 是否通过
 
 ## 案例 1：简单成功案例
 
@@ -41,7 +42,7 @@ LangGraph 演示会在最终结果里重点展示：
 
 1. Product Agent 将需求拆成一个最小任务：打印 `hello world`。
 2. Coder Agent 生成一行 Python 代码。
-3. Tester Agent 静态检查代码，确认没有明显语法和逻辑问题。
+3. Tester Agent 生成 pytest 测试，并验证脚本可以正常运行。
 4. Code Runner 保存代码到 `output/generated_code.py`。
 5. Code Runner 运行代码并输出 `hello world`。
 
@@ -57,7 +58,7 @@ LangGraph 演示会在最终结果里重点展示：
 
 - 蓝色 Product Agent 面板展示需求拆解。
 - 绿色 Coder Agent 面板展示生成代码。
-- 黄色 Tester Agent 面板展示静态检查。
+- 黄色 Tester Agent 面板展示 pytest 测试结果。
 - 最终显示绿色 `✅ 运行成功`。
 
 ## 案例 2：第一次失败但可自动修复案例
@@ -72,7 +73,7 @@ LangGraph 演示会在最终结果里重点展示：
 
 1. Product Agent 拆解为“读取姓名”和“打印问候语”。
 2. Coder Agent 可能生成包含 `input()` 的代码。
-3. Tester Agent 静态检查通常认为代码语法没问题。
+3. Tester Agent 生成 pytest 测试，先检查脚本是否能在测试环境中运行。
 4. Code Runner 自动运行时没有人工输入，容易触发 `EOFError`。
 5. Sentry Agent 分析 `stderr`，指出 `input()` 在非交互环境中读取失败。
 6. Coder Agent 根据错误日志修复代码，例如用 `try-except EOFError` 设置默认姓名。
@@ -111,7 +112,7 @@ Sentry Agent 会建议：
 
 1. Product Agent 将需求拆成数据准备、统计计算、结果输出几个部分。
 2. Coder Agent 生成包含函数的 Python 程序。
-3. Tester Agent 检查函数、变量、入口调用和基础逻辑。
+3. Tester Agent 生成 pytest 测试，覆盖核心统计逻辑和边界情况。
 4. Code Runner 保存并运行代码。
 5. 程序输出平均分、最高分学生、最低分学生和及格人数。
 
@@ -141,6 +142,81 @@ Sentry Agent 会建议：
 - 展示 Tester Agent 对入口函数和逻辑的检查。
 - 展示 Code Runner 自动保存和运行真实 Python 文件。
 - 如果触发错误，可以继续展示 Sentry Agent 自动修复闭环。
+
+## 附加案例：测试驱动修复案例
+
+### 用户输入需求
+
+```text
+写一个函数 get_second_largest(nums)，返回列表中第二大的不同数字。要求处理空列表、单元素列表、重复数字和负数。
+```
+
+### 预期系统流程
+
+1. Product Agent 将需求拆成函数输入、返回值和边界情况。
+2. Coder Agent 可能先生成一个简单实现，例如直接取排序后的倒数第二个元素。
+3. Tester Agent 自动生成 pytest 测试，覆盖正常输入、重复数字、负数、空列表和单元素列表。
+4. pytest 发现代码没有处理“不同数字”或空列表等边界条件。
+5. Sentry Agent 分析 pytest stdout / stderr，判断这是代码逻辑问题或边界条件没处理。
+6. Coder Agent 修复业务代码，例如先用 `set(nums)` 去重，再判断长度是否足够。
+7. pytest 和 Runner 都通过后，流程进入插件和报告阶段。
+
+### 可能出现的错误
+
+```text
+IndexError: list index out of range
+AssertionError
+```
+
+### Sentry Agent 如何修复
+
+Sentry Agent 会指出：
+
+- 不能直接用 `sorted(nums)[-2]`
+- 需要先去重，才能得到第二大的不同数字
+- 空列表或单元素列表没有第二大数字，应返回 `None`
+- 负数也要按正常大小顺序处理
+
+### 最终展示亮点
+
+- 展示 Tester Agent 不只是静态检查，而是会自动生成 pytest。
+- 展示系统可以用测试失败驱动 Coder Agent 修复逻辑问题。
+- 展示最终成功条件是 Runner 成功并且 `test_success=True`。
+
+## Web UI 演示模式讲解重点
+
+比赛现场建议优先使用 Web UI 的“演示模式”。
+
+演示模式会隐藏完整 prompt、完整 state、过长 stderr 和冗长代码分析，只展示关键摘要：
+
+- 用户输入需求
+- 当前执行 Agent
+- Agent 工作流进度
+- 是否发生错误
+- pytest 是否通过
+- Sentry Agent 如何分析错误
+- Coder Agent 如何修复
+- 最终是否成功
+- 修复次数
+- 报告是否生成
+
+当触发自动修复时，页面会出现“自动修复高光时刻”区域。讲解时可以按这个顺序说：
+
+```text
+第一步，Runner 第一次运行失败。
+第二步，系统提取错误摘要。
+第三步，Sentry Agent 分析 stderr，定位问题原因。
+第四步，Coder Agent 根据错误建议重新生成代码。
+第五步，Runner 再次运行，最终成功。
+```
+
+如果没有触发修复，可以强调：
+
+```text
+本次任务一次运行成功，说明多 Agent 流水线也支持最短成功路径。
+```
+
+页面底部的“讲解提示”会根据当前运行结果自动生成答辩话术，可以在演示时作为提词器使用。
 
 ## 现场演示建议
 
@@ -247,11 +323,12 @@ stdout: hello 默认用户
 
 Web UI 中可以看到：
 
-- 左侧项目简介和技术栈
-- 中间 Agent Workflow 流程图
-- Product、Coder、Tester、Sentry 状态卡片
-- stdout 和 error_log 运行结果
-- 自动生成的 Markdown 报告
+- 左侧控制栏：案例选择、需求输入、最大修复次数、插件开关和运行确认。
+- 右侧状态摘要：当前模型、运行状态、success、retry_count 和 enabled_plugins。
+- Agent Workflow：Requirement、Product、Coder、Tester、Runner、Sentry、Plugins、Report。
+- 自动修复高光时刻：集中展示第一次失败、Sentry 分析、Coder 修复和再次运行结果。
+- 结果总结卡片：成功/失败、修复次数、生成代码文件、安全检查、文档生成状态和报告文件名。
+- 自动生成的 Markdown 报告。
 
 这部分是为了让比赛现场的评委更直观地看到每个 Agent 做了什么，而不是只看终端输出。
 
@@ -265,6 +342,6 @@ Web UI 中可以看到：
 
 第三，实现了从需求到代码、从失败到修复、从运行到报告的完整闭环。
 
-未来我们还可以继续扩展 pytest 测试生成、多文件项目生成、Figma 到前端页面生成，让它变成一个更完整的 AI 软件工厂原型。
+未来我们还可以继续扩展测试覆盖率统计、多文件项目生成、Figma 到前端页面生成，让它变成一个更完整的 AI 软件工厂原型。
 
 谢谢各位老师。

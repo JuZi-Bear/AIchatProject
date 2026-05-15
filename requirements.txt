@@ -1,0 +1,9 @@
+openai
+langchain
+langgraph
+rich
+streamlit
+python-dotenv
+pytest
+pyyaml
+coverage

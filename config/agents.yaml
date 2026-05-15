@@ -1,7 +1,9 @@
 plugins:
-  - module: plugins.doc_agent
-    class: DocAgent
+  - name: doc_agent
     enabled: true
-  - module: plugins.security_agent
-    class: SecurityAgent
+  - name: security_agent
+    enabled: true
+  - name: refactor_agent
+    enabled: true
+  - name: ui_agent
     enabled: true

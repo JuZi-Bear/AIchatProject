@@ -1,275 +1,401 @@
 # AI Multi-Agent Pipeline
 
-基于 DeepSeek API 的多智能体自动开发流水线演示项目。
+## 项目简介
 
-## 当前流程
+一个面向比赛演示的多智能体自动开发流水线项目。用户输入自然语言需求后，系统会完成需求拆解、代码生成、pytest 自动测试、代码运行、错误分析、自动修复、插件扩展、质量评分和 Markdown 报告生成。
 
-用户输入需求后，程序会依次执行：
+项目默认支持 DeepSeek，也支持通义千问 Qwen 和智谱 GLM。Web UI 适合比赛现场展示，CLI 适合快速验证和调试。
 
-1. Product Agent：拆解需求
-2. Coder Agent：生成 Python 代码
-3. Tester Agent：静态检查代码
-4. Code Runner：保存并运行代码
-5. Sentry Agent：分析运行错误
-6. Coder Agent：根据错误自动修复，最多 3 次
-7. 自定义 AI 模块：在流程结束前执行插件 Agent
+## 项目亮点
 
-## 安装依赖
+- 国产大模型驱动：支持 DeepSeek、Qwen、GLM。
+- 多 Agent 协作：Product、Coder、Tester、Sentry、Quality 分工明确。
+- LangGraph 状态机：支持条件分支、自动修复循环和人工审批。
+- 测试驱动修复：自动生成 pytest 测试，用测试失败结果驱动修复。
+- Human-in-the-loop：运行 AI 生成代码前需要人工确认。
+- 插件式 AI 模块：Doc、Security、Refactor、UI Agent 可配置启用。
+- 多模型对比：同一需求下对比多个模型的成功率、修复次数、覆盖率和质量评分。
+- 质量评分：从运行、测试、覆盖率、安全和修复次数给出 100 分评价。
+- Web UI 可视化：展示 Agent 工作流、修复过程、插件结果、历史记录和报告。
+- Docker 部署：降低新设备环境差异导致的演示风险。
 
-如果还没有安装 `rich`、`streamlit` 或 `python-dotenv`，请执行：
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install rich streamlit python-dotenv pyyaml
-```
-
-如果 OpenAI SDK 也没有安装，请执行：
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install openai langgraph rich streamlit python-dotenv pyyaml
-```
-
-## 配置 DeepSeek
-
-项目使用 `python-dotenv` 读取项目根目录的 `.env` 文件，也支持直接读取系统环境变量。可以参考 `.env.example` 创建自己的 `.env`：
+## 技术架构
 
 ```text
-DEEPSEEK_API_KEY=你的 DeepSeek API Key
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
-OFFLINE_MODE=false
-CODE_RUN_TIMEOUT=10
+用户需求
+  ↓
+Product Agent：需求拆解
+  ↓
+Coder Agent：代码生成 / 修复
+  ↓
+Tester Agent：生成 pytest 并运行测试
+  ↓
+Approval Node：人工审批
+  ↓
+Runner：保存并运行代码
+  ↓
+条件判断
+  ├─ 成功：Plugins → Quality → Report
+  └─ 失败：Sentry Agent → Coder Agent，最多自动修复 N 次
 ```
 
-`.env` 已加入 `.gitignore`，不要把真实 key 提交到 Git。
+核心状态由 LangGraph 管理，最终写入 `runs/{run_id}.json`，同时生成 Markdown 报告到 `reports/`。
 
-如果比赛现场网络不稳定，或者 API Key 临时不可用，可以开启离线演示模式：
+## 核心功能
+
+- 根据自然语言需求生成 Python 代码。
+- 自动保存代码到 `output/generated_code.py`。
+- 自动生成测试文件 `tests/test_generated_code.py`。
+- 使用 pytest + coverage 验证代码正确性和覆盖率。
+- 捕获 stdout、stderr、returncode。
+- 失败后由 Sentry Agent 分析错误并触发 Coder Agent 修复。
+- 支持最大修复次数配置，默认 3 次。
+- 支持危险代码检查，拦截 `os.remove`、`shutil.rmtree`、`subprocess`、`eval`、`exec`。
+- 支持插件系统、运行历史、报告生成和模型对比。
+
+## 快速启动
+
+Windows 推荐使用一键安装脚本：
+
+```powershell
+cd D:\AIchatProject
+.\install.bat
+```
+
+复制环境变量模板：
+
+```powershell
+copy .env.example .env
+```
+
+填写至少一个模型 API Key，例如：
+
+```text
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEFAULT_MODEL_PROVIDER=deepseek
+OFFLINE_MODE=false
+```
+
+启动 Web UI：
+
+```powershell
+python -m streamlit run webui.py
+```
+
+浏览器访问：
+
+```text
+http://localhost:8501
+```
+
+如果比赛现场网络不稳定，可以设置：
 
 ```text
 OFFLINE_MODE=true
 ```
 
-开启后系统会使用 `offline_demo.py` 中的预置响应，CLI 和 Web UI 仍然可以继续展示 Product、Coder、Tester、Sentry 和自动修复流程。
+系统会使用预置响应继续演示流程。
 
-即使没有手动开启离线模式，只要 DeepSeek API 调用失败，系统也会自动切换到预置演示响应，保证比赛现场不中断。
+## 本地运行方式
 
-## 安全兜底
-
-`Code Runner` 在执行生成代码前会做轻量安全检查，发现以下危险操作会直接拦截：
-
-- `os.remove`
-- `shutil.rmtree`
-- `subprocess`
-- `eval`
-- `exec`
-
-代码运行超时时间由 `CODE_RUN_TIMEOUT` 控制，默认 10 秒。
-
-## 自定义 AI 模块
-
-项目支持通过 `plugins/` 目录扩展自定义 Agent。默认包含两个插件：
-
-- `DocAgent`：根据最终代码生成项目说明文档。
-- `SecurityAgent`：检查生成代码中是否包含危险操作。
-
-插件开关由 `config/agents.yaml` 控制：
-
-```yaml
-plugins:
-  - module: plugins.doc_agent
-    class: DocAgent
-    enabled: true
-  - module: plugins.security_agent
-    class: SecurityAgent
-    enabled: true
-```
-
-如果要关闭某个模块，把 `enabled` 改成 `false` 即可。
-
-新增插件时，可以继承 `plugins/base_plugin.py` 中的 `BasePluginAgent`：
-
-```python
-from plugins.base_plugin import BasePluginAgent
-
-
-class MyAgent(BasePluginAgent):
-    name = "MyAgent"
-    description = "我的自定义模块"
-
-    def run(self, state):
-        return {
-            "name": self.name,
-            "description": self.description,
-            "status": "success",
-            "content": "插件输出内容",
-        }
-```
-
-然后把插件模块和类名加入 `config/agents.yaml`。LangGraph 会在流程结束前自动运行 `enabled=true` 的插件，Web UI 会在“自定义 AI 模块”页签展示结果。
-
-## 运行
-
-一键启动入口（Windows）：
+手动安装依赖：
 
 ```powershell
 cd D:\AIchatProject
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+一键启动菜单：
+
+```powershell
 .\start_demo.bat
 ```
 
-启动后可选择：
+可选择：
 
 ```text
-1. Start CLI Demo: python graph_demo.py
-2. Start Web UI: streamlit run webui.py
-3. Exit
+1. CLI 演示
+2. Web UI
+3. 退出
 ```
 
-原有 CLI 演示入口：
+## Docker 运行方式
+
+先准备 `.env`：
 
 ```powershell
-cd D:\AIchatProject
-.\.venv\Scripts\python.exe main.py
+copy .env.example .env
 ```
 
-启动后会出现演示菜单：
-
-```text
-1. 简单案例
-2. 翻车修复案例
-3. 综合案例
-4. 自定义输入
-```
-
-LangGraph 演示入口：
+启动容器：
 
 ```powershell
-cd D:\AIchatProject
-.\.venv\Scripts\python.exe graph_demo.py
+docker compose up --build
 ```
 
-`graph_demo.py` 也会显示演示菜单：
+访问：
 
 ```text
-1. 简单成功案例
-2. 翻车修复案例
-3. 综合案例
-4. 自定义输入
+http://localhost:8501
 ```
 
-LangGraph 演示会优先展示最终状态摘要：
-
-- 是否成功
-- 修复次数
-- 最终 stdout
-- 最终 error_log
-
-Streamlit Web UI：
+停止：
 
 ```powershell
-cd D:\AIchatProject
-streamlit run webui.py
+docker compose down
 ```
 
-Web UI 包含需求输入、演示案例选择、Agent 执行过程、最终运行结果和 Markdown 报告查看。
+Docker 服务名为 `ai-agent-pipeline`，并挂载：
 
-Web UI 截图占位：
+- `reports/`
+- `runs/`
+- `output/`
+
+## Web UI 使用方式
+
+启动：
+
+```powershell
+python -m streamlit run webui.py
+```
+
+左侧控制栏包含：
+
+- 演示案例选择
+- 自定义需求输入
+- 最大修复次数设置
+- 演示模式 / 开发模式切换
+- DeepSeek / Qwen / GLM 模型选择
+- 多模型对比模式
+- 插件开关
+- 人工审批 checkbox
+- 开始运行和清空结果按钮
+
+右侧展示区包含：
+
+- 当前模型、运行状态、success、retry_count、enabled_plugins 状态卡片
+- Requirement、Product、Coder、Tester、Approval、Runner、Sentry、Plugins、Quality、Report 工作流节点
+- Product / Coder / Tester / Sentry / Plugins / 模型对比 / Final State Tabs
+- pytest 测试结果和 coverage 覆盖率
+- 质量评分
+- stdout / stderr 折叠日志
+- 运行报告和历史记录
+
+演示模式会隐藏完整 prompt、完整 state 和过长错误栈，只保留关键摘要；开发模式显示完整调试信息。
+
+## CLI 使用方式
+
+LangGraph CLI：
+
+```powershell
+python graph_demo.py
+```
+
+可选择：
+
+- 单模型运行
+- 多模型对比运行
+- 简单成功案例
+- 翻车修复案例
+- 综合案例
+- 自定义输入
+
+早期兼容入口仍保留：
+
+```powershell
+python main.py
+```
+
+## 插件系统说明
+
+插件配置文件：
 
 ```text
-docs/assets/webui-dashboard.png
+config/agents.yaml
 ```
 
-建议比赛前截取 Streamlit 首页、Agent 工作流和最终结果面板，放到上面的路径。
+默认插件：
 
-## 演示案例
+- Doc Agent：生成 README 风格说明，写入 `doc_result`。
+- Security Agent：检查危险操作，写入 `security_result`。
+- Refactor Agent：分析代码结构和可读性，写入 `refactor_result`。
+- UI Agent：生成页面布局和交互建议，写入 `ui_result`。
 
-普通成功案例：
+插件统一结果写入：
 
 ```text
-做一个简单 Python 程序，运行后直接打印 hello world，不需要用户输入
+state["plugin_results"]
 ```
 
-自动修复案例：
+统一结构：
 
 ```text
-写一个简单 Python 程序，必须调用 input 读取用户姓名，然后打印 hello 加姓名
+plugin_name
+status: success / warning / failed / disabled
+summary
+detail
 ```
 
-这个案例在自动运行时容易触发 `EOFError`，适合展示：
-
-- 第一次运行失败
-- Sentry Agent 分析错误
-- Coder Agent 自动修复
-- 再次运行成功
-
-综合案例：
+开发新插件可参考：
 
 ```text
-写一个学生成绩统计程序。程序内置 5 个学生的姓名和分数，不需要用户输入。运行后输出平均分、最高分学生、最低分学生、及格人数，并用函数组织代码。
+plugins/plugin_template.py
+docs/PLUGIN_GUIDE.md
 ```
 
-完整比赛讲稿见：
+## 多模型切换说明
+
+模型配置文件：
 
 ```text
-docs/DEMO_SCRIPT.md
+config/models.yaml
 ```
 
-## 输出效果
+支持模型：
 
-CLI 使用 `rich` 展示不同 Agent 的状态：
+- DeepSeek：`deepseek-chat`
+- Qwen：`qwen-plus`
+- GLM：`glm-4-flash`
 
-- Product Agent：蓝色
-- Coder Agent：绿色
-- Tester Agent：黄色
-- Sentry Agent：红色
-
-最终运行结果会显示：
-
-- 成功：绿色 ✅
-- 失败：红色 ❌
-
-## Figma 协作
-
-本项目已准备 Figma 协作说明和 UI 设计规格：
+环境变量：
 
 ```text
-figma/design_link.md
-docs/UI_SPEC.md
+DEEPSEEK_API_KEY=your_deepseek_api_key
+QWEN_API_KEY=your_qwen_api_key
+GLM_API_KEY=your_glm_api_key
+DEFAULT_MODEL_PROVIDER=deepseek
 ```
 
-当前只完成设计文档，不包含前端代码。
-
-建议在 Figma 中设计 4 个核心页面：
-
-- 首页：项目介绍与开始按钮
-- Agent 工作流页：展示 Product、Coder、Tester、Sentry 节点
-- 运行日志页：展示 stdout、stderr、修复次数
-- 报告页：展示 Markdown 报告列表
-
-## 答辩材料
-
-比赛答辩材料已整理在：
+Web UI 可以在侧边栏选择模型。多模型对比会为每个模型独立运行完整流程，并生成对比报告：
 
 ```text
-docs/PRESENTATION_OUTLINE.md
-docs/SCORE_POINTS.md
-docs/DEFENSE_QA.md
+reports/report_compare_{run_id}.md
 ```
 
-建议答辩时按以下顺序准备：
+## 自动测试与质量评分说明
 
-1. 先讲 `PRESENTATION_OUTLINE.md` 中的项目背景、架构和演示流程。
-2. 再用 `SCORE_POINTS.md` 对齐评分点。
-3. 最后用 `DEFENSE_QA.md` 准备评委追问。
+Tester Agent 会根据需求和代码生成 pytest 测试，并运行：
 
-## 操作指南
+```powershell
+python -m coverage run -m pytest tests/test_generated_code.py -q
+python -m coverage report
+```
 
-比赛现场操作说明见：
+最终成功需要同时满足：
+
+- Runner 运行成功。
+- pytest 测试通过。
+
+Quality Node 使用 100 分制评分：
+
+- pytest 通过：30 分
+- 程序运行成功：20 分
+- 覆盖率：最高 20 分
+- 安全检查通过：15 分
+- 自动修复次数：最高 15 分
+
+评分结果保存为：
+
+- `coverage_percent`
+- `quality_score`
+- `quality_summary`
+
+## 自动修复闭环说明
+
+当 Runner 或 pytest 失败时：
+
+1. Sentry Agent 读取代码、stderr、pytest 输出和测试代码。
+2. Sentry Agent 输出错误原因和修复建议。
+3. Coder Agent 根据需求、原始代码、错误日志和 Sentry 建议修复代码。
+4. 系统重新保存、测试并运行。
+5. 达到最大修复次数后仍失败，则停止并生成最终报告。
+
+最大修复次数配置在：
 
 ```text
-docs/OPERATION_GUIDE.md
+config/settings.yaml
 ```
 
-完整用户操作手册和跨设备部署步骤见：
+## 目录结构
 
 ```text
-docs/USER_MANUAL.md
+core/                 LangGraph 核心状态和工作流
+agents.py             Product / Coder / Tester / Sentry Agent
+plugins/              自定义 AI 插件模块
+utils/                代码运行、测试、报告、摘要和历史工具
+config/               模型、插件和默认运行配置
+docs/                 操作手册、答辩材料、设计文档
+reports/              Markdown 运行报告
+runs/                 每次运行的完整 state JSON
+output/               生成代码和兼容输出
+tests/                自动生成的 pytest 测试
+graph_demo.py         CLI 演示入口
+webui.py              Streamlit Web UI
+Dockerfile            Docker 镜像配置
+docker-compose.yml    Docker Compose 启动配置
+requirements.txt      Python 依赖
+.env.example          环境变量模板
 ```
+
+完整提交结构见：
+
+```text
+docs/DELIVERY_STRUCTURE.md
+```
+
+## 答辩与交付材料
+
+- `docs/PRESENTATION_OUTLINE.md`：答辩大纲。
+- `docs/DEFENSE_QA.md`：评委问答。
+- `docs/DEMO_FLOW.md`：比赛现场演示流程。
+- `docs/FINAL_CHECKLIST.md`：交付前检查清单。
+- `docs/INNOVATION_POINTS.md`：创新点总结。
+- `docs/RISK_AND_SOLUTION.md`：风险与解决方案。
+- `docs/TECH_STACK.md`：技术栈说明。
+- `docs/OPERATION_GUIDE.md`：部署和操作指南。
+- `docs/USER_MANUAL.md`：跨设备部署手册。
+
+## 常见问题
+
+### 1. 没有 API Key 能演示吗？
+
+可以。设置 `OFFLINE_MODE=true` 后，系统会使用预置响应完成演示流程。
+
+### 2. Web UI 打不开怎么办？
+
+确认命令是否正在运行：
+
+```powershell
+python -m streamlit run webui.py
+```
+
+再访问 `http://localhost:8501`。如果端口被占用，可以关闭占用进程或修改启动端口。
+
+### 3. 为什么必须勾选人工审批？
+
+因为系统会运行 AI 生成的 Python 代码。人工审批用于防止未经确认就执行潜在危险代码。
+
+### 4. 自动修复一定成功吗？
+
+不保证。系统默认最多修复 3 次，仍失败会停止并生成报告，方便人工接管。
+
+### 5. 生成代码安全吗？
+
+系统在运行前会拦截危险关键词，并通过 Security Agent 再做一次安全检查。但比赛项目仍建议只运行单文件、低风险 Python 示例。
+
+### 6. Docker 和本地启动选哪个？
+
+比赛现场推荐优先使用本地已验证环境；新设备部署或环境不稳定时使用 Docker 更稳。
+
+### 7. 报告和历史记录在哪里？
+
+- 报告：`reports/`
+- 运行状态：`runs/`
+- 生成代码：`output/generated_code.py`
+
+### 8. 如何新增插件？
+
+复制 `plugins/plugin_template.py`，实现 `run(state)`，在 `plugin_loader.py` 注册，并在 `config/agents.yaml` 启用。

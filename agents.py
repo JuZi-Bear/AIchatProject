@@ -1,53 +1,53 @@
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
-from openai import OpenAI
-
-from offline_demo import coder_demo, product_demo, sentry_demo, tester_demo
-
-
-PROJECT_ROOT = Path(__file__).resolve().parent
-
-load_dotenv(PROJECT_ROOT / ".env")
-
-DEFAULT_BASE_URL = "https://api.deepseek.com"
-DEFAULT_MODEL = "deepseek-chat"
+from offline_demo import coder_demo, product_demo, pytest_demo, sentry_demo, tester_demo
+from model_manager import (
+    DEFAULT_PROVIDER,
+    get_config,
+    get_current_model_info,
+    get_llm_client,
+    is_offline_mode,
+)
 
 
-def get_config(name, default=""):
-    return os.getenv(name, default).strip()
+DEFAULT_MODEL = get_current_model_info(DEFAULT_PROVIDER).get("model", "deepseek-chat")
+missing_api_key_warned = False
 
 
-def is_offline_mode():
-    return get_config("OFFLINE_MODE", "false").lower() in ("1", "true", "yes", "on")
+def show_missing_api_key_tip(provider=None):
+    global missing_api_key_warned
+
+    if missing_api_key_warned:
+        return
+
+    model_info = get_current_model_info(provider)
+    env_key = model_info.get("env_key", "")
+    model_name = model_info.get("name", "当前模型")
+
+    print(f"未检测到 {env_key}，{model_name} 已自动切换到离线演示模式。")
+    print("如需调用真实模型 API，请复制 .env.example 为 .env，并填写对应 API Key。")
+    missing_api_key_warned = True
 
 
-def should_use_offline_demo():
-    return is_offline_mode() or not get_config("DEEPSEEK_API_KEY")
+def should_use_offline_demo(provider=None):
+    if is_offline_mode():
+        return True
+
+    model_info = get_current_model_info(provider)
+    env_key = model_info.get("env_key", "")
+
+    if not get_config(env_key):
+        show_missing_api_key_tip(provider)
+        return True
+
+    return False
 
 
-def create_deepseek_client():
-    """Create a DeepSeek client with the OpenAI-compatible API."""
-    api_key = get_config("DEEPSEEK_API_KEY")
-    base_url = get_config("DEEPSEEK_BASE_URL", DEFAULT_BASE_URL)
-
-    if not api_key:
-        raise RuntimeError("请先设置 DEEPSEEK_API_KEY，或将 OFFLINE_MODE 设置为 true")
-
-    return OpenAI(
-        api_key=api_key,
-        base_url=base_url,
-    )
-
-
-def ask_deepseek(system_prompt, user_prompt):
-    """Send one request to DeepSeek and return the text result."""
-    client = create_deepseek_client()
-    model = get_config("DEEPSEEK_MODEL", DEFAULT_MODEL)
+def ask_llm(system_prompt, user_prompt, provider=None):
+    """Send one request to the selected OpenAI-compatible model."""
+    client = get_llm_client(provider)
+    model_info = get_current_model_info(provider)
 
     response = client.chat.completions.create(
-        model=model,
+        model=model_info.get("model", DEFAULT_MODEL),
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -57,7 +57,7 @@ def ask_deepseek(system_prompt, user_prompt):
     return response.choices[0].message.content
 
 
-def product_agent(requirement):
+def product_agent(requirement, provider=None):
     """Turn the user's idea into a simple product plan."""
     prompt = f"""
 请拆解下面的用户需求：
@@ -72,24 +72,41 @@ def product_agent(requirement):
 3. 开发步骤
 """
 
-    if should_use_offline_demo():
+    if should_use_offline_demo(provider):
         return product_demo(requirement)
 
     try:
-        return ask_deepseek(
+        return ask_llm(
             system_prompt="你是一名专业产品经理，擅长把想法拆成可开发任务。",
             user_prompt=prompt,
+            provider=provider,
         )
     except Exception as error:
-        print(f"DeepSeek Product Agent 调用失败，使用离线演示响应：{error}")
+        print(f"Product Agent 模型调用失败，使用离线演示响应：{error}")
         return product_demo(requirement)
 
 
-def coder_agent(product_plan, code=None, error_log=None, sentry_result=None):
+def coder_agent(
+    product_plan,
+    code=None,
+    error_log=None,
+    sentry_result=None,
+    requirement=None,
+    test_code=None,
+    test_stdout=None,
+    test_stderr=None,
+    provider=None,
+):
     """Generate new code first, or fix code after a failed run."""
-    if code and error_log:
+    has_test_failure = bool(test_stdout or test_stderr)
+    has_runtime_failure = bool(error_log)
+
+    if code and (has_runtime_failure or has_test_failure):
         prompt = f"""
-下面的 Python 代码运行失败了，请根据错误日志和修复建议重新生成完整代码。
+下面的 Python 代码运行或 pytest 自动测试失败了，请根据用户需求、错误日志、测试结果和修复建议重新生成完整代码。
+
+原始用户需求：
+{requirement or "未提供"}
 
 原始产品方案：
 {product_plan}
@@ -100,6 +117,15 @@ def coder_agent(product_plan, code=None, error_log=None, sentry_result=None):
 错误日志：
 {error_log}
 
+pytest 测试代码：
+{test_code or "未提供"}
+
+pytest stdout：
+{test_stdout or "无"}
+
+pytest stderr：
+{test_stderr or "无"}
+
 Sentry Agent 的分析和修复建议：
 {sentry_result}
 
@@ -109,7 +135,8 @@ Sentry Agent 的分析和修复建议：
 3. 不要实现复杂功能
 4. 必须根据错误修改代码，不要原样返回旧代码
 5. 如果错误和 input 或 EOFError 有关，即使原需求提到 input，也必须使用 try-except 捕获 EOFError，并提供默认值，确保代码在没有人工输入时也能运行结束
-6. 只输出 Python 代码，不要使用 Markdown 代码块，不要解释
+6. 如果 pytest 失败，请修复业务代码本身，不要修改测试用例来强行通过
+7. 只输出 Python 代码，不要使用 Markdown 代码块，不要解释
 """
     else:
         prompt = f"""
@@ -123,23 +150,34 @@ Sentry Agent 的分析和修复建议：
 3. 只输出 Python 代码，不要使用 Markdown 代码块，不要解释
 """
 
-    if should_use_offline_demo():
-        return coder_demo(product_plan, error_log)
+    if should_use_offline_demo(provider):
+        repair_log = "\n".join(
+            text
+            for text in [error_log or "", test_stdout or "", test_stderr or "", sentry_result or ""]
+            if text
+        )
+        return coder_demo(product_plan, repair_log or None)
 
     try:
-        return ask_deepseek(
+        return ask_llm(
             system_prompt="你是一名 Python 程序员，擅长写简单清晰的入门代码。",
             user_prompt=prompt,
+            provider=provider,
         )
     except Exception as error:
-        print(f"DeepSeek Coder Agent 调用失败，使用离线演示响应：{error}")
-        return coder_demo(product_plan, error_log)
+        print(f"Coder Agent 模型调用失败，使用离线演示响应：{error}")
+        repair_log = "\n".join(
+            text
+            for text in [error_log or "", test_stdout or "", test_stderr or "", sentry_result or ""]
+            if text
+        )
+        return coder_demo(product_plan, repair_log or None)
 
 
-def sentry_agent(code, error_log):
+def sentry_agent(code, error_log, test_code=None, test_stdout=None, test_stderr=None, provider=None):
     """Use DeepSeek to analyze a failed Python run."""
     prompt = f"""
-下面的 Python 代码运行失败了。
+下面的 Python 代码运行或 pytest 自动测试失败了。
 
 原始代码：
 {code}
@@ -147,35 +185,91 @@ def sentry_agent(code, error_log):
 错误日志 stderr：
 {error_log}
 
+pytest 测试代码：
+{test_code or "未提供"}
+
+pytest stdout：
+{test_stdout or "无"}
+
+pytest stderr：
+{test_stderr or "无"}
+
 请用简单清晰的中文输出：
 1. 错误摘要
 2. 错误原因
-3. 修复建议
+3. 判断问题类型：代码逻辑问题 / 测试用例问题 / 边界条件没处理 / 运行环境问题
+4. 修复建议
 
 注意：
 如果错误是 EOFError 或 input 读取失败，请明确建议使用 try-except 捕获 EOFError，并在没有输入时使用默认值。
 本项目的代码会被自动运行，不能依赖人工在终端输入。
+如果 pytest 失败，请优先建议修复业务代码，而不是修改测试用例。
 """
 
-    if should_use_offline_demo():
-        return sentry_demo(error_log)
+    if should_use_offline_demo(provider):
+        combined_log = "\n".join(
+            text for text in [error_log or "", test_stdout or "", test_stderr or ""] if text
+        )
+        return sentry_demo(combined_log)
 
     try:
-        return ask_deepseek(
+        return ask_llm(
             system_prompt="你是一名错误分析工程师，擅长根据 Python stderr 定位问题并给出修复建议。",
             user_prompt=prompt,
+            provider=provider,
         )
     except Exception as error:
-        print(f"DeepSeek Sentry Agent 调用失败，使用离线演示响应：{error}")
-        return sentry_demo(error_log)
+        print(f"Sentry Agent 模型调用失败，使用离线演示响应：{error}")
+        combined_log = "\n".join(
+            text for text in [error_log or "", test_stdout or "", test_stderr or ""] if text
+        )
+        return sentry_demo(combined_log)
 
 
-def tester_agent(code):
-    """Use DeepSeek to review generated Python code without running it."""
+def tester_agent(requirement_or_code, code=None, provider=None):
+    """Review code in the old flow, or generate pytest code in the LangGraph flow."""
+    if code is not None:
+        requirement = requirement_or_code
+        prompt = f"""
+请根据用户需求和生成代码，编写 pytest 测试代码。
+
+用户需求：
+{requirement}
+
+生成代码：
+{code}
+
+测试代码要求：
+1. 使用 pytest
+2. 测试核心功能
+3. 测试正常输入
+4. 测试边界情况
+5. 测试异常输入
+6. 尽量避免复杂依赖
+7. 被测代码文件路径是 output/generated_code.py
+8. 如果被测代码提供函数，优先用 importlib.util 从 output/generated_code.py 加载模块后测试函数
+9. 如果被测代码只是脚本，可以用 subprocess 运行脚本并检查 returncode/stdout
+10. 只输出 Python 测试代码，不要使用 Markdown 代码块，不要解释
+"""
+
+        if should_use_offline_demo(provider):
+            return pytest_demo(requirement, code)
+
+        try:
+            return ask_llm(
+                system_prompt="你是一名 Python 测试工程师，擅长为简单代码编写 pytest 测试。",
+                user_prompt=prompt,
+                provider=provider,
+            )
+        except Exception as error:
+            print(f"Tester Agent 模型调用失败，使用离线 pytest 演示响应：{error}")
+            return pytest_demo(requirement, code)
+
+    generated_code = requirement_or_code
     prompt = f"""
 请静态检查下面这段 Python 代码，不要运行代码：
 
-{code}
+{generated_code}
 
 请用简单清晰的中文输出：
 1. 是否有明显语法问题
@@ -185,14 +279,15 @@ def tester_agent(code):
 5. 检查结论：通过 / 需要修改
 """
 
-    if should_use_offline_demo():
-        return tester_demo(code)
+    if should_use_offline_demo(provider):
+        return tester_demo(generated_code)
 
     try:
-        return ask_deepseek(
+        return ask_llm(
             system_prompt="你是一名 Python 测试工程师，擅长做简单的代码静态检查。",
             user_prompt=prompt,
+            provider=provider,
         )
     except Exception as error:
-        print(f"DeepSeek Tester Agent 调用失败，使用离线演示响应：{error}")
-        return tester_demo(code)
+        print(f"Tester Agent 模型调用失败，使用离线演示响应：{error}")
+        return tester_demo(generated_code)

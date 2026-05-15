@@ -20,6 +20,27 @@ def product_demo(requirement):
 def coder_demo(product_plan="", error_log=None):
     """Return simple preset code when the real API is unavailable."""
     if error_log:
+        if (
+            "get_second_largest" in error_log
+            or "第二大" in product_plan
+            or "AssertionError" in error_log
+            or "test_generated_code" in error_log
+            or "pytest" in error_log
+        ):
+            return """def get_second_largest(nums):
+    unique_numbers = sorted(set(nums), reverse=True)
+
+    if len(unique_numbers) < 2:
+        return None
+
+    return unique_numbers[1]
+
+
+if __name__ == "__main__":
+    demo_numbers = [5, 1, 5, 3, 2]
+    print("第二大的不同数字是:", get_second_largest(demo_numbers))
+"""
+
         if "EOFError" in error_log or "input" in error_log:
             return """try:
     name = input("请输入你的姓名: ")
@@ -60,6 +81,15 @@ def show_score_report():
 show_score_report()
 """
 
+    if "get_second_largest" in product_plan or "第二大" in product_plan:
+        return """def get_second_largest(nums):
+    return sorted(nums)[-2]
+
+
+if __name__ == "__main__":
+    print(get_second_largest([1, 2, 3]))
+"""
+
     if "input" in product_plan or "姓名" in product_plan:
         return """name = input("请输入你的姓名: ")
 print("hello", name)
@@ -85,13 +115,80 @@ def tester_demo(code=""):
 """.format(risk_note=risk_note, conclusion=conclusion)
 
 
+def pytest_demo(requirement="", code=""):
+    if "get_second_largest" in requirement or "第二大" in requirement or "get_second_largest" in code:
+        return """import importlib.util
+from pathlib import Path
+
+
+MODULE_PATH = Path(__file__).resolve().parents[1] / "output" / "generated_code.py"
+spec = importlib.util.spec_from_file_location("generated_code", MODULE_PATH)
+generated_code = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(generated_code)
+
+
+def test_get_second_largest_normal_input():
+    assert generated_code.get_second_largest([1, 3, 2]) == 2
+
+
+def test_get_second_largest_with_duplicates():
+    assert generated_code.get_second_largest([5, 5, 4, 3]) == 4
+
+
+def test_get_second_largest_with_negative_numbers():
+    assert generated_code.get_second_largest([-10, -3, -7]) == -7
+
+
+def test_get_second_largest_empty_list():
+    assert generated_code.get_second_largest([]) is None
+
+
+def test_get_second_largest_single_item():
+    assert generated_code.get_second_largest([1]) is None
+"""
+
+    return """import subprocess
+import sys
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CODE_FILE = PROJECT_ROOT / "output" / "generated_code.py"
+
+
+def test_generated_script_runs_successfully():
+    result = subprocess.run(
+        [sys.executable, str(CODE_FILE)],
+        input="测试用户\\n",
+        capture_output=True,
+        text=True,
+        timeout=5,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() != ""
+"""
+
+
 def sentry_demo(error_log):
     if "安全检查失败" in error_log:
         reason = "代码包含被禁止的危险操作，运行器在执行前主动拦截。"
         suggestion = "移除 os.remove、shutil.rmtree、subprocess、eval 或 exec 等危险调用。"
+        problem_type = "运行安全问题。"
+    elif "No module named pytest" in error_log:
+        reason = "运行环境缺少 pytest，测试命令无法启动。"
+        suggestion = "先安装 requirements.txt 中的依赖，或执行 python -m pip install pytest。"
+        problem_type = "运行环境问题。"
+    elif "pytest" in error_log or "test_generated_code" in error_log or "AssertionError" in error_log:
+        reason = "pytest 自动测试失败，通常说明代码逻辑没有覆盖正常输入、重复值或边界情况。"
+        suggestion = "保持测试用例不变，修复业务代码，让函数正确处理空列表、单元素列表、重复数字和负数。"
+        problem_type = "代码逻辑问题或边界条件没处理。"
     else:
         reason = "如果错误与 input 或 EOFError 有关，说明自动运行环境没有人工输入。"
         suggestion = "使用 try-except 捕获 EOFError，并提供默认值，确保代码在无人输入时也能结束。"
+        problem_type = "运行环境问题或交互输入问题。"
 
     return f"""1. 错误摘要
 代码运行失败，错误日志为：
@@ -100,6 +197,9 @@ def sentry_demo(error_log):
 2. 错误原因
 {reason}
 
-3. 修复建议
+3. 问题类型
+{problem_type}
+
+4. 修复建议
 {suggestion}
 """
