@@ -20,6 +20,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+python -c "import streamlit, rich, langgraph, openai, dotenv, yaml" >nul 2>nul
+if errorlevel 1 (
+    echo Project dependencies are missing or incomplete.
+    echo Please run install.bat first, then start this script again.
+    pause
+    exit /b 1
+)
+
 echo ========================================
 echo AI Multi-Agent Pipeline Demo
 echo ========================================

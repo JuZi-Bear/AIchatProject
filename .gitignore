@@ -9,4 +9,7 @@ __pycache__/
 *.pyc
 .coverage
 output/
+reports/
+runs/*.json
+tests/test_generated_code.py
 .DS_Store

@@ -6,6 +6,24 @@
 - [x] 暂停新增 Vue、Java、C++ 等新架构模块
 - [x] 不再改变现有核心运行逻辑
 - [x] 当前阶段只做交付检查、答辩材料、演示流程和风险预案收口
+- [x] 当前阶段只允许 Bug 修复、提示优化、文档完善和启动稳定性改善
+
+## v1.0 稳定性测试
+
+- [x] 新建 docs/STABILITY_TEST.md
+- [x] 新建 docs/BUG_FIX_LOG.md
+- [x] 环境测试：Python 3.11、虚拟环境、依赖、.env 和 API Key 提示
+- [x] CLI 测试：graph_demo 菜单、简单案例、翻车修复、报告生成和人工审批
+- [x] Web UI 测试：Streamlit 启动、案例、插件、模型、结果、报告、历史和模式切换
+- [x] Docker 测试：docker compose 配置、端口、env_file 和目录挂载
+- [x] 核心功能测试：Product、Coder、Tester、Runner、Sentry、Quality、run_summary 和插件报告
+- [x] 文档检查：README、FINAL_CHECKLIST、DEMO_FLOW、BUG_FIX_LOG 和 STABILITY_TEST
+- [x] 演示流程检查：Web UI 翻车修复案例、人工审批、自动修复、质量评分和报告展示
+- [x] 使用 DeepSeek `deepseek-v4-pro` 做在线 smoke test
+- [x] 修复 start_demo.bat 依赖缺失提示
+- [x] 修复 install.bat Python 3.11 推荐提示
+- [x] 修复自动生成测试/报告/运行历史误入 Git 的风险
+- [x] 修复 DEEPSEEK_MODEL / DEEPSEEK_BASE_URL 环境变量覆盖模型配置的问题
 
 ## 第一阶段：基础 Agent
 

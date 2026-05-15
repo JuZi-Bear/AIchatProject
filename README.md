@@ -209,6 +209,29 @@ python graph_demo.py
 python main.py
 ```
 
+## 比赛演示流程
+
+推荐现场优先使用 Web UI 演示：
+
+1. 启动 `python -m streamlit run webui.py`。
+2. 在左侧选择“翻车修复案例”。
+3. 选择 DeepSeek / Qwen / GLM 模型。
+4. 启用 Doc、Security、Refactor、UI 插件。
+5. 勾选“我确认允许运行 AI 生成的代码”。
+6. 点击“开始运行”。
+7. 展示 Agent 工作流状态变化。
+8. 展示 pytest 测试失败或 Runner 失败。
+9. 展示 Sentry Agent 错误分析。
+10. 展示 Coder Agent 自动修复。
+11. 展示测试通过、质量评分和 Markdown 报告。
+
+详细操作脚本见：
+
+```text
+docs/DEMO_FLOW.md
+docs/DEMO_SCRIPT.md
+```
+
 ## 插件系统说明
 
 插件配置文件：

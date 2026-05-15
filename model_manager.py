@@ -41,6 +41,12 @@ DEFAULT_MODELS = [
     },
 ]
 
+PROVIDER_ENV_PREFIX = {
+    "deepseek": "DEEPSEEK",
+    "qwen": "QWEN",
+    "zhipu": "GLM",
+}
+
 
 def get_config(name, default=""):
     return os.getenv(name, default).strip()
@@ -66,7 +72,24 @@ def load_models_config():
 
 def get_available_models():
     """Return all configured models so the UI can show every provider option."""
-    return load_models_config().get("models", [])
+    return [apply_env_overrides(model_info) for model_info in load_models_config().get("models", [])]
+
+
+def apply_env_overrides(model_info):
+    """Allow .env values to override model/base_url without editing YAML."""
+    provider = model_info.get("provider", "")
+    prefix = PROVIDER_ENV_PREFIX.get(provider, provider.upper())
+    current_model = dict(model_info)
+    model_override = get_config(f"{prefix}_MODEL")
+    base_url_override = get_config(f"{prefix}_BASE_URL")
+
+    if model_override:
+        current_model["model"] = model_override
+
+    if base_url_override:
+        current_model["base_url"] = base_url_override
+
+    return current_model
 
 
 def get_default_model():
