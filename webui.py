@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 from html import escape
 from pathlib import Path
 
@@ -8,42 +7,38 @@ import yaml
 
 from config.config_loader import get_setting
 from demo_cases import DEMO_CASES
-from graph import run_graph_demo
 from model_manager import (
-    get_available_models,
     get_config,
     get_current_model_info,
     get_default_model,
     is_offline_mode,
 )
 from plugin_loader import CONFIG_FILE, PLUGIN_CLASSES
-from report_generator import (
-    build_error_summary_section,
-    build_plugin_results_section,
-    build_run_summary_section,
-)
 from utils.code_runner import check_code_safety
 from utils.error_utils import format_error_for_display, summarize_error
-from utils.model_comparator import create_compare_rows, save_compare_report
+from utils.model_comparator import create_compare_rows
 from utils.run_store import (
     create_run_id,
-    get_latest_run,
     get_run_state_path,
-    list_runs,
-    load_run_state,
-    save_run_state,
 )
 from utils.summary_builder import build_run_summary
 from utils.ui_state_builder import (
+    build_ui_view_model,
     build_plugin_display_data,
     build_report_display_data,
-    build_workflow_status,
+    build_workflow_status_map,
+)
+from services.run_service import (
+    create_compare_report,
+    create_run,
+    get_available_models as service_get_available_models,
+    get_available_plugins as service_get_available_plugins,
+    get_latest_report as service_get_latest_report,
+    get_run as service_get_run,
+    list_run_history,
 )
 
 
-REPORT_DIR = Path("reports")
-LATEST_REPORT_FILE = REPORT_DIR / "latest_report.md"
-LEGACY_REPORT_FILE = Path("output") / "web_report.md"
 GENERATED_CODE_FILE = Path("output") / "generated_code.py"
 
 PLUGIN_ORDER = ["doc_agent", "security_agent", "refactor_agent", "ui_agent"]
@@ -92,6 +87,7 @@ STATUS_LABELS = {
     "Done": "已完成",
     "Failed": "失败",
     "Repairing": "修复中",
+    "Skipped": "已跳过",
 }
 
 RUN_STATUS_LABELS = {
@@ -151,9 +147,33 @@ def apply_page_style():
             margin: 0;
             font-size: 15px;
         }
+        .header-meta {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .header-meta-item {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+        .header-meta-label {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .header-meta-value {
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 850;
+            word-break: break-word;
+        }
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 12px;
             margin: 12px 0 18px 0;
         }
@@ -161,9 +181,9 @@ def apply_page_style():
             background: white;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
-            padding: 14px 16px;
+            padding: 10px 12px;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
-            min-height: 92px;
+            min-height: 72px;
         }
         .summary-label {
             color: #64748b;
@@ -191,7 +211,7 @@ def apply_page_style():
             border: 1px solid #e5e7eb;
             border-left: 5px solid #94a3b8;
             border-radius: 8px;
-            padding: 12px 14px;
+            padding: 10px 12px;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
         }
         .workflow-title {
@@ -242,6 +262,13 @@ def apply_page_style():
             background: #fef9c3;
             color: #854d0e;
         }
+        .status-skipped {
+            border-left-color: #94a3b8;
+        }
+        .status-skipped .workflow-status {
+            background: #f1f5f9;
+            color: #475569;
+        }
         .status-retry {
             border-color: #facc15;
             border-left-color: #eab308;
@@ -261,6 +288,89 @@ def apply_page_style():
             font-size: 12px;
             font-weight: 700;
             margin-top: 8px;
+        }
+        .workflow-summary {
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.45;
+            margin-top: 8px;
+            min-height: 34px;
+        }
+        .timeline-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin: 12px 0 18px 0;
+        }
+        .timeline-node {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-top: 5px solid #94a3b8;
+            border-radius: 8px;
+            padding: 10px 12px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+            min-height: 126px;
+        }
+        .timeline-icon {
+            font-size: 22px;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .timeline-title {
+            color: #111827;
+            font-size: 14px;
+            font-weight: 900;
+            margin-bottom: 6px;
+        }
+        .timeline-status {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 12px;
+            font-weight: 850;
+            margin-bottom: 8px;
+            background: #f1f5f9;
+            color: #475569;
+        }
+        .timeline-summary {
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .timeline-waiting,
+        .timeline-skipped {
+            border-top-color: #94a3b8;
+        }
+        .timeline-running {
+            border-top-color: #2563eb;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.16);
+        }
+        .timeline-running .timeline-status {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .timeline-done {
+            border-top-color: #16a34a;
+        }
+        .timeline-done .timeline-status {
+            background: #dcfce7;
+            color: #15803d;
+        }
+        .timeline-failed {
+            border-top-color: #dc2626;
+            box-shadow: 0 10px 24px rgba(220, 38, 38, 0.13);
+        }
+        .timeline-failed .timeline-status {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .timeline-repairing {
+            border-top-color: #eab308;
+            box-shadow: 0 10px 24px rgba(234, 179, 8, 0.18);
+        }
+        .timeline-repairing .timeline-status {
+            background: #fef9c3;
+            color: #854d0e;
         }
         .workflow-meta.retry-active {
             color: #a16207;
@@ -328,9 +438,9 @@ def apply_page_style():
             background: white;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
-            padding: 14px 16px;
+            padding: 10px 12px;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
-            min-height: 88px;
+            min-height: 74px;
         }
         .result-card.success-card {
             border-color: #86efac;
@@ -340,13 +450,46 @@ def apply_page_style():
             border-color: #fecaca;
             background: #fef2f2;
         }
+        .quick-index-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 10px;
+            margin: 10px 0 16px 0;
+        }
+        .quick-index-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 9px 11px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+            min-height: 64px;
+        }
+        .quick-index-item.available {
+            border-color: #86efac;
+            background: #f0fdf4;
+        }
+        .quick-index-item.unavailable {
+            background: #f8fafc;
+            color: #64748b;
+        }
+        .quick-index-label {
+            color: #111827;
+            font-size: 13px;
+            font-weight: 900;
+            margin-bottom: 6px;
+        }
+        .quick-index-status {
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
+        }
         .plugin-card {
             border: 1px solid #e5e7eb;
             border-left: 6px solid #94a3b8;
             border-radius: 8px;
             background: white;
-            padding: 14px 16px;
-            margin: 10px 0;
+            padding: 10px 12px;
+            margin: 8px 0;
             box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
         }
         .plugin-ok {
@@ -473,8 +616,11 @@ def apply_page_style():
         @media (max-width: 1100px) {
             .summary-grid,
             .workflow-grid,
+            .timeline-grid,
             .demo-grid,
-            .result-grid {
+            .result-grid,
+            .quick-index-grid,
+            .header-meta {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
@@ -532,7 +678,10 @@ def get_builtin_security_summary(state):
 
 
 def status_to_chinese(status):
-    return STATUS_LABELS.get(status, status)
+    normalized = str(status or "").strip()
+    if not normalized:
+        return normalized
+    return STATUS_LABELS.get(normalized, STATUS_LABELS.get(normalized.title(), normalized))
 
 
 def run_status_to_chinese(status):
@@ -540,6 +689,7 @@ def run_status_to_chinese(status):
 
 
 def get_current_agent_label(workflow_status):
+    workflow_status = normalize_workflow_status_map(workflow_status)
     for status in ("Repairing", "Running"):
         for step in WORKFLOW_STEPS:
             if workflow_status.get(step) == status:
@@ -552,6 +702,16 @@ def get_current_agent_label(workflow_status):
         return "流程失败"
 
     return "暂无运行中的 Agent"
+
+
+def normalize_workflow_status_map(workflow_status):
+    if isinstance(workflow_status, list):
+        return {
+            item.get("label", item.get("key", "")): str(item.get("status", "waiting")).title()
+            for item in workflow_status
+        }
+
+    return workflow_status or {}
 
 
 def summarize_code_fix(code):
@@ -744,6 +904,10 @@ def save_plugin_enabled_map(enabled_map):
 
 
 def get_plugin_display_info(plugin_name):
+    for plugin_info in service_get_available_plugins():
+        if plugin_info.get("name") == plugin_name:
+            return plugin_info.get("display_name", plugin_name), plugin_info.get("description", "")
+
     plugin_class = PLUGIN_CLASSES[plugin_name]
     plugin = plugin_class()
     return plugin.name, plugin.description
@@ -761,7 +925,7 @@ def get_enabled_plugin_names(enabled_map):
 
 
 def make_initial_workflow_status():
-    return build_workflow_status(None)
+    return build_workflow_status_map(None)
 
 
 def initialize_session_state():
@@ -867,9 +1031,34 @@ def get_mode_label(provider=None):
     return "在线 API 模式"
 
 
+def build_current_ui_view_model(state, run_status, controls, enabled_plugins):
+    view_state = dict(state or {})
+    model_info = controls.get("model_info", {})
+    model_provider = controls.get("model_provider", st.session_state.get("model_provider"))
+
+    view_state["_run_status"] = run_status
+    view_state["_display_mode"] = controls.get("display_mode", "演示模式")
+    view_state.setdefault("model_provider", model_provider)
+    view_state.setdefault("model_name", model_info.get("model", ""))
+    view_state.setdefault("model_base_url", model_info.get("base_url", ""))
+    view_state.setdefault("enabled_plugins", enabled_plugins)
+
+    if st.session_state.get("run_id") and not view_state.get("run_id"):
+        view_state["run_id"] = st.session_state["run_id"]
+
+    if st.session_state.get("latest_report") and not view_state.get("report_path"):
+        view_state["report_path"] = st.session_state["latest_report"]
+
+    ui_view_model = build_ui_view_model(view_state)
+    ui_view_model["history"] = {
+        "rows": list_run_history(),
+    }
+    return ui_view_model
+
+
 def render_model_selector_sidebar():
     st.sidebar.markdown("### 模型选择")
-    models = get_available_models()
+    models = service_get_available_models()
 
     if not models:
         st.sidebar.warning("没有找到模型配置，已使用 DeepSeek 默认配置。")
@@ -908,7 +1097,7 @@ def render_model_selector_sidebar():
 def render_model_compare_sidebar():
     st.sidebar.markdown("### 模型对比")
     compare_mode = st.sidebar.checkbox("启用模型对比模式")
-    models = get_available_models()
+    models = service_get_available_models()
     provider_options = [model_info.get("provider", "") for model_info in models]
     label_map = {
         model_info.get("provider", ""): f"{model_info.get('name')} / {model_info.get('model')}"
@@ -934,51 +1123,67 @@ def render_model_compare_sidebar():
     return compare_mode, selected_providers
 
 
-def render_summary_cards(model_label, run_status, state, enabled_plugins):
-    run_summary = build_run_summary(state)
+def render_compact_cards(cards, columns_count=4, card_class="summary-card"):
+    columns_count = max(1, min(columns_count, len(cards) or 1))
+    columns = st.columns(columns_count)
+
+    for index, (label, value, custom_class) in enumerate(cards):
+        column = columns[index % columns_count]
+        css_class = custom_class or card_class
+        column.markdown(
+            f"""
+            <div class="{css_class}">
+                <div class="summary-label">{escape(str(label))}</div>
+                <div class="summary-value">{escape(str(value))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_summary_cards(ui_view_model):
+    summary_cards = ui_view_model.get("summary_cards", {})
+    report = ui_view_model.get("report", {})
+    raw_state = ui_view_model.get("raw", {}).get("state", {})
+    has_run = bool(raw_state.get("run_id") or report.get("run_id") or report.get("report_path"))
+
     success_value = "等待中"
-    retry_count = "0"
-
-    if state:
-        success_value = "✅ 成功" if run_summary["success"] else "❌ 失败"
-        retry_count = str(run_summary["retry_count"])
-
-    summary_plugins = run_summary["enabled_plugins"] or enabled_plugins
-    plugin_text = f"{len(summary_plugins)} 个启用"
-    if summary_plugins:
-        plugin_text += "：" + "、".join(summary_plugins)
+    test_value = "等待中"
+    if has_run:
+        success_value = "✅ 成功" if summary_cards.get("success") else "❌ 失败"
+        test_value = "通过" if summary_cards.get("test_success") else "未通过"
 
     cards = [
-        ("当前模型", model_label),
-        ("当前运行状态", run_status_to_chinese(run_status)),
-        ("success", success_value),
-        ("retry_count", retry_count),
-        ("enabled_plugins", plugin_text),
+        ("success", success_value, None),
+        ("retry_count", summary_cards.get("retry_count", 0) if has_run else 0, None),
+        ("test_success", test_value, None),
+        ("coverage_percent", f"{summary_cards.get('coverage_percent', 0)}%" if has_run else "等待中", None),
+        ("quality_score", f"{summary_cards.get('quality_score', 0)}/100" if has_run else "等待中", None),
+        ("security_status", summary_cards.get("security_status", "等待安全检查"), None),
     ]
 
-    html = '<div class="summary-grid">'
-    for label, value in cards:
-        html += (
-            '<div class="summary-card">'
-            f'<div class="summary-label">{escape(label)}</div>'
-            f'<div class="summary-value">{escape(str(value))}</div>'
-            "</div>"
-        )
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
+    render_compact_cards(cards, columns_count=6, card_class="summary-card")
 
 
-def render_workflow_progress(workflow_status, state=None):
+def render_workflow_progress(workflow_status, state=None, ui_view_model=None):
+    workflow_status = normalize_workflow_status_map(workflow_status)
+    ui_view_model = ui_view_model or build_ui_view_model(state or {})
+    workflow_steps = sorted(
+        ui_view_model.get("workflow_steps", []),
+        key=lambda item: item.get("order", 0),
+    )
     retry_count = safe_int((state or {}).get("retry_count", 0))
     final_success = bool((state or {}).get("success"))
     repair_related_steps = {"Coder Agent", "Tester Agent", "Runner", "Sentry Agent"}
     html = '<div class="workflow-grid">'
 
-    for step in WORKFLOW_STEPS:
-        status = workflow_status.get(step, "Waiting")
+    for item in workflow_steps:
+        step = item.get("label", "")
+        status = workflow_status.get(step, item.get("status", "waiting"))
         status_class = f"status-{status.lower()}"
         node_classes = ["workflow-node", status_class]
         meta_classes = ["workflow-meta"]
+        summary = summarize_text(item.get("summary", ""), 92)
 
         if retry_count > 0 and step in repair_related_steps:
             node_classes.append("status-retry")
@@ -991,12 +1196,129 @@ def render_workflow_progress(workflow_status, state=None):
             f'<div class="{" ".join(node_classes)}">'
             f'<div class="workflow-title">{escape(step)}</div>'
             f'<div class="workflow-status">{escape(status_to_chinese(status))}</div>'
+            f'<div class="workflow-summary">{escape(summary)}</div>'
             f'<div class="{" ".join(meta_classes)}">修复次数：{escape(str(retry_count))}</div>'
             "</div>"
         )
 
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
+
+
+def render_workflow_timeline(ui_view_model):
+    status_config = {
+        "waiting": ("⚪", "等待中"),
+        "running": ("🔵", "运行中"),
+        "done": ("✅", "已完成"),
+        "failed": ("❌", "失败"),
+        "repairing": ("🟡", "修复中"),
+        "skipped": ("⚪", "已跳过"),
+    }
+    label_map = {
+        "Approval Node": "Approval",
+    }
+
+    workflow_steps = sorted(
+        ui_view_model.get("workflow_steps", []),
+        key=lambda item: item.get("order", 0),
+    )
+    summary_cards = ui_view_model.get("summary_cards", {})
+    agent_outputs = ui_view_model.get("agent_outputs", {})
+    report = ui_view_model.get("report", {})
+    total_steps = len(workflow_steps) or 1
+    active_step = None
+    reached_order = 0
+    has_run_for_highlight = bool(report.get("run_id") or report.get("report_path"))
+
+    for item in workflow_steps:
+        status = str(item.get("status", "waiting")).lower()
+        order = int(item.get("order", 0) or 0)
+
+        if status != "waiting":
+            reached_order = max(reached_order, order)
+
+        if status in ("running", "repairing") and active_step is None:
+            active_step = item
+
+    progress_order = int(active_step.get("order", 0)) if active_step else reached_order
+    progress_percent = max(0, min(100, round(progress_order / total_steps * 100)))
+    has_run_for_highlight = has_run_for_highlight or progress_order > 0
+    st.progress(progress_percent, text=f"整体进度：{progress_percent}%")
+
+    if active_step:
+        active_status = str(active_step.get("status", "running")).lower()
+        icon, status_text = status_config.get(active_status, ("⚪", active_status))
+        active_label = label_map.get(active_step.get("label", ""), active_step.get("label", "Agent"))
+        active_summary = summarize_text(active_step.get("summary", ""), 180)
+
+        if hasattr(st, "status"):
+            with st.status(
+                f"{icon} 当前步骤：{active_label} · {status_text}",
+                state="running",
+                expanded=False,
+            ):
+                st.write(active_summary)
+        else:
+            st.info(f"{icon} 当前步骤：{active_label} · {status_text}。{active_summary}")
+    else:
+        has_run = bool(report.get("run_id") or report.get("report_path"))
+        has_failed_step = any(
+            str(item.get("status", "")).lower() == "failed"
+            for item in workflow_steps
+        )
+
+        if summary_cards.get("success"):
+            st.success("✅ 工作流已完成，最终运行成功。")
+        elif has_run or has_failed_step:
+            st.error("❌ 工作流已结束，但最终结果未成功。")
+        else:
+            st.info("⚪ 等待开始运行。")
+
+    html = '<div class="timeline-grid">'
+    for item in workflow_steps:
+        status = str(item.get("status", "waiting")).lower()
+        icon, status_text = status_config.get(status, ("⚪", status))
+        label = label_map.get(item.get("label", ""), item.get("label", "Agent"))
+        summary = summarize_text(item.get("summary", ""), 88)
+
+        html += (
+            f'<div class="timeline-node timeline-{escape(status)}">'
+            f'<div class="timeline-icon">{escape(icon)}</div>'
+            f'<div class="timeline-title">{escape(label)}</div>'
+            f'<div class="timeline-status">{escape(status_text)}</div>'
+            f'<div class="timeline-summary">{escape(summary)}</div>'
+            "</div>"
+        )
+
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
+
+    retry_count = safe_int(summary_cards.get("retry_count", 0))
+    error_summary = agent_outputs.get("error_summary") or "无错误"
+    sentry_result = summarize_text(agent_outputs.get("sentry_result", ""), 180)
+    final_test_status = "通过" if summary_cards.get("test_success") else "未通过"
+    final_success = bool(summary_cards.get("success"))
+
+    if retry_count > 0:
+        html = f"""
+        <div class="highlight-box">
+            <h3>自动修复高光时刻</h3>
+            <ul>
+                <li><strong>第一次运行失败：</strong>{escape(error_summary)}</li>
+                <li><strong>Sentry Agent 发现问题：</strong>{escape(sentry_result or "已分析错误并生成修复建议。")}</li>
+                <li><strong>Coder Agent 自动修复：</strong>已根据错误反馈重新生成代码。</li>
+                <li><strong>测试最终结果：</strong>{escape(final_test_status)}，最终状态：{escape("成功" if final_success else "失败")}。</li>
+            </ul>
+        </div>
+        """
+        st.markdown(html, unsafe_allow_html=True)
+    elif has_run_for_highlight:
+        if final_success:
+            st.info("本次任务一次运行成功，未触发自动修复。")
+        else:
+            st.warning("本次任务未触发自动修复，最终结果暂未成功。")
+    else:
+        st.info("运行后这里会展示是否触发自动修复。")
 
 
 def render_plugin_config_sidebar():
@@ -1122,179 +1444,6 @@ def render_sidebar():
     }
 
 
-def build_markdown_report(state):
-    run_summary = build_run_summary(state)
-    success_text = "成功" if run_summary["success"] else "失败"
-    enabled_plugins_text = "、".join(run_summary["enabled_plugins"]) or "无"
-
-    return f"""# AI Multi-Agent Pipeline 运行报告
-
-## 用户需求
-
-{state.get("requirement", "")}
-
-## 运行结果
-
-- run_id：{state.get("run_id", "未生成")}
-- 运行时间：{state.get("run_time", "未记录")}
-- 模型服务商：{run_summary["model_provider"]}
-- 模型名称：{state.get("model_name", "未记录")}
-- base_url：{state.get("model_base_url", "未记录")}
-- 是否成功：{success_text}
-- 修复次数：{run_summary["retry_count"]}
-- 最大修复次数：{state.get("max_retry_count", get_setting("max_retry_count"))}
-- pytest 是否通过：{"是" if run_summary["test_success"] else "否"}
-- 测试覆盖率：{run_summary["coverage_percent"]}%
-- 质量评分：{run_summary["quality_score"]}
-- 安全状态：{run_summary["security_status"]}
-- 已启用插件：{enabled_plugins_text}
-- 是否启用人工审批：{"是" if state.get("require_human_approval") else "否"}
-- 是否通过审批：{"是" if state.get("approved") else "否"}
-- 审批说明：{state.get("approval_message", "无")}
-- 状态文件路径：{state.get("state_path", "未保存")}
-- 报告文件路径：{run_summary["report_path"]}
-
-{build_run_summary_section(state)}
-
-## Product Agent
-
-{state.get("product_result", "")}
-
-## Coder Agent 生成代码
-
-```python
-{state.get("code", "")}
-```
-
-## Tester Agent
-
-{state.get("tester_result", "")}
-
-{build_error_summary_section(state)}
-
-## pytest 自动测试
-
-- test_success：{"通过" if state.get("test_success") else "未通过"}
-
-### 自动生成的 pytest 测试代码
-
-```python
-{state.get("test_code", "")}
-```
-
-### pytest stdout
-
-```text
-{state.get("test_stdout", "")}
-```
-
-### pytest stderr
-
-```text
-{state.get("test_stderr", "")}
-```
-
-### coverage report
-
-```text
-{state.get("coverage_stdout", "")}
-```
-
-## 质量评分
-
-- coverage_percent：{run_summary["coverage_percent"]}%
-- quality_score：{run_summary["quality_score"]}
-- 自动修复次数：{run_summary["retry_count"]}
-- 安全检查结果：{run_summary["security_status"]}
-
-```text
-{state.get("quality_summary", "")}
-```
-
-## 测试驱动修复过程
-
-当 pytest 或 Runner 任一失败时，系统会将测试失败信息、运行错误日志和 Sentry Agent 分析结果反馈给 Coder Agent，要求修复业务代码本身，而不是修改测试用例。
-
-## Sentry Agent
-
-{state.get("sentry_result", "")}
-
-{build_plugin_results_section(state)}
-
-## stdout
-
-```text
-{state.get("stdout", "")}
-```
-
-## error_log
-
-```text
-{state.get("error_log", "")}
-```
-"""
-
-
-def save_report(report, report_file=None):
-    REPORT_DIR.mkdir(exist_ok=True)
-    LEGACY_REPORT_FILE.parent.mkdir(exist_ok=True)
-
-    if report_file is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_file = REPORT_DIR / f"report_{timestamp}.md"
-    else:
-        report_file = Path(report_file)
-
-    report_file.write_text(report, encoding="utf-8")
-    LATEST_REPORT_FILE.write_text(report, encoding="utf-8")
-    LEGACY_REPORT_FILE.write_text(report, encoding="utf-8")
-
-    return report_file
-
-
-def persist_compare_states(compare_run_id, states, enabled_plugins):
-    saved_states = []
-
-    for index, state in enumerate(states, start=1):
-        state_run_id = f"{compare_run_id}_model{index}"
-        state_path = Path("runs") / f"{state_run_id}.json"
-        report_file = Path("reports") / f"{state_run_id}.md"
-
-        state["run_id"] = state_run_id
-        state["compare_run_id"] = compare_run_id
-        state["run_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        state["enabled_plugins"] = enabled_plugins
-        state["state_path"] = str(state_path)
-        state["report_path"] = str(report_file)
-
-        report = build_markdown_report(state)
-        save_report(report, report_file)
-        save_run_state(state_run_id, state)
-        saved_states.append(state)
-
-    compare_report_path = save_compare_report(compare_run_id, saved_states)
-    return saved_states, compare_report_path
-
-
-def get_latest_report_file():
-    if not REPORT_DIR.exists():
-        return None
-
-    report_files = sorted(
-        REPORT_DIR.glob("report_*.md"),
-        key=lambda file: file.stat().st_mtime,
-        reverse=True,
-    )
-
-    if report_files:
-        return report_files[0]
-
-    if LATEST_REPORT_FILE.exists():
-        return LATEST_REPORT_FILE
-
-    return None
-
-
 def render_stdout_stderr(state, display_mode):
     stdout = state.get("stdout", "") if state else ""
     error_log = state.get("error_log", "") if state else ""
@@ -1406,6 +1555,8 @@ def render_quality_area(state, display_mode):
 
 def render_plugin_result_panel(state, enabled_map, display_mode="开发模式"):
     st.markdown('<div class="section-title">插件执行结果</div>', unsafe_allow_html=True)
+    ui_view_model = build_ui_view_model(state)
+    plugin_outputs = ui_view_model["plugin_outputs"]
     status_labels = {
         "success": "通过",
         "warning": "警告",
@@ -1419,7 +1570,7 @@ def render_plugin_result_panel(state, enabled_map, display_mode="开发模式"):
         "disabled": "plugin-disabled",
     }
 
-    for item in build_plugin_display_data(state):
+    for item in build_plugin_display_data(plugin_outputs):
         status = item.get("status", "warning")
         status_text = status_labels.get(status, status)
         status_class = status_classes.get(status, "plugin-warn")
@@ -1503,7 +1654,8 @@ def get_security_summary(state, enabled_map):
     if not enabled_map.get("security_agent", False):
         return "该插件未启用"
 
-    for item in build_plugin_display_data(state):
+    ui_view_model = build_ui_view_model(state)
+    for item in build_plugin_display_data(ui_view_model["plugin_outputs"]):
         if item.get("field_name") != "security_result":
             continue
 
@@ -1526,7 +1678,8 @@ def get_doc_summary(state, enabled_map):
     if not enabled_map.get("doc_agent", False):
         return "该插件未启用"
 
-    for item in build_plugin_display_data(state):
+    ui_view_model = build_ui_view_model(state)
+    for item in build_plugin_display_data(ui_view_model["plugin_outputs"]):
         if item.get("field_name") != "doc_result":
             continue
 
@@ -1707,107 +1860,278 @@ def render_speaker_notes(state, enabled_plugins):
         )
 
 
-def render_agent_tabs(state, enabled_map, display_mode):
-    tab_product, tab_coder, tab_tester, tab_sentry, tab_plugins, tab_compare, tab_final = st.tabs(
-        ["Product Agent", "Coder Agent", "Tester Agent", "Sentry Agent", "Plugins", "模型对比", "Final State"]
+def render_result_overview(ui_view_model):
+    st.markdown('<div class="section-title">最终结果总览</div>', unsafe_allow_html=True)
+
+    summary_cards = ui_view_model["summary_cards"]
+    report = ui_view_model["report"]
+    raw_state = ui_view_model.get("raw", {}).get("state", {})
+    has_run = bool(raw_state.get("run_id") or report.get("run_id") or report.get("report_path"))
+    report_value = report.get("report_path") or summary_cards.get("report_path") or "未生成"
+    run_id = report.get("run_id") or raw_state.get("run_id") or "等待生成"
+    success_text = "等待运行"
+    test_text = "等待测试"
+
+    if has_run:
+        success_text = "✅ 成功" if summary_cards.get("success") else "❌ 失败"
+        test_text = "通过" if summary_cards.get("test_success") else "未通过"
+
+    cards = [
+        ("最终状态", success_text),
+        ("run_id", run_id),
+        ("修复次数", summary_cards.get("retry_count", 0) if has_run else 0),
+        ("pytest 测试", test_text),
+        ("覆盖率", f"{summary_cards.get('coverage_percent', 0)}%" if has_run else "等待统计"),
+        ("质量评分", f"{summary_cards.get('quality_score', 0)}/100" if has_run else "等待评分"),
+        ("安全状态", summary_cards.get("security_status", "等待安全检查")),
+        ("报告路径", report_value),
+    ]
+    display_cards = [
+        (label, value, get_card_class(label, value))
+        for label, value in cards
+    ]
+    render_compact_cards(display_cards, columns_count=4, card_class="result-card")
+
+
+def render_final_result_overview(ui_view_model, state=None, report_path=None):
+    render_result_overview(ui_view_model)
+
+
+def render_result_index(ui_view_model):
+    st.markdown('<div class="section-title">结果索引</div>', unsafe_allow_html=True)
+
+    result_index = ui_view_model["result_index"]
+    plugin_outputs = ui_view_model["plugin_outputs"]
+    agent_outputs = ui_view_model["agent_outputs"]
+    report = ui_view_model["report"]
+    raw_state = ui_view_model.get("raw", {}).get("state", {})
+    summary_cards = ui_view_model.get("summary_cards", {})
+    repair_available = bool(summary_cards.get("retry_count", 0) or agent_outputs.get("sentry_result"))
+
+    index_items = [
+        ("最终代码", result_index["final_code_available"]),
+        ("pytest 测试结果", result_index["test_result_available"]),
+        ("错误摘要", result_index["error_available"]),
+        ("自动修复过程", repair_available),
+        ("插件结果", result_index["plugins_available"]),
+        ("运行报告", result_index["report_available"]),
+        ("历史记录", True),
+    ]
+
+    html = '<div class="quick-index-grid">'
+    for label, available in index_items:
+        item_class = "available" if available else "unavailable"
+        status_text = "可查看" if available else "暂无"
+        html += (
+            f'<div class="quick-index-item {item_class}">'
+            f'<div class="quick-index-label">{escape(label)}</div>'
+            f'<div class="quick-index-status">{escape(status_text)}</div>'
+            "</div>"
+        )
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
+
+    (
+        tab_code,
+        tab_test,
+        tab_error,
+        tab_repair,
+        tab_plugins,
+        tab_report,
+        tab_history,
+    ) = st.tabs(["最终代码", "pytest 测试", "错误摘要", "自动修复", "插件结果", "运行报告", "历史记录"])
+
+    with tab_code:
+        with st.expander("查看最终代码", expanded=False):
+            st.code(agent_outputs.get("code") or "# 暂无最终代码", language="python")
+
+    with tab_test:
+        st.write(summarize_test_result(raw_state))
+        col1, col2, col3 = st.columns(3)
+        col1.metric("test_success", "通过" if summary_cards.get("test_success") else "未通过")
+        col2.metric("coverage", f"{summary_cards.get('coverage_percent', 0)}%")
+        col3.metric("quality", f"{summary_cards.get('quality_score', 0)}/100")
+        with st.expander("pytest 测试代码", expanded=False):
+            st.code(raw_state.get("test_code", "") or "# 暂无测试代码", language="python")
+        with st.expander("pytest stdout", expanded=False):
+            st.code(raw_state.get("test_stdout", "") or "无 pytest stdout", language="text")
+        with st.expander("pytest stderr", expanded=False):
+            st.code(format_error_for_display(raw_state.get("test_stderr", ""), demo_mode=False), language="text")
+
+    with tab_error:
+        st.code(agent_outputs.get("error_summary") or "无错误", language="text")
+        with st.expander("完整错误日志", expanded=False):
+            st.code(agent_outputs.get("error_log") or "无完整错误日志", language="text")
+
+    with tab_repair:
+        retry_count = safe_int(summary_cards.get("retry_count", 0))
+        if retry_count > 0:
+            st.success(f"本次触发自动修复，共修复 {retry_count} 次。")
+            st.write("第一次运行失败后，Sentry Agent 分析错误，Coder Agent 根据反馈重新生成代码。")
+            st.write("最终测试结果：" + ("通过" if summary_cards.get("test_success") else "未通过"))
+            with st.expander("Sentry Agent 分析结果", expanded=False):
+                st.markdown(agent_outputs.get("sentry_result") or "暂无 Sentry 分析")
+        else:
+            st.info("本次任务一次运行成功，未触发自动修复。")
+
+    with tab_plugins:
+        for item in build_plugin_display_data(plugin_outputs):
+            st.markdown(f"**{item.get('display_name')} / {item.get('status')}**")
+            st.write(item.get("summary", "无摘要"))
+            with st.expander(f"{item.get('display_name')} 详细输出", expanded=False):
+                st.markdown(item.get("detail", "") or "无详细输出")
+
+    with tab_report:
+        st.write(f"报告路径：`{report.get('report_path') or '未生成'}`")
+        if report.get("report_markdown"):
+            with st.expander("查看 Markdown 报告", expanded=False):
+                render_markdown_with_code_blocks(report.get("report_markdown"))
+        else:
+            st.info("暂无报告")
+
+    with tab_history:
+        st.info("历史记录区位于页面底部，可选择 run_id 并加载为当前结果。")
+        st.write(f"当前 run_id：`{report.get('run_id') or raw_state.get('run_id') or '未生成'}`")
+
+
+def render_plugin_results(ui_view_model):
+    st.markdown('<div class="section-title">插件执行结果</div>', unsafe_allow_html=True)
+    plugin_outputs = ui_view_model.get("plugin_outputs", {})
+    status_labels = {
+        "success": "通过",
+        "warning": "警告",
+        "failed": "失败",
+        "disabled": "未启用",
+    }
+    status_classes = {
+        "success": "plugin-ok",
+        "warning": "plugin-warn",
+        "failed": "plugin-fail",
+        "disabled": "plugin-disabled",
+    }
+
+    for item in build_plugin_display_data(plugin_outputs):
+        status = item.get("status", "warning")
+        status_text = status_labels.get(status, status)
+        status_class = status_classes.get(status, "plugin-warn")
+        display_name = item.get("display_name", "Plugin")
+        summary = item.get("summary", "无摘要")
+        detail = item.get("detail", "")
+
+        st.markdown(
+            f"""
+            <div class="plugin-card {status_class}">
+                <div class="plugin-title">{escape(display_name)}</div>
+                <div class="plugin-status">{escape(status_text)}</div>
+                <div>{escape(summary)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.expander(f"{display_name} 详细输出", expanded=False):
+            st.markdown(detail or ("该插件未启用" if status == "disabled" else "等待插件执行"))
+
+
+def render_report_section(ui_view_model):
+    report = ui_view_model.get("report", {})
+    report_path = report.get("report_path") or "未生成"
+    report_markdown = report.get("report_markdown", "")
+
+    st.write(f"报告路径：`{report_path}`")
+
+    if report_markdown:
+        with st.expander("完整 Markdown 报告", expanded=False):
+            render_markdown_with_code_blocks(report_markdown)
+    else:
+        st.info("暂无报告")
+
+
+def render_agent_tabs(ui_view_model):
+    agent_outputs = ui_view_model["agent_outputs"]
+    report = ui_view_model["report"]
+    raw_state = ui_view_model.get("raw", {}).get("state", {})
+    display_mode = raw_state.get("_display_mode", "演示模式")
+
+    tab_product, tab_coder, tab_tester, tab_sentry, tab_plugins, tab_report, tab_raw = st.tabs(
+        ["Product", "Coder", "Tester", "Sentry", "Plugins", "Report", "Raw State"]
     )
 
     with tab_product:
-        product_result = (state or {}).get("product_result") or "等待 Product Agent 输出"
-        if display_mode == "演示模式":
-            st.markdown(summarize_text(product_result, 320))
-        else:
-            st.markdown(product_result)
+        product_result = agent_outputs.get("product_result") or "等待 Product Agent 输出"
+        st.markdown(product_result)
 
     with tab_coder:
-        code = (state or {}).get("code") or ""
-        if display_mode == "演示模式" and code:
-            code_lines = code.splitlines()
-            preview_code = "\n".join(code_lines[:80])
-            if len(code_lines) > 80:
-                preview_code += "\n# ... 演示模式仅展示前 80 行"
-            st.code(preview_code, language="python")
-        else:
-            st.code(code or "# 等待 Coder Agent 生成代码", language="python")
+        with st.expander("完整代码", expanded=False):
+            st.code(agent_outputs.get("code") or "# 等待 Coder Agent 生成代码", language="python")
 
     with tab_tester:
-        tester_result = (state or {}).get("tester_result") or "等待 Tester Agent 输出"
-        if display_mode == "演示模式":
-            st.markdown(summarize_text(tester_result, 260))
-            st.info(summarize_test_result(state))
-        else:
-            st.markdown(tester_result)
-            st.metric("test_success", "通过" if (state or {}).get("test_success") else "未通过")
-            st.markdown("**pytest 测试代码**")
-            st.code((state or {}).get("test_code", "") or "# 等待 Tester Agent 生成测试代码", language="python")
-            render_stdout_stderr(
-                {
-                    "stdout": (state or {}).get("test_stdout", ""),
-                    "error_log": (state or {}).get("test_stderr", ""),
-                },
-                display_mode,
+        tester_result = agent_outputs.get("tester_result") or "等待 Tester Agent 输出"
+        st.markdown(tester_result)
+        col1, col2 = st.columns(2)
+        col1.metric("test_success", "通过" if raw_state.get("test_success") else "未通过")
+        col2.metric("coverage", f"{raw_state.get('coverage_percent', 0)}%")
+        with st.expander("pytest 测试代码", expanded=False):
+            st.code(raw_state.get("test_code", "") or "# 等待 Tester Agent 生成测试代码", language="python")
+        with st.expander("pytest stdout", expanded=False):
+            st.code(raw_state.get("test_stdout", "") or "无 pytest stdout", language="text")
+        with st.expander("pytest stderr", expanded=False):
+            st.code(
+                format_error_for_display(raw_state.get("test_stderr", ""), demo_mode=display_mode == "演示模式"),
+                language="text",
             )
-            with st.expander("coverage report", expanded=False):
-                st.code((state or {}).get("coverage_stdout", "") or "无 coverage 输出", language="text")
+        with st.expander("coverage report", expanded=False):
+            st.code(raw_state.get("coverage_stdout", "") or "无 coverage 输出", language="text")
 
     with tab_sentry:
-        sentry_result = (state or {}).get("sentry_result") or ""
+        sentry_result = agent_outputs.get("sentry_result") or ""
         if sentry_result:
-            if display_mode == "演示模式":
-                st.markdown(summarize_text(sentry_result, 300))
-            else:
-                st.markdown(sentry_result)
+            st.markdown(sentry_result)
         else:
             st.info("Sentry Agent 尚未触发，或本次运行无需自动修复。")
 
     with tab_plugins:
-        render_plugin_result_panel(state or {}, enabled_map, display_mode)
+        render_plugin_results(ui_view_model)
 
-    with tab_compare:
-        render_model_compare_tab(
-            st.session_state.get("compare_states", []),
-            st.session_state.get("compare_report_path"),
-            display_mode,
-        )
+    with tab_report:
+        render_report_section(ui_view_model)
 
-    with tab_final:
-        if not state:
+        if st.session_state.get("compare_states"):
+            st.markdown("**模型对比结果**")
+            render_model_compare_tab(
+                st.session_state.get("compare_states", []),
+                st.session_state.get("compare_report_path"),
+                display_mode,
+            )
+
+    with tab_raw:
+        if display_mode != "开发模式":
+            st.info("Raw State 仅在开发模式显示。")
+            return
+
+        if not raw_state:
             st.info("暂无运行结果")
-        else:
-            run_summary = build_run_summary(state)
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("success", "成功" if run_summary["success"] else "失败")
-            col2.metric("retry_count", run_summary["retry_count"])
-            col3.metric("max_retry_count", state.get("max_retry_count", get_setting("max_retry_count")))
-            col4.metric("quality_score", f"{run_summary['quality_score']}/100")
+            return
 
-            render_stdout_stderr(state, display_mode)
-
-            if display_mode == "开发模式":
-                st.markdown("**完整 state**")
-                st.json(json.loads(json.dumps(state, ensure_ascii=False, default=str)))
-            else:
-                st.markdown("**演示摘要**")
-                st.write(
-                    {
-                        "requirement": summarize_text(state.get("requirement"), 90),
-                        "success": run_summary["success"],
-                        "retry_count": run_summary["retry_count"],
-                        "test_success": run_summary["test_success"],
-                        "coverage_percent": run_summary["coverage_percent"],
-                        "quality_score": run_summary["quality_score"],
-                        "security_status": run_summary["security_status"],
-                        "model_provider": run_summary["model_provider"],
-                        "report_path": run_summary["report_path"],
-                        "test_summary": summarize_test_result(state),
-                        "error_summary": summarize_error(state.get("error_log")),
-                    }
-                )
+        run_summary = ui_view_model.get("raw", {}).get("run_summary", build_run_summary(raw_state))
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("success", "成功" if run_summary["success"] else "失败")
+        col2.metric("retry_count", run_summary["retry_count"])
+        col3.metric("max_retry_count", raw_state.get("max_retry_count", get_setting("max_retry_count")))
+        col4.metric("quality_score", f"{run_summary['quality_score']}/100")
+        render_stdout_stderr(raw_state, display_mode)
+        with st.expander("完整 state", expanded=False):
+            st.json(json.loads(json.dumps(raw_state, ensure_ascii=False, default=str)))
 
 
 def render_report_area(report_path=None):
     st.markdown('<div class="section-title">报告区域</div>', unsafe_allow_html=True)
-    report_data = build_report_display_data({"report_path": report_path})
+    if report_path:
+        ui_view_model = build_ui_view_model({"report_path": report_path})
+        report = ui_view_model["report"]
+        report_data = build_report_display_data({"report_path": report["report_path"]})
+    else:
+        report_data = service_get_latest_report()
 
     if not report_data["exists"]:
         st.info("暂无报告")
@@ -1842,24 +2166,26 @@ def render_report_area(report_path=None):
     )
 
 
-def render_history_area(display_mode):
+def render_history_section(ui_view_model):
     st.markdown('<div class="section-title">历史运行记录</div>', unsafe_allow_html=True)
 
-    run_ids = list_runs()
-    latest_run = get_latest_run()
+    raw_state = ui_view_model.get("raw", {}).get("state", {})
+    display_mode = raw_state.get("_display_mode", "演示模式")
+    history_rows = ui_view_model.get("history", {}).get("rows", [])
+    run_ids = [item["run_id"] for item in history_rows]
 
     if not run_ids:
         st.info("暂无历史运行记录。完成一次运行后，会在这里看到 run_id。")
         return
 
-    default_index = run_ids.index(latest_run) if latest_run in run_ids else 0
     selected_run_id = st.selectbox(
         "选择历史 run_id",
         run_ids,
-        index=default_index,
+        index=0,
         key="history_run_id",
     )
-    history_state = load_run_state(selected_run_id)
+    history_response = service_get_run(selected_run_id)
+    history_state = history_response.get("state", {})
 
     if not history_state:
         st.warning("没有找到该 run_id 对应的状态文件。")
@@ -1939,24 +2265,57 @@ def render_history_area(display_mode):
             st.code(history_state.get("coverage_stdout", "") or "无 coverage 输出", language="text")
 
 
+def render_history_area(display_mode):
+    ui_view_model = build_ui_view_model({"_display_mode": display_mode})
+    ui_view_model["history"] = {"rows": list_run_history()}
+    render_history_section(ui_view_model)
+
+
 def update_workflow_for_node(node_name, state, workflow_status, max_retry_count):
     display_state = dict(state or {})
     display_state["_current_node"] = node_name
     display_state["_max_retry_count"] = max_retry_count
     workflow_status.clear()
-    workflow_status.update(build_workflow_status(display_state))
+    workflow_status.update(build_workflow_status_map(display_state))
 
 
-def render_page_header():
+def render_header(ui_view_model):
+    ui_view_model = ui_view_model or build_ui_view_model({})
+    header = ui_view_model["header"]
+    report = ui_view_model.get("report", {})
+    model_provider = header.get("model_provider") or "model"
+    model_name = header.get("model_name") or "未选择模型"
+    current_model = f"{model_provider} / {model_name}"
+    current_status = run_status_to_chinese(header.get("run_status", "Waiting"))
+    current_run_id = report.get("run_id") or "等待生成"
+
     st.markdown(
-        """
+        f"""
         <div class="dashboard-title">
-            <h1>AI Multi-Agent Pipeline</h1>
-            <p>AI Dashboard · Developer Console · Agent Workflow · Pipeline Dashboard</p>
+            <h1>{escape(header.get("title", "AI Multi-Agent Pipeline"))}</h1>
+            <p>{escape(header.get("subtitle", "多 Agent 自动开发流水线演示控制台"))}</p>
+            <div class="header-meta">
+                <div class="header-meta-item">
+                    <div class="header-meta-label">当前模型</div>
+                    <div class="header-meta-value">{escape(current_model)}</div>
+                </div>
+                <div class="header-meta-item">
+                    <div class="header-meta-label">当前运行状态</div>
+                    <div class="header-meta-value">{escape(current_status)}</div>
+                </div>
+                <div class="header-meta-item">
+                    <div class="header-meta-label">当前 run_id</div>
+                    <div class="header-meta-value">{escape(str(current_run_id))}</div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_page_header(ui_view_model=None, model_label=None, run_status=None):
+    render_header(ui_view_model or build_ui_view_model({}))
 
 
 def main():
@@ -1972,23 +2331,27 @@ def main():
     state = st.session_state.get("result_state")
     run_status = st.session_state.get("run_status", "Waiting")
     workflow_status = st.session_state.get("workflow_status", make_initial_workflow_status())
+    ui_view_model = build_current_ui_view_model(state, run_status, controls, enabled_plugins)
 
-    render_page_header()
-
+    header_placeholder = st.empty()
     summary_placeholder = st.empty()
     workflow_placeholder = st.empty()
     progress_placeholder = st.empty()
 
-    with summary_placeholder.container():
-        render_summary_cards(get_current_model_label(controls["model_provider"]), run_status, state, enabled_plugins)
+    with header_placeholder.container():
+        render_header(ui_view_model)
 
-    st.markdown('<div class="section-title">Agent 工作流进度</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">状态摘要</div>', unsafe_allow_html=True)
+    with summary_placeholder.container():
+        render_summary_cards(ui_view_model)
+
+    st.markdown('<div class="section-title">AI 工作流时间轴</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="small-note">Requirement → Product → Coder → Tester → Approval → Runner → Sentry → Plugins → Quality → Report</div>',
         unsafe_allow_html=True,
     )
     with workflow_placeholder.container():
-        render_workflow_progress(workflow_status, state)
+        render_workflow_timeline(ui_view_model)
 
     if (
         controls["start_button"]
@@ -2015,7 +2378,7 @@ def main():
                 else "等待人工确认：用户未勾选运行确认框，已停止执行 Runner。"
             )
         )
-        workflow_status = build_workflow_status(
+        workflow_status = build_workflow_status_map(
             {"requirement": requirement, "_current_node": "start"}
         )
         progress_log = ["Requirement 已确认"]
@@ -2026,11 +2389,20 @@ def main():
         st.session_state["progress_log"] = progress_log
         st.session_state["repair_events"] = repair_events
 
+        running_view_model = build_current_ui_view_model(
+            {"requirement": requirement, "_current_node": "start"},
+            "Running",
+            controls,
+            enabled_plugins,
+        )
+        with header_placeholder.container():
+            render_header(running_view_model)
+
         with summary_placeholder.container():
-            render_summary_cards(get_current_model_label(controls["model_provider"]), "Running", None, enabled_plugins)
+            render_summary_cards(running_view_model)
 
         with workflow_placeholder.container():
-            render_workflow_progress(workflow_status, None)
+            render_workflow_timeline(running_view_model)
 
         if controls["compare_mode"]:
             selected_providers = controls["compare_providers"][:3]
@@ -2044,31 +2416,36 @@ def main():
 
             try:
                 with st.spinner("多模型对比正在运行，每个模型会独立执行完整 Agent 流程..."):
-                    for provider in selected_providers:
+                    for index, provider in enumerate(selected_providers, start=1):
                         progress_log.append(f"开始运行模型：{provider}")
-                        progress_placeholder.markdown("\n".join(f"- {item}" for item in progress_log))
-                        model_state = run_graph_demo(
-                            requirement,
-                            max_retry_count=max_retry_count,
-                            require_human_approval=controls["require_human_approval"],
-                            approved=run_approved,
-                            model_provider=provider,
-                            approval_message=approval_message,
+                        if controls["display_mode"] == "开发模式":
+                            progress_placeholder.markdown("\n".join(f"- {item}" for item in progress_log))
+                        run_result = create_run(
+                            {
+                                "requirement": requirement,
+                                "model_provider": provider,
+                                "enabled_plugins": enabled_plugins,
+                                "max_retry_count": max_retry_count,
+                                "require_human_approval": controls["require_human_approval"],
+                                "approved": run_approved,
+                                "approval_message": approval_message,
+                                "demo_mode": controls["display_mode"] == "演示模式",
+                                "offline_mode": is_offline_mode(),
+                                "_run_id": f"{compare_run_id}_model{index}",
+                            }
                         )
+                        model_state = run_result["state"]
                         compare_states.append(model_state)
                         progress_log.append(f"模型 {provider} 运行完成")
 
-                saved_states, compare_report_path = persist_compare_states(
-                    compare_run_id,
-                    compare_states,
-                    enabled_plugins,
-                )
+                saved_states = compare_states
+                compare_report_path = create_compare_report(compare_run_id, saved_states)
                 best_state = max(
                     saved_states,
                     key=lambda item: item.get("quality_score", 0),
                 )
 
-                workflow_status = build_workflow_status(
+                workflow_status = build_workflow_status_map(
                     {**best_state, "_current_node": "report_node"}
                 )
 
@@ -2092,7 +2469,7 @@ def main():
                 st.rerun()
 
             except Exception as error:
-                workflow_status = build_workflow_status({"_current_node": "error"})
+                workflow_status = build_workflow_status_map({"_current_node": "error"})
                 st.session_state["run_status"] = "Failed"
                 st.session_state["workflow_status"] = workflow_status
                 st.session_state["stderr"] = str(error)
@@ -2148,37 +2525,39 @@ def main():
             st.session_state["repair_events"] = repair_events
 
             with workflow_placeholder.container():
-                render_workflow_progress(workflow_status, node_state)
+                node_display_state = dict(node_state or {})
+                node_display_state["_current_node"] = node_name
+                node_display_state["_max_retry_count"] = max_retry_count
+                node_view_model = build_current_ui_view_model(
+                    node_display_state,
+                    "Running",
+                    controls,
+                    enabled_plugins,
+                )
+                render_workflow_timeline(node_view_model)
 
-            progress_placeholder.markdown("\n".join(f"- {item}" for item in progress_log))
+            if controls["display_mode"] == "开发模式":
+                progress_placeholder.markdown("\n".join(f"- {item}" for item in progress_log))
 
         try:
             with st.spinner("LangGraph 正在运行，多 Agent 正在协作..."):
-                state = run_graph_demo(
-                    requirement,
-                    progress_callback=on_progress,
-                    max_retry_count=max_retry_count,
-                    require_human_approval=controls["require_human_approval"],
-                    approved=run_approved,
-                    model_provider=controls["model_provider"],
-                    approval_message=approval_message,
+                run_result = create_run(
+                    {
+                        "requirement": requirement,
+                        "model_provider": controls["model_provider"],
+                        "enabled_plugins": enabled_plugins,
+                        "max_retry_count": max_retry_count,
+                        "require_human_approval": controls["require_human_approval"],
+                        "approved": run_approved,
+                        "approval_message": approval_message,
+                        "demo_mode": controls["display_mode"] == "演示模式",
+                        "offline_mode": is_offline_mode(),
+                        "_progress_callback": on_progress,
+                    }
                 )
+                state = run_result["state"]
 
-            run_id = create_run_id()
-            state_path = Path("runs") / f"{run_id}.json"
-            report_file = Path("reports") / f"{run_id}.md"
-
-            state["run_id"] = run_id
-            state["run_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            state["enabled_plugins"] = enabled_plugins
-            state["state_path"] = str(state_path)
-            state["report_path"] = str(report_file)
-
-            report = build_markdown_report(state)
-            save_report(report, report_file)
-            save_run_state(run_id, state)
-
-            workflow_status = build_workflow_status(
+            workflow_status = build_workflow_status_map(
                 {**state, "_current_node": "report_node"}
             )
             if state.get("approved") is False:
@@ -2186,14 +2565,14 @@ def main():
             else:
                 run_status = "Completed" if state.get("success") else "Failed"
 
-            st.session_state["run_id"] = run_id
+            st.session_state["run_id"] = state.get("run_id")
             st.session_state["result_state"] = state
             st.session_state["run_state"] = state
             st.session_state["run_status"] = run_status
             st.session_state["workflow_status"] = workflow_status
             st.session_state["progress_log"] = progress_log
-            st.session_state["latest_report"] = str(report_file)
-            st.session_state["report_path"] = str(report_file)
+            st.session_state["latest_report"] = state.get("report_path")
+            st.session_state["report_path"] = state.get("report_path")
             st.session_state["stdout"] = state.get("stdout", "")
             st.session_state["stderr"] = state.get("error_log", "")
             st.session_state["test_stdout"] = state.get("test_stdout", "")
@@ -2202,7 +2581,7 @@ def main():
             st.session_state["repair_events"] = repair_events
 
         except Exception as error:
-            workflow_status = build_workflow_status({"_current_node": "error"})
+            workflow_status = build_workflow_status_map({"_current_node": "error"})
             run_status = "Failed"
             st.session_state["run_status"] = run_status
             st.session_state["workflow_status"] = workflow_status
@@ -2213,34 +2592,38 @@ def main():
     run_status = st.session_state.get("run_status", run_status)
     workflow_status = st.session_state.get("workflow_status", workflow_status)
     report_path = st.session_state.get("latest_report")
+    ui_view_model = build_current_ui_view_model(state, run_status, controls, enabled_plugins)
+
+    with header_placeholder.container():
+        render_header(ui_view_model)
 
     with summary_placeholder.container():
-        render_summary_cards(get_current_model_label(controls["model_provider"]), run_status, state, enabled_plugins)
+        render_summary_cards(ui_view_model)
 
     with workflow_placeholder.container():
-        render_workflow_progress(workflow_status, state)
+        render_workflow_timeline(ui_view_model)
 
-    if st.session_state.get("progress_log"):
+    if controls["display_mode"] == "开发模式" and st.session_state.get("progress_log"):
         progress_placeholder.markdown(
             "\n".join(f"- {item}" for item in st.session_state["progress_log"])
         )
-    else:
+    elif controls["display_mode"] == "开发模式":
         progress_placeholder.info("在左侧选择案例或输入需求，确认运行权限后点击“开始运行”。")
+    else:
+        progress_placeholder.empty()
 
     if controls["display_mode"] == "演示模式":
-        render_demo_overview(state, workflow_status, report_path, enabled_map)
-        render_highlight_moment(state)
-        render_result_summary_cards(state, enabled_map, report_path)
+        render_result_overview(ui_view_model)
+        render_result_index(ui_view_model)
+        return
 
-    render_quality_area(state, controls["display_mode"])
-    render_test_result_area(state, controls["display_mode"])
-    render_speaker_notes(state, enabled_plugins)
+    render_result_overview(ui_view_model)
 
-    st.markdown('<div class="section-title">Agent 输出</div>', unsafe_allow_html=True)
-    render_agent_tabs(state, enabled_map, controls["display_mode"])
+    st.markdown('<div class="section-title">Agent 输出详情</div>', unsafe_allow_html=True)
+    render_agent_tabs(ui_view_model)
 
-    render_report_area(report_path)
-    render_history_area(controls["display_mode"])
+    render_result_index(ui_view_model)
+    render_history_section(ui_view_model)
 
 
 if __name__ == "__main__":

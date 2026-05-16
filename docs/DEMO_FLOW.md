@@ -23,7 +23,7 @@ python -m streamlit run webui.py
 http://localhost:8501
 ```
 
-讲解重点：这是一个 AI 自动开发控制台，左侧控制运行参数，右侧展示 Agent 工作流和结果。
+讲解重点：这是一个 AI 自动开发控制台，左侧控制运行参数，右侧展示工作流时间轴、最终结果、快速导航和报告。
 
 ## 第二部分：选择“翻车修复案例”
 
@@ -78,12 +78,12 @@ DeepSeek
 
 讲解重点：点击后 LangGraph 会按状态机推进，每个节点只负责一个清晰任务。
 
-## 第七部分：展示 Agent 工作流
+## 第七部分：展示工作流进度
 
-观察右侧工作流节点：
+观察右侧 AI 工作流时间轴：
 
 ```text
-Requirement → Product Agent → Coder Agent → Tester Agent → Approval Node → Runner → Sentry Agent → Plugins → Quality → Report
+Requirement → Product Agent → Coder Agent → Tester Agent → Approval → Runner → Sentry Agent → Plugins → Quality → Report
 ```
 
 讲解重点：
@@ -97,10 +97,11 @@ Requirement → Product Agent → Coder Agent → Tester Agent → Approval Node
 - Plugins 执行扩展能力。
 - Quality Node 量化质量。
 - Report Node 生成 Markdown 报告。
+- 时间轴会显示当前节点、中文状态、摘要、整体进度和自动修复高光。
 
 ## 第八部分：展示 pytest 测试失败
 
-如果案例触发失败，打开“Tester Agent”或“pytest 自动测试结果”区域。
+如果案例触发失败，打开“结果索引”中的“pytest 测试”或 Agent 输出里的“Tester”Tab。
 
 展示内容：
 
@@ -112,7 +113,7 @@ Requirement → Product Agent → Coder Agent → Tester Agent → Approval Node
 
 ## 第九部分：展示 Sentry 自动分析
 
-打开“Sentry Agent”Tab 或“自动修复高光时刻”区域。
+查看 AI 工作流时间轴下方的“自动修复高光时刻”，或打开“Sentry”Tab。
 
 展示内容：
 
@@ -124,7 +125,7 @@ Requirement → Product Agent → Coder Agent → Tester Agent → Approval Node
 
 ## 第十部分：展示 Coder 自动修复
 
-打开“Coder Agent”Tab。
+打开“结果索引”的“自动修复”入口，或打开“Coder”Tab。
 
 展示内容：
 
@@ -136,7 +137,7 @@ Requirement → Product Agent → Coder Agent → Tester Agent → Approval Node
 
 ## 第十一部分：展示测试通过
 
-回到“pytest 自动测试结果”区域。
+回到“结果索引”的“pytest 测试”入口。
 
 展示内容：
 
@@ -148,7 +149,7 @@ Requirement → Product Agent → Coder Agent → Tester Agent → Approval Node
 
 ## 第十二部分：展示质量评分和报告
 
-展示右侧“质量评分”和“报告区域”。
+展示“最终结果总览”和“结果索引”的“运行报告”入口。
 
 展示内容：
 
@@ -156,8 +157,8 @@ Requirement → Product Agent → Coder Agent → Tester Agent → Approval Node
 - `coverage_percent`
 - 安全检查结果
 - 自动修复次数
-- Markdown 报告文件名
-- 报告预览
+- Markdown 报告路径
+- 报告预览和下载入口
 
 讲解重点：系统最终产出不只是代码，还包括测试结果、质量评分、插件分析和可复盘报告。
 

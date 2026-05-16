@@ -1,20 +1,23 @@
 from pathlib import Path
 
 from utils.error_utils import summarize_error
+from utils.summary_builder import build_run_summary
 
 
-WORKFLOW_STEPS = [
-    "Requirement",
-    "Product Agent",
-    "Coder Agent",
-    "Tester Agent",
-    "Approval Node",
-    "Runner",
-    "Sentry Agent",
-    "Plugins",
-    "Quality",
-    "Report",
+WORKFLOW_STEP_DEFINITIONS = [
+    ("requirement", "Requirement"),
+    ("product", "Product Agent"),
+    ("coder", "Coder Agent"),
+    ("tester", "Tester Agent"),
+    ("approval", "Approval Node"),
+    ("runner", "Runner"),
+    ("sentry", "Sentry Agent"),
+    ("plugins", "Plugins"),
+    ("quality", "Quality"),
+    ("report", "Report"),
 ]
+
+WORKFLOW_STEPS = [label for _, label in WORKFLOW_STEP_DEFINITIONS]
 
 PLUGIN_DISPLAY_ITEMS = [
     ("doc_agent", "doc_result", "Doc Agent"),
@@ -27,8 +30,12 @@ REPORT_DIR = Path("reports")
 LATEST_REPORT_FILE = REPORT_DIR / "latest_report.md"
 
 
+def _status_to_title(status):
+    return str(status or "waiting").strip().lower().title()
+
+
 def _base_workflow_status():
-    return {step: "Waiting" for step in WORKFLOW_STEPS}
+    return {key: "waiting" for key, _ in WORKFLOW_STEP_DEFINITIONS}
 
 
 def _apply_completed_state(status, state):
@@ -36,95 +43,204 @@ def _apply_completed_state(status, state):
         return status
 
     if state.get("requirement"):
-        status["Requirement"] = "Done"
+        status["requirement"] = "done"
     if state.get("product_result"):
-        status["Product Agent"] = "Done"
+        status["product"] = "done"
     if state.get("code"):
-        status["Coder Agent"] = "Done"
+        status["coder"] = "done"
     if state.get("tester_result") or state.get("test_code"):
-        status["Tester Agent"] = "Done"
+        status["tester"] = "done"
     if state.get("approval_message") or state.get("approved") is not None:
-        status["Approval Node"] = "Done" if state.get("approved", True) else "Failed"
+        status["approval"] = "done" if state.get("approved", True) else "failed"
     if state.get("approved") is not False and (
         state.get("stdout") or state.get("error_log") or state.get("success")
     ):
-        status["Runner"] = "Done" if state.get("success") and state.get("test_success") else "Failed"
+        status["runner"] = "done" if state.get("success") and state.get("test_success") else "failed"
+    if state.get("approved") is False:
+        status["runner"] = "skipped"
     if state.get("sentry_result"):
-        status["Sentry Agent"] = "Done"
+        status["sentry"] = "done"
     if state.get("plugin_results"):
-        status["Plugins"] = "Done"
+        status["plugins"] = "done"
     if state.get("quality_summary") or state.get("quality_score"):
-        status["Quality"] = "Done"
+        status["quality"] = "done"
     if state.get("report_path") or state.get("run_id"):
-        status["Report"] = "Done"
+        status["report"] = "done"
 
     return status
 
 
-def build_workflow_status(state):
-    """Build Agent workflow node status from state plus optional _current_node."""
+def _workflow_summary(key, state):
+    state = state or {}
+    summaries = {
+        "requirement": state.get("requirement", "等待用户输入需求"),
+        "product": state.get("product_result", "等待 Product Agent 拆解需求"),
+        "coder": "已生成代码" if state.get("code") else "等待 Coder Agent 生成代码",
+        "tester": "已生成 pytest 测试" if state.get("test_code") else "等待 Tester Agent 生成测试",
+        "approval": state.get("approval_message", "等待人工审批"),
+        "runner": state.get("stdout") or state.get("error_log") or "等待 Runner 执行代码",
+        "sentry": state.get("sentry_result", "未触发 Sentry Agent"),
+        "plugins": "插件已执行" if state.get("plugin_results") else "等待插件执行",
+        "quality": state.get("quality_summary", "等待质量评分"),
+        "report": state.get("report_path", "等待报告生成"),
+    }
+
+    return summaries.get(key, "")
+
+
+def build_workflow_status(state: dict) -> list[dict]:
+    """Build display-ready workflow steps from state plus optional _current_node."""
     state = state or {}
     status = _apply_completed_state(_base_workflow_status(), state)
     current_node = state.get("_current_node", "")
     max_retry_count = int(state.get("_max_retry_count", state.get("max_retry_count", 3)) or 3)
 
     if current_node == "start":
-        status["Requirement"] = "Done"
-        status["Product Agent"] = "Running"
+        status["requirement"] = "done"
+        status["product"] = "running"
 
     if current_node == "product_node":
-        status["Product Agent"] = "Done"
-        status["Coder Agent"] = "Running"
+        status["product"] = "done"
+        status["coder"] = "running"
 
     if current_node == "coder_node":
-        status["Coder Agent"] = "Done"
-        status["Tester Agent"] = "Running"
+        status["coder"] = "done"
+        status["tester"] = "running"
 
     if current_node == "tester_node":
-        status["Tester Agent"] = "Done"
-        status["Approval Node"] = "Running"
+        status["tester"] = "done"
+        status["approval"] = "running"
 
     if current_node == "approval_node":
         if state.get("approved"):
-            status["Approval Node"] = "Done"
-            status["Runner"] = "Running"
+            status["approval"] = "done"
+            status["runner"] = "running"
         else:
-            status["Approval Node"] = "Failed"
-            status["Plugins"] = "Running"
+            status["approval"] = "failed"
+            status["runner"] = "skipped"
+            status["plugins"] = "running"
 
     if current_node == "runner_node":
         if state.get("success") and state.get("test_success"):
-            status["Runner"] = "Done"
-            status["Plugins"] = "Running"
+            status["runner"] = "done"
+            status["plugins"] = "running"
         else:
-            status["Runner"] = "Failed"
+            status["runner"] = "failed"
             if int(state.get("retry_count", 0) or 0) >= max_retry_count:
-                status["Plugins"] = "Running"
+                status["plugins"] = "running"
             else:
-                status["Sentry Agent"] = "Repairing"
+                status["sentry"] = "repairing"
 
     if current_node == "sentry_node":
-        status["Sentry Agent"] = "Done"
-        status["Coder Agent"] = "Repairing"
-        status["Tester Agent"] = "Waiting"
-        status["Approval Node"] = "Waiting"
-        status["Runner"] = "Waiting"
+        status["sentry"] = "done"
+        status["coder"] = "repairing"
+        status["tester"] = "waiting"
+        status["approval"] = "waiting"
+        status["runner"] = "waiting"
 
     if current_node == "plugins_node":
-        status["Plugins"] = "Done"
-        status["Quality"] = "Running"
+        status["plugins"] = "done"
+        status["quality"] = "running"
 
     if current_node == "quality_node":
-        status["Quality"] = "Done"
-        status["Report"] = "Running"
+        status["quality"] = "done"
+        status["report"] = "running"
 
     if current_node == "report_node":
-        status["Report"] = "Done"
+        status["report"] = "done"
 
     if current_node == "error":
-        status["Report"] = "Failed"
+        status["report"] = "failed"
 
-    return status
+    return [
+        {
+            "key": key,
+            "label": label,
+            "status": status.get(key, "waiting"),
+            "summary": _workflow_summary(key, state),
+            "order": index + 1,
+        }
+        for index, (key, label) in enumerate(WORKFLOW_STEP_DEFINITIONS)
+    ]
+
+
+def build_workflow_status_map(state: dict) -> dict:
+    """Build the legacy label -> TitleCase status map used by the current Streamlit UI."""
+    return {
+        item["label"]: _status_to_title(item["status"])
+        for item in build_workflow_status(state)
+    }
+
+
+def build_result_index(state: dict, run_summary: dict | None = None) -> dict:
+    """Build quick lookup flags for important run outputs."""
+    state = state or {}
+    run_summary = run_summary or build_run_summary(state)
+    report_path = run_summary.get("report_path") or state.get("report_path", "")
+    report_available = bool(report_path and report_path != "未生成")
+
+    return {
+        "run_id": state.get("run_id", ""),
+        "final_code_available": bool(state.get("code")),
+        "test_result_available": bool(state.get("test_code") or state.get("test_stdout") or state.get("test_stderr")),
+        "error_available": bool(state.get("error_log") or state.get("test_stderr")),
+        "report_available": report_available,
+        "quality_available": bool(state.get("quality_summary") or state.get("quality_score") is not None),
+        "plugins_available": bool(state.get("plugin_results")),
+    }
+
+
+def build_ui_view_model(state: dict, run_summary: dict | None = None) -> dict:
+    """Build a stable UI ViewModel from raw LangGraph state."""
+    state = state or {}
+    run_summary = run_summary or build_run_summary(state)
+    report_data = build_report_display_data(state)
+
+    return {
+        "header": {
+            "title": "AI Multi-Agent Pipeline",
+            "subtitle": "多 Agent 自动开发流水线演示控制台",
+            "run_status": state.get("_run_status", "Waiting"),
+            "model_name": state.get("model_name", ""),
+            "model_provider": run_summary.get("model_provider", state.get("model_provider", "")),
+        },
+        "summary_cards": {
+            "success": run_summary.get("success", False),
+            "retry_count": run_summary.get("retry_count", 0),
+            "test_success": run_summary.get("test_success", False),
+            "coverage_percent": run_summary.get("coverage_percent", 0),
+            "quality_score": run_summary.get("quality_score", 0),
+            "security_status": run_summary.get("security_status", "等待安全检查"),
+            "report_path": run_summary.get("report_path", state.get("report_path", "未生成")),
+        },
+        "workflow_steps": build_workflow_status(state),
+        "agent_outputs": {
+            "product_result": state.get("product_result", ""),
+            "code": state.get("code", ""),
+            "tester_result": state.get("tester_result", ""),
+            "sentry_result": state.get("sentry_result", ""),
+            "stdout": state.get("stdout", ""),
+            "error_summary": summarize_error(state.get("error_log", "")),
+            "error_log": state.get("error_log", ""),
+        },
+        "plugin_outputs": {
+            "plugin_results": state.get("plugin_results", []),
+            "doc_result": state.get("doc_result", ""),
+            "security_result": state.get("security_result", ""),
+            "refactor_result": state.get("refactor_result", ""),
+            "ui_result": state.get("ui_result", ""),
+        },
+        "report": {
+            "report_path": report_data.get("path") or state.get("report_path", ""),
+            "report_markdown": report_data.get("content", ""),
+            "run_id": state.get("run_id", ""),
+        },
+        "result_index": build_result_index(state, run_summary),
+        "raw": {
+            "state": state,
+            "run_summary": run_summary,
+        },
+    }
 
 
 def _legacy_plugin_status(content, enabled=True):

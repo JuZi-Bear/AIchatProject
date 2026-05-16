@@ -95,3 +95,19 @@
 ## 24. 如何证明系统不是简单 prompt 拼接？
 
 答：系统有明确状态流转、pytest 执行、coverage 统计、代码运行、错误反馈、自动修复、插件执行、质量评分和历史报告。它是一个可执行的工程流程，而不是单次提示词输出。
+
+## 25. 为什么现在没有直接使用 Vue / Java / C++？
+
+答：v1.0 的目标是比赛稳定演示。Streamlit 能快速完成可视化、部署简单、现场风险低；Python 也最适合直接承载 LangGraph 和模型调用。Vue、Java、C++ 已经在架构文档中预留，但当前不引入实际代码，避免增加联调和部署风险。
+
+## 26. 后续如何升级为多语言平台？
+
+答：升级路线是先用 FastAPI 包装 Python Agent Engine，再用 Vue3 + TypeScript 替换 Streamlit 前端，随后引入 Java Spring Boot 做平台服务层，最后使用 C++ Runner Sandbox 增强代码运行隔离。各层通过 `docs/API_CONTRACT.md` 中的接口契约连接。
+
+## 27. 当前架构是否支持前后端分离？
+
+答：支持。我们已经抽离了 `services/run_service.py` 作为 Application Service 层，并统一输出 `state`、`run_summary` 和 `ui_view_model`。未来只需要把 run_service 包装成 HTTP API，Vue 或 Java 就可以复用同样的数据结构。
+
+## 28. ui_view_model 和 run_service 的作用是什么？
+
+答：`run_service` 负责统一创建运行、读取历史、查询模型、插件和报告，是未来 API 层的服务边界。`ui_view_model` 负责把复杂 state 转成稳定的前端展示结构，避免 Web UI 或未来 Vue 前端直接解析 LangGraph 原始状态。

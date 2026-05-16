@@ -25,6 +25,88 @@
 - [x] 修复自动生成测试/报告/运行历史误入 Git 的风险
 - [x] 修复 DEEPSEEK_MODEL / DEEPSEEK_BASE_URL 环境变量覆盖模型配置的问题
 
+## UI/UX 优化与架构重构同步计划
+
+- [x] 第一阶段：新增 docs/ui_workflow/ UI 优化工作流文档
+- [x] 第二阶段：统一 UI 状态数据层
+- [x] 新增 build_ui_view_model(state, run_summary=None)
+- [x] 新增列表结构 build_workflow_status(state)
+- [x] 新增 build_result_index(state, run_summary=None)
+- [x] 保留 build_workflow_status_map(state) 兼容当前 Streamlit 页面
+- [x] webui.py 开始优先读取 UI ViewModel 展示摘要、工作流、插件和报告数据
+- [x] 更新 UI_COMPONENTS_SPEC.md 说明 ViewModel、workflow_steps 和 summary_cards
+- [x] 新增 docs/CODEX_UI_WORKFLOW.md 标记第二阶段进度
+- [x] 第三阶段：基于 UI ViewModel 重排 Web UI 页面结构
+- [x] Header 展示项目名称、当前模型、运行状态和 run_id
+- [x] 主区域顶部使用紧凑 summary_cards 展示 success、retry_count、test_success、coverage_percent、quality_score、security_status
+- [x] AI 工作流进度区按 workflow_steps 的 order 展示节点状态和摘要
+- [x] 最终结果总览区集中展示成功状态、修复次数、测试、覆盖率、质量评分、报告路径和错误摘要
+- [x] Agent 输出详情 Tabs 调整为 Product、Coder、Tester、Sentry、Plugins、Report、Raw State
+- [x] 新增结果索引区，固定提供最终代码、测试结果、错误摘要、插件结果和报告入口
+- [x] 演示模式隐藏完整日志和 Raw State，只保留摘要、工作流、高光、最终结果和报告入口
+- [x] 开发模式保留完整代码、stdout、stderr、plugin_results 和 state
+- [x] 更新 UI_LAYOUT_SPEC 和 UI_ACCEPTANCE_CHECKLIST
+- [x] 第四阶段：抽离接口适配层
+- [x] 新建 services/ 目录
+- [x] 新建 services/run_service.py
+- [x] 实现 create_run(request)，统一返回 state、run_summary、ui_view_model
+- [x] 实现 get_run(run_id)、list_run_history()、get_latest_report()
+- [x] 实现 get_available_models()、get_available_plugins()
+- [x] webui.py 通过 create_run(request) 执行工作流，不再直接调用 LangGraph 核心入口
+- [x] webui.py 历史记录、模型列表、插件信息开始使用服务层数据
+- [x] 新建 docs/API_CONTRACT.md 记录未来 FastAPI / Vue / Java 接口结构
+- [x] 更新 TECH_STACK 和 CODEX_UI_WORKFLOW
+- [x] 第五阶段：增强 AI 工作流视觉引导和轻量动画感
+- [x] 新增 render_workflow_timeline(ui_view_model)
+- [x] Timeline 只接收 ui_view_model，不直接解析原始 state
+- [x] Timeline 展示 Requirement、Product、Coder、Tester、Approval、Runner、Sentry、Plugins、Quality、Report
+- [x] 每个节点展示中文状态、简短摘要和状态图标
+- [x] 使用 st.progress 展示整体进度
+- [x] 使用 st.status / st.info 展示当前执行步骤
+- [x] 自动修复高光时刻改为读取 ui_view_model
+- [x] 更新 UI_ANIMATION_SPEC
+- [x] 第六阶段：增加结果快速导航与报告聚合
+- [x] 新增 render_result_overview(ui_view_model)
+- [x] 最终结果总览展示成功状态、run_id、修复次数、测试结果、覆盖率、质量评分、安全状态和报告路径
+- [x] 新增 render_result_index(ui_view_model)
+- [x] 结果索引提供最终代码、pytest、错误摘要、自动修复、插件结果、运行报告和历史记录入口
+- [x] 结果索引用 Tabs + expander 实现快速查看
+- [x] Agent 输出详情继续统一放入 Product、Coder、Tester、Sentry、Plugins、Report、Raw State Tabs
+- [x] 完整代码、stdout、stderr、full state 和 report markdown 默认折叠
+- [x] 更新 UI_INTERACTION_SPEC 和 UI_ACCEPTANCE_CHECKLIST
+- [x] 第七阶段：减少空白 box 并规范 UI 组件渲染
+- [x] 新增 render_header(ui_view_model)
+- [x] 规范 render_summary_cards(ui_view_model)
+- [x] 保留 render_workflow_timeline(ui_view_model) 作为主工作流展示
+- [x] 规范 render_result_overview(ui_view_model)
+- [x] 规范 render_agent_tabs(ui_view_model)
+- [x] 新增 render_plugin_results(ui_view_model)
+- [x] 新增 render_report_section(ui_view_model)
+- [x] 新增 render_history_section(ui_view_model)
+- [x] 短字段使用 columns 横向排列
+- [x] 长内容统一放入 expander
+- [x] 统一卡片 padding、margin 和高度，减少大面积空白
+- [x] 更新 UI_COMPONENTS_SPEC 和 UI_ACCEPTANCE_CHECKLIST
+- [x] 第八阶段：生成 v2.0 多技术栈架构预留文档
+- [x] 新建 docs/V2_ARCHITECTURE_PLAN.md
+- [x] 记录 v1.0 当前架构和 v2.0 目标架构
+- [x] 规划 frontend-vue、backend-java、agent-engine-python、runner-sandbox-cpp 服务拆分
+- [x] 记录 Vue → Java API → Python Agent Engine → LangGraph → Runner Sandbox → ui_view_model 数据流
+- [x] 引用 docs/API_CONTRACT.md 作为接口契约
+- [x] 说明当前保留 Streamlit 的原因
+- [x] 规划 FastAPI、Vue3 + TS、Java Spring Boot、C++ Runner Sandbox、Docker Compose 升级路线
+- [x] 更新 TECH_STACK、README 和 DEFENSE_QA
+- [x] v1.0 最终验收
+- [x] 新建 docs/V1_RELEASE_NOTES.md
+- [x] 新建 docs/V1_FINAL_ACCEPTANCE.md
+- [x] 新建 docs/V1_FREEZE_RULES.md
+- [x] README 检查并补充 UI/UX 优化说明和 v2.0 架构规划
+- [x] DEMO_FLOW 检查并同步当前 Web UI 展示流程
+- [x] DEFENSE_QA 检查，确认包含 25+ 个评委问答
+- [x] v1.0 版本冻结
+- [x] 比赛演示准备
+- [x] 答辩材料确认
+
 ## 第一阶段：基础 Agent
 
 - [x] 接入 DeepSeek API

@@ -6,7 +6,7 @@
 
 项目默认支持 DeepSeek，也支持通义千问 Qwen 和智谱 GLM。Web UI 适合比赛现场展示，CLI 适合快速验证和调试。
 
-## 项目亮点
+## 核心亮点
 
 - 国产大模型驱动：支持 DeepSeek、Qwen、GLM。
 - 多 Agent 协作：Product、Coder、Tester、Sentry、Quality 分工明确。
@@ -176,15 +176,26 @@ python -m streamlit run webui.py
 
 右侧展示区包含：
 
-- 当前模型、运行状态、success、retry_count、enabled_plugins 状态卡片
-- Requirement、Product、Coder、Tester、Approval、Runner、Sentry、Plugins、Quality、Report 工作流节点
-- Product / Coder / Tester / Sentry / Plugins / 模型对比 / Final State Tabs
-- pytest 测试结果和 coverage 覆盖率
-- 质量评分
-- stdout / stderr 折叠日志
-- 运行报告和历史记录
+- Header：当前模型、运行状态、run_id。
+- Summary Cards：success、retry_count、test_success、coverage、quality_score、security_status。
+- AI 工作流时间轴：Requirement、Product、Coder、Tester、Approval、Runner、Sentry、Plugins、Quality、Report。
+- 自动修复高光时刻：展示失败、Sentry 分析、Coder 修复和最终测试结果。
+- 最终结果总览：成功状态、修复次数、测试、覆盖率、质量评分、安全状态和报告路径。
+- 结果快速导航：最终代码、pytest、错误摘要、自动修复、插件结果、运行报告和历史记录。
+- Agent 输出 Tabs：Product、Coder、Tester、Sentry、Plugins、Report、Raw State。
 
 演示模式会隐藏完整 prompt、完整 state 和过长错误栈，只保留关键摘要；开发模式显示完整调试信息。
+
+## UI/UX 优化说明
+
+Web UI 已围绕比赛演示做过专项优化：
+
+- 页面采用左侧控制栏 + 右侧主展示区。
+- 首屏优先展示核心状态、工作流时间轴和最终结果。
+- 通过 `ui_view_model` 统一页面数据结构，减少直接解析原始 state。
+- 通过 `run_service` 统一创建运行、读取历史、查询报告、模型和插件。
+- 短指标使用横向卡片，长内容默认折叠，减少大面积空白。
+- 结果索引保证三步内找到最终代码、错误摘要和报告。
 
 ## CLI 使用方式
 
@@ -342,6 +353,23 @@ Quality Node 使用 100 分制评分：
 config/settings.yaml
 ```
 
+## 后续架构升级方向
+
+v1.0 先保留 Streamlit，是为了保证比赛现场稳定、部署简单、演示快速。当前已经抽离 `services/run_service.py`、`run_summary` 和 `ui_view_model`，后续可以平滑升级为前后端分离架构：
+
+- FastAPI 包装 Python Agent Engine。
+- Vue3 + TypeScript 实现正式前端。
+- Java Spring Boot 承担平台服务层、任务管理和权限审计。
+- C++ Runner Sandbox 增强 AI 生成代码的隔离执行能力。
+- Docker Compose 编排多服务部署。
+
+详细规划见：
+
+```text
+docs/V2_ARCHITECTURE_PLAN.md
+docs/API_CONTRACT.md
+```
+
 ## 目录结构
 
 ```text
@@ -375,9 +403,13 @@ docs/DELIVERY_STRUCTURE.md
 - `docs/DEFENSE_QA.md`：评委问答。
 - `docs/DEMO_FLOW.md`：比赛现场演示流程。
 - `docs/FINAL_CHECKLIST.md`：交付前检查清单。
+- `docs/V1_RELEASE_NOTES.md`：v1.0 发布说明。
+- `docs/V1_FINAL_ACCEPTANCE.md`：v1.0 最终验收清单。
+- `docs/V1_FREEZE_RULES.md`：v1.0 版本冻结规则。
 - `docs/INNOVATION_POINTS.md`：创新点总结。
 - `docs/RISK_AND_SOLUTION.md`：风险与解决方案。
 - `docs/TECH_STACK.md`：技术栈说明。
+- `docs/V2_ARCHITECTURE_PLAN.md`：v2.0 多技术栈架构规划。
 - `docs/OPERATION_GUIDE.md`：部署和操作指南。
 - `docs/USER_MANUAL.md`：跨设备部署手册。
 
