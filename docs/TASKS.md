@@ -8,6 +8,13 @@
 - [x] 当前阶段只做交付检查、答辩材料、演示流程和风险预案收口
 - [x] 当前阶段只允许 Bug 修复、提示优化、文档完善和启动稳定性改善
 
+## v2.0 第一阶段 API 升级
+
+- [ ] v2.0 Python Agent Engine API
+- [ ] FastAPI 接口
+- [ ] API 文档
+- [ ] 与 run_service 打通
+
 ## v1.0 稳定性测试
 
 - [x] 新建 docs/STABILITY_TEST.md

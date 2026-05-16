@@ -177,6 +177,7 @@ def _build_approval_message(request, approved):
 def _build_response(state):
     run_summary = build_run_summary(state)
     return {
+        "run_id": state.get("run_id", ""),
         "state": state,
         "run_summary": run_summary,
         "ui_view_model": build_ui_view_model(state, run_summary),
@@ -236,6 +237,8 @@ def get_run(run_id: str) -> dict:
 
     if not state:
         return {
+            "run_id": run_id,
+            "found": False,
             "state": {},
             "run_summary": {},
             "ui_view_model": build_ui_view_model({}),
@@ -243,7 +246,9 @@ def get_run(run_id: str) -> dict:
 
     state.setdefault("run_id", run_id)
     state.setdefault("state_path", str(get_run_state_path(run_id)))
-    return _build_response(state)
+    response = _build_response(state)
+    response["found"] = True
+    return response
 
 
 def list_run_history() -> list[dict]:
@@ -256,6 +261,7 @@ def list_run_history() -> list[dict]:
         history.append(
             {
                 "run_id": run_id,
+                "run_summary": run_summary,
                 "success": run_summary.get("success", False),
                 "retry_count": run_summary.get("retry_count", 0),
                 "test_success": run_summary.get("test_success", False),
@@ -269,6 +275,58 @@ def list_run_history() -> list[dict]:
         )
 
     return history
+
+
+def list_reports() -> list[dict]:
+    """Return Markdown reports saved under reports/, newest first."""
+    if not REPORT_DIR.exists():
+        return []
+
+    report_files = sorted(
+        REPORT_DIR.glob("*.md"),
+        key=lambda file: file.stat().st_mtime,
+        reverse=True,
+    )
+
+    reports = []
+    for report_file in report_files:
+        file_stat = report_file.stat()
+        reports.append(
+            {
+                "name": report_file.name,
+                "path": str(report_file),
+                "size": file_stat.st_size,
+                "modified_time": datetime.fromtimestamp(file_stat.st_mtime).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+            }
+        )
+
+    return reports
+
+
+def get_report(report_name: str) -> dict:
+    """Return one Markdown report by filename, guarding against path traversal."""
+    if not report_name:
+        raise ValueError("report_name 不能为空")
+
+    report_root = REPORT_DIR.resolve()
+    report_file = (REPORT_DIR / report_name).resolve()
+
+    if report_file.parent != report_root:
+        raise ValueError("report_name 只能是 reports/ 目录下的文件名")
+
+    if report_file.suffix.lower() != ".md":
+        raise ValueError("只支持读取 Markdown 报告")
+
+    if not report_file.exists():
+        raise FileNotFoundError(f"报告不存在：{report_name}")
+
+    return {
+        "name": report_file.name,
+        "path": str(REPORT_DIR / report_file.name),
+        "content": report_file.read_text(encoding="utf-8"),
+    }
 
 
 def get_latest_report() -> dict:

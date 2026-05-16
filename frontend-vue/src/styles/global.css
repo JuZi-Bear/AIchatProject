@@ -1,0 +1,258 @@
+:root {
+  color: #1f2937;
+  background: #f4f7fb;
+  font-family:
+    Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  font-size: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1180px;
+  background: #f4f7fb;
+}
+
+a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: #172033;
+  border-right: 1px solid #27344c;
+  color: #f8fafc;
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 20px 18px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 8px;
+  background: #2dd4bf;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.brand-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.brand-subtitle {
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.nav-menu {
+  border-right: 0;
+  background: transparent;
+}
+
+.nav-menu .el-menu-item {
+  color: #cbd5e1;
+}
+
+.nav-menu .el-menu-item.is-active,
+.nav-menu .el-menu-item:hover {
+  background: #22304a;
+  color: #ffffff;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.topbar-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.topbar-subtitle {
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.main-content {
+  padding: 22px;
+}
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.page-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.panel {
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.panel + .panel {
+  margin-top: 16px;
+}
+
+.panel-title {
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.subsection-title {
+  margin: 18px 0 12px;
+  color: #475569;
+  font-weight: 700;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  min-height: 86px;
+  padding: 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.metric-label {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.metric-value {
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.metric-value.small {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.action-button {
+  margin-top: 18px;
+}
+
+.switch-grid {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.workflow-list {
+  display: grid;
+  gap: 10px;
+}
+
+.workflow-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.step-order {
+  display: grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #1e40af;
+  font-weight: 800;
+}
+
+.step-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.step-summary {
+  margin-top: 6px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.output-block,
+.markdown-preview {
+  max-height: 520px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #0f172a;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1280px) {
+  body {
+    min-width: 1024px;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

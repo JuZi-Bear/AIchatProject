@@ -17,6 +17,8 @@
 - 多模型对比：同一需求下对比多个模型的成功率、修复次数、覆盖率和质量评分。
 - 质量评分：从运行、测试、覆盖率、安全和修复次数给出 100 分评价。
 - Web UI 可视化：展示 Agent 工作流、修复过程、插件结果、历史记录和报告。
+- FastAPI 服务层：新增 Python Agent Engine API，预留 Vue / Java / C++ 接入边界。
+- Vue 前端预览：基于 `ui_view_model` 展示工作流、历史、报告、平台 Dashboard 和比赛演示模式，并支持前端默认模型和插件启用状态管理。
 - Docker 部署：降低新设备环境差异导致的演示风险。
 
 ## 技术架构
@@ -87,6 +89,34 @@ python -m streamlit run webui.py
 ```text
 http://localhost:8501
 ```
+
+启动 Python Agent Engine API：
+
+```powershell
+python -m uvicorn api_server:app --reload --port 8000
+```
+
+API 健康检查：
+
+```text
+http://localhost:8000/health
+```
+
+启动 Vue3 + TypeScript 前端骨架：
+
+```powershell
+cd frontend-vue
+npm install
+npm run dev
+```
+
+`frontend-vue/.env.development` 默认配置：
+
+```text
+VITE_API_BASE_URL=http://127.0.0.1:8001
+```
+
+如果使用该默认配置，请将 Python API 启动在 8001 端口，或按本地实际端口调整 `.env.development`。
 
 如果比赛现场网络不稳定，可以设置：
 
@@ -357,8 +387,11 @@ config/settings.yaml
 
 v1.0 先保留 Streamlit，是为了保证比赛现场稳定、部署简单、演示快速。当前已经抽离 `services/run_service.py`、`run_summary` 和 `ui_view_model`，后续可以平滑升级为前后端分离架构：
 
-- FastAPI 包装 Python Agent Engine。
-- Vue3 + TypeScript 实现正式前端。
+- FastAPI 包装 Python Agent Engine，当前已提供 `api_server.py` 预览接口。
+- Vue3 + TypeScript 前端骨架，当前已提供 `frontend-vue/` 独立项目，并支持 Dashboard 总览、工作流可视化、历史记录、报告查看、默认模型选择和插件开关。
+- Vue Dashboard 已支持运行统计、最近运行、最近报告、模型状态、插件状态和快捷操作；各模块独立容错，API 未连接时不会白屏。
+- Vue RunConsole 已支持比赛演示模式，突出 Agent 工作流阶段、自动修复高光、最终质量评分、报告入口和答辩讲解提示。
+- Vue 前端配置当前保存于浏览器 localStorage，后续可升级为 Java 后端统一配置管理。
 - Java Spring Boot 承担平台服务层、任务管理和权限审计。
 - C++ Runner Sandbox 增强 AI 生成代码的隔离执行能力。
 - Docker Compose 编排多服务部署。
@@ -379,12 +412,15 @@ plugins/              自定义 AI 插件模块
 utils/                代码运行、测试、报告、摘要和历史工具
 config/               模型、插件和默认运行配置
 docs/                 操作手册、答辩材料、设计文档
+frontend-vue/         Vue3 + TypeScript 前端骨架
 reports/              Markdown 运行报告
 runs/                 每次运行的完整 state JSON
 output/               生成代码和兼容输出
 tests/                自动生成的 pytest 测试
 graph_demo.py         CLI 演示入口
 webui.py              Streamlit Web UI
+api_server.py         FastAPI Python Agent Engine API
+schemas/              API 请求和响应 Pydantic Schema
 Dockerfile            Docker 镜像配置
 docker-compose.yml    Docker Compose 启动配置
 requirements.txt      Python 依赖

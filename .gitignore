@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!frontend-vue/.env.development
 .venv/
 .idea/
 .vscode/
@@ -8,6 +9,8 @@ __pycache__/
 */__pycache__/
 *.pyc
 .coverage
+frontend-vue/node_modules/
+frontend-vue/dist/
 output/
 reports/
 runs/*.json
