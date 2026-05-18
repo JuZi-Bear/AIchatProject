@@ -3,6 +3,7 @@ import { Refresh, Search } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 
+import { currentApiMode, getApiDisconnectedHint, getConfigSourceLabel, getDataModeLabel } from "@/api/client";
 import { getPlugins } from "@/api/plugins";
 import { useSettingsStore } from "@/stores/settings";
 import type { PluginConfig } from "@/types/plugin";
@@ -12,6 +13,12 @@ const plugins = ref<PluginConfig[]>([]);
 const loading = ref(false);
 const keyword = ref("");
 const statusFilter = ref("all");
+const dataModeLabel = getDataModeLabel();
+const dataSourceLabel = getConfigSourceLabel();
+const settingsStorageDescription =
+  currentApiMode === "java"
+    ? "当前配置会优先同步到 Java /api/settings；同步失败时回退到前端 localStorage，将在运行任务时生效。"
+    : "当前配置保存于前端 localStorage，将在运行任务时生效；暂不写回 config/agents.yaml。";
 
 const filteredPlugins = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase();
@@ -63,12 +70,13 @@ async function loadPlugins() {
   loading.value = true;
 
   try {
+    await settingsStore.loadSettings();
     plugins.value = await getPlugins();
     settingsStore.hydratePluginDefaults(
       plugins.value.filter((plugin) => plugin.enabled).map((plugin) => pluginValue(plugin)),
     );
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "加载插件配置失败");
+    ElMessage.error(error instanceof Error ? error.message : `${getApiDisconnectedHint()}，加载插件配置失败`);
   } finally {
     loading.value = false;
   }
@@ -93,11 +101,16 @@ onMounted(loadPlugins);
     </div>
 
     <el-alert
-      title="当前配置保存于前端 localStorage，将在运行任务时生效；暂不写回 config/agents.yaml。"
+      :title="settingsStorageDescription"
       type="info"
       show-icon
       :closable="false"
     />
+
+    <div class="mode-tags">
+      <el-tag type="warning" effect="plain">当前数据模式：{{ dataModeLabel }}</el-tag>
+      <el-tag type="primary" effect="plain">当前数据来源：{{ dataSourceLabel }}</el-tag>
+    </div>
 
     <section class="panel">
       <div class="plugin-toolbar">
@@ -157,6 +170,12 @@ onMounted(loadPlugins);
   grid-template-columns: 1fr 140px;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.mode-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .plugin-grid {

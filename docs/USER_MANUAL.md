@@ -1,5 +1,7 @@
 # 用户操作手册与跨设备部署指南
 
+> 用户手册：本文面向比赛演示用户和新设备部署。维护者排障、Docker 多服务和双轨启动顺序请优先阅读 `docs/OPERATION_GUIDE.md`、`docs/STARTUP_ORDER.md` 和 `docs/DOCKER_COMPOSE_GUIDE.md`。
+
 本文档面向比赛演示、答辩现场和新设备部署。按照本文档操作，可以在另一台电脑上重新安装环境、配置 DeepSeek API，并启动 CLI 或 Web UI 演示。
 
 ## 1. 项目简介

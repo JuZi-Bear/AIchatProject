@@ -187,6 +187,8 @@ def show_final_summary(state):
     show_text("模型服务商", run_summary["model_provider"], "cyan")
     show_text("模型名称", state.get("model_name", ""), "cyan")
     show_text("报告路径", run_summary["report_path"], "magenta")
+    show_text("runner_mode", run_summary.get("runner_mode", "python"), "magenta")
+    show_text("runner_warning", run_summary.get("runner_warning", ""), "yellow")
     show_text("人工审批", state.get("approval_message", "无"), "magenta")
     show_text("最终 stdout", state["stdout"], "cyan")
     show_text("最终 error_log 摘要", summarize_error(state["error_log"]), "red")

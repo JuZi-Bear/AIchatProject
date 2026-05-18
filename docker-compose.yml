@@ -1,7 +1,79 @@
 services:
-  ai-agent-pipeline:
+  mysql:
+    image: mysql:8.0
+    container_name: aichat-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-aichat_platform}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  ai-agent-api:
     build: .
-    container_name: ai_agent_pipeline
+    command: python -m uvicorn api_server:app --host 0.0.0.0 --port 8001
+    env_file:
+      - .env
+    environment:
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      GLM_API_KEY: ${GLM_API_KEY:-}
+      DEFAULT_MODEL_PROVIDER: ${DEFAULT_MODEL_PROVIDER:-deepseek}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      OFFLINE_MODE: ${OFFLINE_MODE:-false}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./reports:/app/reports
+      - ./runs:/app/runs
+      - ./output:/app/output
+      - ./config:/app/config
+      - ./runner-cpp:/app/runner-cpp
+    restart: unless-stopped
+
+  backend-java:
+    build: ./backend-java
+    ports:
+      - "8088:8088"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      ai-agent-api:
+        condition: service_started
+    environment:
+      AGENT_ENGINE_BASE_URL: http://ai-agent-api:8001
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/aichat_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    restart: unless-stopped
+
+  frontend-vue:
+    build:
+      context: ./frontend-vue
+      args:
+        VITE_API_MODE: java
+        VITE_JAVA_API_BASE_URL: http://localhost:8088/api
+        VITE_PYTHON_API_BASE_URL: http://localhost:8001
+    ports:
+      - "5174:80"
+    depends_on:
+      backend-java:
+        condition: service_started
+      ai-agent-api:
+        condition: service_started
+    restart: unless-stopped
+
+  streamlit-web:
+    build: .
+    command: python -m streamlit run webui.py --server.address=0.0.0.0 --server.port=8501
     env_file:
       - .env
     environment:
@@ -16,6 +88,14 @@ services:
       - "8501:8501"
     volumes:
       - ./reports:/app/reports
-      - ./output:/app/output
       - ./runs:/app/runs
+      - ./output:/app/output
+      - ./config:/app/config
+      - ./runner-cpp:/app/runner-cpp
+    depends_on:
+      ai-agent-api:
+        condition: service_started
     restart: unless-stopped
+
+volumes:
+  mysql_data:

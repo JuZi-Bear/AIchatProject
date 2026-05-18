@@ -1,0 +1,6 @@
+{
+  "code_file": "../output/generated_code.py",
+  "timeout_seconds": 5,
+  "working_dir": "../output",
+  "allow_network": false
+}

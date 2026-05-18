@@ -1,5 +1,7 @@
 # 风险与解决方案
 
+> 早期风险文档：本文保留 v1.0 风险预案和部分 v2.0 Runner 说明。当前双轨稳定性、现场兜底和平台化风险主文档请优先阅读 `docs/RISK_AND_STABILITY.md`。
+
 ## API Key 缺失
 
 风险：未配置 `DEEPSEEK_API_KEY`、`QWEN_API_KEY` 或 `GLM_API_KEY` 时，在线模型无法调用。
@@ -40,6 +42,18 @@
 - 禁止 `os.remove`、`shutil.rmtree`、`subprocess`、`eval`、`exec`。
 - Approval Node 要求人工确认后才运行代码。
 - Security Agent 在插件阶段再次检查安全风险。
+- v2.0 已新增 `runner-cpp/` C++ Runner Sandbox 最小版本。默认仍使用 Python Runner；当 `runner_mode=cpp` 且 `runner.exe` 已编译时，会先由 C++ 层扫描危险关键词再执行。未编译时自动回退 Python Runner，并在 `runner_warning` 中提示。
+
+## C++ Runner 未编译或不可用
+
+风险：将 `runner_mode` 设置为 `cpp` 后，如果没有编译 `runner-cpp/build/runner.exe`，可能导致用户误以为已经使用 C++ Runner。
+
+解决方案：
+
+- `utils/cpp_runner_adapter.py` 会检测 runner 是否存在。
+- runner 不存在时自动回退 Python Runner，不影响演示和原有流程。
+- `run_summary.runner_warning`、Web UI 和 Vue 前端会展示回退提示。
+- 编译方法见 `docs/CPP_RUNNER_SANDBOX.md`。
 
 ## 测试失败
 

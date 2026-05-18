@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
+from agent_registry import get_default_agent_registry
 from config.config_loader import get_setting
 from graph import run_graph_demo
 from model_manager import (
@@ -25,6 +26,7 @@ from utils.run_store import (
 )
 from utils.summary_builder import build_run_summary
 from utils.ui_state_builder import build_report_display_data, build_ui_view_model
+from workflow_templates import get_default_workflows
 
 
 REPORT_DIR = Path("reports")
@@ -379,6 +381,156 @@ def get_available_plugins() -> list[dict]:
         )
 
     return plugins
+
+
+def get_available_agents() -> list[dict]:
+    """Return registered Agent metadata for API clients and future workflow editors."""
+    return get_default_agent_registry().to_dict_list()
+
+
+def get_workflow_templates() -> list[dict]:
+    """Return reusable workflow templates for future workflow editors."""
+    return get_default_workflows(include_markdown=True)
+
+
+def _find_workflow_template(template_key: str) -> dict | None:
+    for template in get_workflow_templates():
+        if template.get("key") == template_key:
+            return template
+
+    return None
+
+
+def _build_custom_workflow_template(template_key: str, template_data: dict) -> dict:
+    nodes = template_data.get("nodes") or []
+    enabled_nodes = [node for node in nodes if node.get("enabled", True)]
+
+    return {
+        "key": template_key,
+        "name": template_data.get("name") or template_key,
+        "description": template_data.get("description") or "Vue Workflow Editor 自定义模板",
+        "agent_sequence": [
+            node.get("agentKey") or node.get("agent_key") or node.get("key") or "agent"
+            for node in enabled_nodes
+        ],
+        "stage_sequence": [node.get("stage") or "未分类" for node in enabled_nodes],
+        "enabled": bool(template_data.get("enabled", True)),
+        "version": str(template_data.get("version", "custom")),
+        "md_path": "",
+        "markdown": "",
+        "connections": template_data.get("connections") or [],
+    }
+
+
+def _build_template_workflow_steps(template: dict) -> list[dict]:
+    labels = {
+        "product": "Product Agent",
+        "coder": "Coder Agent",
+        "tester": "Tester Agent",
+        "runner": "Runner",
+        "sentry": "Sentry Agent",
+        "plugins": "Plugin Executor",
+        "quality": "Quality Evaluator",
+        "report": "Report Generator",
+    }
+    agent_sequence = template.get("agent_sequence", [])
+    stage_sequence = template.get("stage_sequence", [])
+
+    steps = []
+    for index, agent_key in enumerate(agent_sequence):
+        stage = stage_sequence[index] if index < len(stage_sequence) else "待执行"
+        steps.append(
+            {
+                "key": f"{agent_key}_{index + 1}",
+                "agent_key": agent_key,
+                "label": labels.get(agent_key, agent_key),
+                "status": "waiting",
+                "summary": f"{stage}阶段等待执行",
+                "order": index + 1,
+            }
+        )
+
+    return steps
+
+
+def instantiate_workflow_template(request: dict) -> dict:
+    """Create a lightweight workflow-template task view without running LangGraph."""
+    request = request or {}
+    template_key = str(request.get("template_key", "")).strip()
+    input_data = request.get("input_data") or {}
+    template_data = request.get("template_data") or {}
+
+    if not template_key:
+        raise ValueError("template_key 不能为空")
+
+    template = _find_workflow_template(template_key)
+    if not template and isinstance(template_data, dict) and template_data:
+        template = _build_custom_workflow_template(template_key, template_data)
+
+    if not template:
+        raise ValueError(f"Workflow 模板不存在：{template_key}")
+
+    platform_run_id = f"workflow_template_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    requirement = str(input_data.get("requirement", "")).strip()
+    workflow_events = []
+    workflow_steps = _build_template_workflow_steps(template)
+    run_summary = {
+        "run_id": platform_run_id,
+        "platformRunId": platform_run_id,
+        "requirement": requirement,
+        "success": False,
+        "retry_count": 0,
+        "test_success": False,
+        "coverage_percent": 0,
+        "quality_score": 0,
+        "security_status": "not_run",
+        "enabled_plugins": [],
+        "model_provider": str(input_data.get("model_provider", "")),
+        "report_path": "",
+        "workflow_template": template_key,
+        "event_count": 0,
+        "last_event": None,
+        "workflow_event_summary": {
+            "template_key": template_key,
+            "status": "instantiated",
+        },
+    }
+    ui_view_model = {
+        "header": {
+            "title": template.get("name", "Workflow Template"),
+            "subtitle": template.get("description", ""),
+            "template_key": template_key,
+        },
+        "summary_cards": run_summary,
+        "workflow_template": template,
+        "workflow_steps": workflow_steps,
+        "workflow_events": workflow_events,
+        "agent_outputs": {
+            "product_result": requirement,
+        },
+        "plugin_outputs": {},
+        "report": {
+            "report_path": "",
+            "report_markdown": "",
+            "run_id": platform_run_id,
+        },
+        "raw": {
+            "template_key": template_key,
+            "input_data": input_data,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    }
+
+    return {
+        "platformRunId": platform_run_id,
+        "platform_run_id": platform_run_id,
+        "run_id": platform_run_id,
+        "template_key": template_key,
+        "input_data": input_data,
+        "workflow_events": workflow_events,
+        "run_summary": run_summary,
+        "ui_view_model": ui_view_model,
+    }
 
 
 def create_compare_report(compare_run_id, states):

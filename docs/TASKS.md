@@ -8,12 +8,171 @@
 - [x] 当前阶段只做交付检查、答辩材料、演示流程和风险预案收口
 - [x] 当前阶段只允许 Bug 修复、提示优化、文档完善和启动稳定性改善
 
+## 双轨并行架构收敛整理阶段
+
+- [x] 新增双轨架构说明
+- [x] 新增项目目录指南
+- [x] 新增文档总导航
+- [x] 新增 Codex 协作规范和模块边界说明
+- [x] 新增 Video Coding 指南
+- [x] 新增比赛答辩讲稿
+- [x] 新增风险与稳定性说明
+- [x] 补齐关键目录 README
+- [x] 精简根 README
+- [x] 规范 `.gitignore`
+
+## 代码健康检查与最小清理阶段
+
+- [x] 新增代码健康检查报告
+- [x] 新增维护指南
+- [x] 新增安全变更检查清单
+- [x] 检查核心入口有效性
+- [x] 检查疑似临时文件和重复文档
+- [x] 检查配置端口和 API 模式一致性
+- [x] 检查 FastAPI、Java Gateway 和 Vue API 路径一致性
+- [x] 低风险修正文档中的 Docker 服务名和挂载说明
+
+## v1.0 / v2.0 双轨启动测试清单阶段
+
+- [x] 新增双轨启动测试清单
+- [x] 新增测试结果记录表
+- [x] 新增推荐启动顺序说明
+- [x] README 增加双轨启动测试入口
+- [x] CODEX_PROJECT_CONTEXT 增加修改后最低验证要求
+
+## 双轨测试问题归档与修复计划
+
+- [x] 整理 ISSUE_TRIAGE.md
+- [x] 整理 FIX_PLAN.md
+- [x] 整理 NEXT_ACTION_QUEUE.md
+- [x] 同步 CODEX_PROJECT_CONTEXT.md
+- [ ] 等待用户确认高风险修复项
+
+## P2 文档去重归档阶段
+
+- [x] 新增 REDUNDANCY_REVIEW.md
+- [x] 标记 ARCHITECTURE.md 为历史架构文档
+- [x] 标记 DELIVERY_STRUCTURE.md 为交付历史文档
+- [x] 标记 RISK_AND_SOLUTION.md 为早期风险文档
+- [x] 明确 USER_MANUAL.md 与 OPERATION_GUIDE.md 读者边界
+- [x] 更新 DOCUMENT_INDEX、README 和 NEXT_ACTION_QUEUE
+
+## 技术框架扩展规划
+
+- [x] 新增 FRAMEWORK_EXTENSION_PLAN.md
+- [x] 新增 FRAMEWORK_EXTENSION_BOUNDARY.md
+- [x] 新增 FRAMEWORK_EXTENSION_CANDIDATES.md
+- [x] 新增 RECOMMENDED_EXTENSION_ROADMAP.md
+- [x] 新增 FRAMEWORK_EXTENSION_ARCHITECTURE.md
+- [x] 更新 README 技术框架扩展方向
+- [x] 更新 V2_ARCHITECTURE_PLAN 平台化框架升级说明
+- [x] 更新 TECH_STACK 技术栈扩展边界
+- [x] 更新 CODEX_PROJECT_CONTEXT 框架扩展原则
+
 ## v2.0 第一阶段 API 升级
 
 - [ ] v2.0 Python Agent Engine API
 - [ ] FastAPI 接口
 - [ ] API 文档
 - [ ] 与 run_service 打通
+
+## v2.0 第八步生产构建与 Docker 联调
+
+- [x] Vue 生产构建
+- [x] Vue Dockerfile
+- [x] Nginx 配置
+- [x] FastAPI Docker 服务
+- [x] Docker Compose 多服务联调
+
+## v2.0 第九步 Java 平台服务层
+
+- [x] Java Spring Boot 最小骨架
+- [x] Java API Gateway / Proxy
+- [x] PythonAgentClient
+- [x] Java CORS 配置
+- [x] backend-java Dockerfile
+- [x] Docker Compose 增加 backend-java 服务
+
+## v2.0 第十步 Vue API 调用模式切换
+
+- [x] `.env.development` 支持 Python Direct / Java Gateway 配置
+- [x] `.env.production` 默认使用 Java Gateway
+- [x] `client.ts` 统一选择 API Base URL 和 health 路径
+- [x] Dashboard 展示当前 API 模式、地址和连接状态
+- [x] Models 页面展示当前 API 模式说明
+- [x] Java Gateway 补齐报告详情代理接口
+- [x] 文档更新 API 模式映射和两种启动方式
+
+## v2.0 第十一步 Java 平台服务雏形
+
+- [x] Java 内存级 RunRecord 任务记录
+- [x] `/api/platform/runs` 平台运行记录接口
+- [x] `/api/settings` 前端配置保存接口
+- [x] ApiResponse 统一响应结构
+- [x] GlobalExceptionHandler 统一异常处理
+- [x] Vue Java 模式优先同步 Java settings，失败回退 localStorage
+- [x] Dashboard 展示 Java 平台记录
+
+## v2.0 第十二步 Java MySQL 持久化
+
+- [x] Spring Data JPA 和 MySQL Connector 依赖
+- [x] MySQL datasource 与 Hibernate update 配置
+- [x] RunRecordEntity / FrontendSettingsEntity / ModelConfigEntity / PluginConfigEntity
+- [x] JPA Repository 层
+- [x] RunRecordService 保存和查询 MySQL
+- [x] SettingsService 保存和查询 MySQL
+- [x] 模型和插件默认配置初始化
+- [x] Docker Compose MySQL 服务和数据卷
+- [x] MySQL 安装与故障处理文档
+
+## v2.0 第十三步 Vue 接入 Java + MySQL 数据视图
+
+- [x] Vue API 层支持 Java `/platform/runs` 平台运行记录
+- [x] History 页面在 Java 模式下优先展示 MySQL 运行记录
+- [x] Settings 在 Java 模式下优先同步 `/api/settings`，失败回退 localStorage
+- [x] Models 页面显示 Java/MySQL 模型配置来源
+- [x] Plugins 页面显示 Java/MySQL 插件配置来源
+- [x] Dashboard 展示 MySQL 运行记录数量和最近平台记录
+- [x] 页面顶部展示 Python Direct / Java Gateway + MySQL 数据模式
+
+## v2.0 第十四步 Java + MySQL 任务详情和报告索引管理
+
+- [x] RunRecordEntity 增强运行摘要、UI ViewModel、插件结果和审批字段
+- [x] ReportIndexEntity / ReportIndexRepository
+- [x] ReportIndexService 报告索引保存和查询
+- [x] `/api/platform/reports` 平台报告索引接口
+- [x] `/api/platform/reports/{reportName}` 报告索引与正文接口
+- [x] `/api/platform/runs/{platformRunId}/reports` 运行关联报告接口
+- [x] `/api/platform/stats` 平台统计接口
+- [x] Vue Reports 接入 Java/MySQL 报告索引
+- [x] Vue Dashboard 接入 Java/MySQL 平台统计
+- [x] Vue History 展示增强运行记录字段
+
+## v2.0 第十五步 C++ Runner Sandbox 最小版本
+
+- [x] 新增 `runner-cpp/` CMake 工程
+- [x] C++ Runner 支持读取 task.json
+- [x] SecurityScanner 危险关键词扫描
+- [x] SandboxRunner 调用 Python 执行目标文件
+- [x] Runner 输出 JSON 执行结果
+- [x] 新增 `utils/cpp_runner_adapter.py`
+- [x] `config/settings.yaml` 新增 `runner_mode`
+- [x] `utils/code_runner.py` 支持 python/cpp 模式和 fallback
+- [x] `run_summary` 增加 runner_mode / runner_warning
+- [x] Web UI / Vue 轻量展示 Runner 模式和 warning
+- [x] 新增 `docs/CPP_RUNNER_SANDBOX.md`
+
+## v2.0 第十六步 Docker Compose 多服务总集成
+
+- [x] Docker Compose 多服务总集成
+- [x] MySQL 容器服务
+- [x] FastAPI 容器服务
+- [x] Java 容器服务
+- [x] Vue 容器服务
+- [x] Streamlit 容器服务
+- [x] C++ Runner Sandbox 作为本地可选增强模块挂载说明
+- [x] 新增 `.env.docker.example`
+- [x] 新增 `docs/DOCKER_COMPOSE_GUIDE.md`
 
 ## v1.0 稳定性测试
 
@@ -393,7 +552,7 @@
 - [x] 默认启动 Web UI
 - [x] Web UI 绑定 0.0.0.0:8501
 - [x] 支持通过 .env 传入 DeepSeek 配置
-- [x] docker-compose.yml 服务名设置为 ai-agent-pipeline
+- [x] docker-compose.yml 保留 Streamlit v1 服务，当前服务名为 streamlit-web
 - [x] docker-compose.yml 挂载 reports/ 和 output/
 - [x] 新增 .dockerignore 避免打包本地敏感文件
 - [x] README 增加 Docker 启动方式
@@ -564,3 +723,134 @@
 - [x] RISK_AND_SOLUTION 说明 API Key、网络、模型、代码安全、测试、Docker、依赖和 Python 版本风险处理
 - [x] 新建 docs/TECH_STACK.md
 - [x] TECH_STACK 整理 Python 3.11、DeepSeek/Qwen/GLM、OpenAI SDK、LangGraph、Streamlit、Rich、pytest、coverage、Docker、PyYAML、python-dotenv 和 Markdown 报告作用
+
+## 技术框架扩展落地第二步：任务运行日志与事件记录
+
+- [x] 新增 RunEventType 事件类型枚举
+- [x] 新增 RunEventEntity
+- [x] 新增 RunEventRepository
+- [x] 新增 RunEventService
+- [x] 在 Java POST /api/runs 流程记录任务创建、状态变化、Python 请求/响应、成功失败、报告索引和异常事件
+- [x] 新增任务事件接口
+- [x] 新增取消接口事件记录
+- [x] Vue RunHistory 增加事件时间线
+- [x] Vue Dashboard 增加最近平台事件
+- [x] Vue RunConsole 增加 Java 平台事件记录入口
+- [x] 更新 API、架构、技术栈和 README 文档
+
+## 技术框架扩展落地第三步：SSE 实时日志预留接口
+
+- [x] 新增 RunEventSseService
+- [x] 新增 RunEventSseController
+- [x] Java RunEventService 写入事件后推送 SSE
+- [x] SSE 连接支持 connected、run-event、final 和 stream-error 事件
+- [x] Vue 新增 EventSource 客户端
+- [x] RunConsole 增加实时事件日志展示
+- [x] RunHistory 增加订阅实时事件和停止订阅按钮
+- [x] Dashboard 增加最近事件刷新入口
+- [x] 更新 API、架构、技术栈和 README 文档
+
+## 技术框架扩展落地第四步：Python Agent Engine 细粒度事件上报
+
+- [x] 新增 workflow_events 字段
+- [x] 新增 utils/workflow_event_builder.py
+- [x] Product Agent 节点追加开始、完成、失败事件
+- [x] Coder Agent 节点追加开始、完成、失败事件
+- [x] Tester Agent 节点追加测试开始、测试完成、失败事件
+- [x] Runner 节点追加执行开始、执行完成、失败事件
+- [x] Sentry Agent 节点追加修复分析开始、修复分析完成、失败事件
+- [x] Quality 节点追加质量评分事件
+- [x] Report 节点追加报告生成事件
+- [x] 工作流追加 WORKFLOW_STARTED / WORKFLOW_FINISHED
+- [x] run_summary 增加 event_count、last_event、workflow_event_summary
+- [x] ui_view_model 增加 workflow_events
+- [x] FastAPI POST /runs 和 GET /runs/{run_id} 返回 workflow_events
+- [x] Java 保存 Python workflow_events 到 MySQL RunEventEntity
+- [x] Java 通过已有 SSE 推送 Python workflow_events
+- [x] Vue RunConsole、RunHistory、Dashboard 展示 Agent 事件 Tag
+- [x] WorkflowTimeline 使用 workflow_events 作为增强提示
+
+## 技术框架扩展落地第五步：工作流回放功能
+
+- [x] Java replay API
+- [x] Java replay 数据解析 runSummaryJson / uiViewModelJson
+- [x] Vue WorkflowReplay 页面
+- [x] 新增 WorkflowReplayTimeline 组件
+- [x] 新增 ReplayControlPanel 组件
+- [x] 新增 ReplayEventCard 组件
+- [x] 支持上一步、下一步、自动播放、暂停、重置
+- [x] 支持 500ms / 800ms / 1200ms 播放速度
+- [x] History 增加回放入口
+- [x] Dashboard 增加最近运行回放入口
+- [x] 更新 API、架构、技术栈和 README 文档
+
+## 技术框架扩展落地第六步：Agent 注册中心与 Prompt 模板管理
+
+- [x] 新增 AgentMeta
+- [x] 新增 AgentRegistry
+- [x] 新增默认 Agent 注册
+- [x] 新增 prompts/ Prompt 模板目录
+- [x] 新增 product_agent.md
+- [x] 新增 coder_agent.md
+- [x] 新增 tester_agent.md
+- [x] 新增 sentry_agent.md
+- [x] 新增 Prompt Loader
+- [x] Product Agent 接入 Prompt Loader
+- [x] Coder Agent 接入 Prompt Loader
+- [x] Tester Agent 接入 Prompt Loader
+- [x] Sentry Agent 接入 Prompt Loader
+- [x] FastAPI /agents
+- [x] Java Gateway /api/agents
+- [x] Vue Agents 页面
+- [x] Dashboard 快捷入口增加 Agent 注册中心
+- [x] 更新 API、架构、技术栈、Codex 上下文和 README 文档
+
+## 技术框架扩展落地第七步：Workflow 模板管理
+
+- [x] 新增 WorkflowTemplate 类
+- [x] 新增 workflow_templates/template_md 描述文件
+- [x] 新增 simple_demo / full_agent_flow / repair_flow 默认模板
+- [x] 新增 FastAPI Workflow 模板接口
+- [x] 新增 Java Gateway Workflow 模板代理接口
+- [x] 新增 Vue WorkflowTemplates 页面
+- [x] 新增 Workflow 模板 API 封装和类型定义
+- [x] Dashboard 快捷入口增加创建新工作流任务
+- [x] 更新 API、架构、技术栈和 README 文档
+
+## 技术框架扩展落地第八步：Vue 可视化工作流拖拽编辑器
+
+- [x] 新增 WorkflowEditor 页面
+- [x] 新增 WorkflowCanvas 组件
+- [x] 新增 AgentNode 组件
+- [x] 新增 NodePropertiesPanel 组件
+- [x] 新增 Toolbar 组件
+- [x] 新增 WorkflowEditorStore Pinia 状态管理
+- [x] 新增 workflowEditor TypeScript 类型定义
+- [x] 支持从 Agent Palette 拖入节点
+- [x] 支持节点位置拖动、删除和顺序调整
+- [x] 支持节点输入输出、阶段、描述和启用状态编辑
+- [x] 支持加载 API Workflow 模板
+- [x] 支持本地保存模板和导出 JSON
+- [x] 支持调用 Workflow instantiate API 生成任务视图
+- [x] Dashboard / 侧边栏增加 Workflow Editor 入口
+- [x] 更新 API、架构、技术栈和 README 文档
+
+## 简化 CodeAgent 文件操作节点
+
+- [x] 新增 Python `utils/simple_code_agent.py`
+- [x] 支持 read_file
+- [x] 支持 write_file
+- [x] 支持 list_files
+- [x] 文件写入前自动创建父目录
+- [x] 增加路径白名单和阻断路径配置
+- [x] 增加 CodeAgent JSONL 操作审计日志
+- [x] 输出统一操作摘要
+- [x] 生成 AGENT_STARTED / AGENT_FINISHED / AGENT_FAILED 事件
+- [x] FastAPI 新增 `/api/code-agent/execute`
+- [x] Agent Registry 新增 CodeAgent
+- [x] Workflow 模板新增 CodeAgent 文件操作流程
+- [x] Java Gateway 新增 `/api/code-agent/execute`
+- [x] Java 保存 CodeAgent 事件到 RunEvent 并推送 SSE
+- [x] Vue Workflow Editor 新增 CodeAgentPanel
+- [x] Vue 支持触发 CodeAgent 节点并展示事件时间线
+- [x] 更新 API、架构、技术栈和 README 文档

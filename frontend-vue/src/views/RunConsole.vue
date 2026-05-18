@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 
 import AgentOutputTabs from "@/components/AgentOutputTabs.vue";
 import DemoHero from "@/components/DemoHero.vue";
@@ -12,6 +12,9 @@ import ReportPreview from "@/components/ReportPreview.vue";
 import ResultOverview from "@/components/ResultOverview.vue";
 import SummaryCards from "@/components/SummaryCards.vue";
 import WorkflowTimeline from "@/components/WorkflowTimeline.vue";
+import { currentApiMode, getApiModeLabel } from "@/api/client";
+import { getRunEvents } from "@/api/events";
+import { subscribeRunEvents, type RunEventSubscription } from "@/api/eventStream";
 import { getModels } from "@/api/models";
 import { getPlugins } from "@/api/plugins";
 import { postRun } from "@/api/runs";
@@ -20,6 +23,7 @@ import type { DemoCase, DemoCaseKey } from "@/types/demo";
 import type { ModelConfig } from "@/types/model";
 import type { PluginConfig } from "@/types/plugin";
 import type { RunRequest, RunResponse } from "@/types/run";
+import type { RunEvent } from "@/types/runEvent";
 
 const demoCases: DemoCase[] = [
   {
@@ -49,6 +53,8 @@ const demoCases: DemoCase[] = [
 ];
 
 const settingsStore = useSettingsStore();
+const apiModeLabel = getApiModeLabel();
+const isJavaMode = currentApiMode === "java";
 const models = ref<ModelConfig[]>([]);
 const plugins = ref<PluginConfig[]>([]);
 const loadingOptions = ref(false);
@@ -57,6 +63,11 @@ const result = ref<RunResponse | null>(null);
 const errorDetail = ref("");
 const lastRequirement = ref("");
 const selectedDemoCaseKey = ref<DemoCaseKey>("auto_repair");
+const liveEvents = ref<RunEvent[]>([]);
+const liveEventError = ref("");
+const liveEventStreaming = ref(false);
+const liveEventConnected = ref(false);
+let liveEventSubscription: RunEventSubscription | null = null;
 
 const form = reactive<RunRequest>({
   requirement: "",
@@ -70,7 +81,10 @@ const form = reactive<RunRequest>({
 
 const selectedSummary = computed(() => result.value?.run_summary || null);
 const workflowSteps = computed(() => result.value?.ui_view_model.workflow_steps || []);
+const workflowEvents = computed(() => result.value?.ui_view_model.workflow_events || []);
 const reportView = computed(() => result.value?.ui_view_model.report || {});
+const resultPlatformRunId = computed(() => result.value?.platform_run_id || result.value?.platformRunId || "");
+const showLiveEvents = computed(() => isJavaMode && (Boolean(resultPlatformRunId.value) || liveEvents.value.length > 0));
 const selectedDemoCase = computed(
   () => demoCases.find((demoCase) => demoCase.key === selectedDemoCaseKey.value) || demoCases[0],
 );
@@ -81,7 +95,7 @@ const currentRunStepHint = computed(() => {
   }
 
   if (errorDetail.value) {
-    return "当前阶段提示：演示运行失败，请检查 Python Agent Engine API 是否启动。";
+    return `当前阶段提示：演示运行失败，请检查 ${apiModeLabel} 是否启动。`;
   }
 
   if (result.value) {
@@ -121,6 +135,133 @@ function normalizeError(error: unknown) {
   return possibleError.message || "运行失败";
 }
 
+function eventTagType(eventType: string) {
+  if (eventType === "RUN_SUCCESS" || eventType === "REPORT_INDEXED") {
+    return "success";
+  }
+
+  if (eventType === "RUN_FAILED" || eventType === "ERROR_OCCURRED") {
+    return "danger";
+  }
+
+  if (eventType === "RUN_CANCELLED") {
+    return "warning";
+  }
+
+  if (eventType === "RUN_STARTED" || eventType === "PYTHON_REQUEST_SENT" || eventType === "PYTHON_RESPONSE_RECEIVED") {
+    return "primary";
+  }
+
+  return "info";
+}
+
+function agentLabel(agent?: string) {
+  const labels: Record<string, string> = {
+    product: "Product",
+    coder: "Coder",
+    tester: "Tester",
+    sentry: "Sentry",
+    runner: "Runner",
+    quality: "Quality",
+    report: "Report",
+    workflow: "Workflow",
+  };
+
+  return labels[agent || ""] || agent || "";
+}
+
+function agentTagType(agent?: string) {
+  const types: Record<string, string> = {
+    product: "primary",
+    coder: "success",
+    tester: "warning",
+    sentry: "danger",
+    runner: "info",
+    quality: "success",
+    report: "primary",
+    workflow: "info",
+  };
+
+  return types[agent || ""] || "info";
+}
+
+function isTerminalEvent(event: RunEvent) {
+  return event.eventType === "RUN_SUCCESS" || event.eventType === "RUN_FAILED" || event.eventType === "RUN_CANCELLED";
+}
+
+function appendLiveEvent(event: RunEvent) {
+  const existingIndex = liveEvents.value.findIndex((item) => item.id === event.id && item.id > 0);
+
+  if (existingIndex >= 0) {
+    liveEvents.value.splice(existingIndex, 1, event);
+  } else {
+    liveEvents.value.push(event);
+  }
+
+  liveEvents.value.sort((left, right) => (left.createdAt || "").localeCompare(right.createdAt || ""));
+}
+
+function closeLiveEventStream() {
+  liveEventSubscription?.close();
+  liveEventSubscription = null;
+  liveEventStreaming.value = false;
+  liveEventConnected.value = false;
+}
+
+async function loadLiveEventHistory(platformRunId: string) {
+  if (!isJavaMode || !platformRunId) {
+    return;
+  }
+
+  try {
+    liveEvents.value = await getRunEvents(platformRunId);
+  } catch (error) {
+    liveEventError.value = error instanceof Error ? error.message : "加载历史事件失败";
+  }
+}
+
+function startLiveEventStream(platformRunId: string) {
+  if (!isJavaMode || !platformRunId) {
+    return;
+  }
+
+  closeLiveEventStream();
+  liveEventError.value = "";
+  liveEventStreaming.value = true;
+
+  liveEventSubscription = subscribeRunEvents(
+    platformRunId,
+    (event) => {
+      appendLiveEvent(event);
+      if (isTerminalEvent(event)) {
+        closeLiveEventStream();
+      }
+    },
+    (error) => {
+      liveEventError.value = error.message;
+      closeLiveEventStream();
+      loadLiveEventHistory(platformRunId);
+    },
+    () => {
+      liveEventConnected.value = true;
+    },
+  );
+
+  if (!liveEventSubscription.supported) {
+    liveEventStreaming.value = false;
+    loadLiveEventHistory(platformRunId);
+  }
+}
+
+function syncFormFromSettings() {
+  form.model_provider = settingsStore.selectedModelProvider;
+  form.enabled_plugins = [...settingsStore.enabledPlugins];
+  form.max_retry_count = settingsStore.maxRetryCount;
+  form.require_human_approval = settingsStore.requireHumanApproval;
+  form.demo_mode = settingsStore.demoMode;
+  form.offline_mode = settingsStore.offlineMode;
+}
+
 function applyDemoCase(caseKey = selectedDemoCaseKey.value) {
   const demoCase = demoCases.find((item) => item.key === caseKey);
 
@@ -142,6 +283,9 @@ async function loadOptions() {
   loadingOptions.value = true;
 
   try {
+    await settingsStore.loadSettings();
+    syncFormFromSettings();
+
     const [modelRows, pluginRows] = await Promise.all([getModels(), getPlugins()]);
     models.value = modelRows;
     plugins.value = pluginRows;
@@ -179,6 +323,9 @@ async function submitRun() {
   running.value = true;
   result.value = null;
   errorDetail.value = "";
+  liveEvents.value = [];
+  liveEventError.value = "";
+  closeLiveEventStream();
   lastRequirement.value = form.requirement.trim();
 
   try {
@@ -193,6 +340,9 @@ async function submitRun() {
       ...form,
       requirement: form.requirement.trim(),
     });
+    if (resultPlatformRunId.value) {
+      startLiveEventStream(resultPlatformRunId.value);
+    }
     ElMessage.success("运行完成");
   } catch (error) {
     errorDetail.value = normalizeError(error);
@@ -220,6 +370,10 @@ onMounted(async () => {
   if (form.demo_mode && !form.requirement.trim()) {
     applyDemoCase();
   }
+});
+
+onBeforeUnmount(() => {
+  closeLiveEventStream();
 });
 
 watch(
@@ -358,12 +512,74 @@ watch(
         <el-alert
           v-if="errorDetail"
           :title="form.demo_mode ? '演示运行失败' : '运行失败'"
-          :description="`${errorDetail}。请检查 Python Agent Engine API 是否启动。`"
+          :description="`${errorDetail}。请检查 ${apiModeLabel} 是否启动。`"
           type="error"
           show-icon
           :closable="false"
           class="run-alert"
         />
+
+        <el-alert
+          v-if="isJavaMode && resultPlatformRunId"
+          title="Java 平台事件记录已生成"
+          type="success"
+          show-icon
+          :closable="false"
+          class="run-alert"
+        >
+          <template #default>
+            <router-link class="event-link" :to="{ path: '/history', query: { run_id: resultPlatformRunId } }">
+              查看事件记录：{{ resultPlatformRunId }}
+            </router-link>
+          </template>
+        </el-alert>
+
+        <section v-if="showLiveEvents" class="panel live-event-panel">
+          <div class="live-event-head">
+            <div>
+              <div class="panel-title">实时事件日志</div>
+              <p>
+                {{ liveEventStreaming ? "正在订阅 Java 平台 SSE 事件流" : "事件流已关闭，展示已收到的事件记录" }}
+              </p>
+            </div>
+            <div class="live-event-tags">
+              <el-tag :type="liveEventConnected ? 'success' : 'info'" effect="plain">
+                {{ liveEventConnected ? "SSE 已连接" : "SSE 未连接" }}
+              </el-tag>
+              <el-tag effect="plain">事件 {{ liveEvents.length }}</el-tag>
+            </div>
+          </div>
+          <el-alert
+            v-if="liveEventError"
+            :title="`${liveEventError}，已回退查询历史事件`"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="run-alert"
+          />
+          <el-empty v-if="!liveEvents.length" description="暂无实时事件" />
+          <el-timeline v-else>
+            <el-timeline-item
+              v-for="event in liveEvents"
+              :key="event.id || `${event.eventType}-${event.createdAt}`"
+              :timestamp="event.createdAt"
+              placement="top"
+            >
+              <div class="live-event-item">
+                <div class="live-event-line">
+                  <el-tag v-if="event.agent" :type="agentTagType(event.agent)" effect="plain" size="small">
+                    {{ agentLabel(event.agent) }}
+                  </el-tag>
+                  <el-tag :type="eventTagType(event.eventType)" effect="plain" size="small">
+                    {{ event.eventText || event.eventType }}
+                  </el-tag>
+                  <el-tag effect="plain" size="small">{{ event.status || "UNKNOWN" }}</el-tag>
+                </div>
+                <div class="live-event-message">{{ event.message || "无事件描述" }}</div>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+        </section>
 
         <div v-if="form.demo_mode" class="demo-mode-stack">
           <DemoHero
@@ -403,7 +619,7 @@ watch(
 
           <section class="panel">
             <div class="panel-title">Agent 工作流节点</div>
-            <WorkflowTimeline :workflow-steps="workflowSteps" />
+            <WorkflowTimeline :workflow-steps="workflowSteps" :workflow-events="workflowEvents" />
           </section>
 
           <section class="panel">
@@ -456,5 +672,54 @@ watch(
 .demo-collapse {
   border-radius: 8px;
   background: #ffffff;
+}
+
+.event-link {
+  color: #2563eb;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.event-link:hover {
+  text-decoration: underline;
+}
+
+.live-event-panel {
+  margin-bottom: 16px;
+}
+
+.live-event-head,
+.live-event-tags,
+.live-event-line {
+  display: flex;
+  align-items: center;
+}
+
+.live-event-head {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.live-event-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.live-event-tags,
+.live-event-line {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.live-event-item {
+  display: grid;
+  gap: 8px;
+}
+
+.live-event-message {
+  color: #334155;
+  line-height: 1.5;
 }
 </style>

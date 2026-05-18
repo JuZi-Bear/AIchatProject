@@ -1,5 +1,7 @@
 # 操作指南
 
+> 维护指南：本文面向维护者和排障场景。面向演示用户的新设备部署说明见 `docs/USER_MANUAL.md`，双轨启动顺序见 `docs/STARTUP_ORDER.md`，Docker 多服务主文档见 `docs/DOCKER_COMPOSE_GUIDE.md`。
+
 如果需要在另一台设备上重新部署项目，请优先参考完整手册：
 
 ```text
@@ -598,9 +600,75 @@ runs/{run_id}.json
 - 状态保存路径
 - 报告路径
 
-## 6. Docker 部署方式
+## 6. Docker 与 v2 前端部署方式
 
 如果新电脑已经安装 Docker Desktop，可以使用 Docker 固定 Python 版本和依赖环境。
+
+### 6.0 Vue 开发模式启动
+
+Vue3 + TypeScript 前端位于：
+
+```text
+frontend-vue/
+```
+
+开发模式默认使用 Python Direct，需要两个终端。
+
+终端 1：启动 Python Agent Engine API：
+
+```powershell
+python -m uvicorn api_server:app --reload --host 127.0.0.1 --port 8001
+```
+
+终端 2：启动 Vue 开发服务器：
+
+```powershell
+cd D:\AIchatProject\frontend-vue
+npm install
+npm run dev
+```
+
+开发模式访问：
+
+```text
+Vue 前端: http://localhost:5173
+FastAPI Docs: http://localhost:8001/docs
+```
+
+`frontend-vue/.env.development` 默认指向 Python Direct：
+
+```text
+VITE_API_MODE=python
+VITE_PYTHON_API_BASE_URL=http://127.0.0.1:8001
+VITE_JAVA_API_BASE_URL=http://127.0.0.1:8088/api
+```
+
+如果要通过 Java Gateway 调用，请先启动 MySQL 和 `backend-java`，再将 `VITE_API_MODE` 改为 `java`。MySQL 配置见 `docs/MYSQL_SETUP.md`。
+
+### 6.0.1 Vue 生产构建
+
+生产构建命令：
+
+```powershell
+cd D:\AIchatProject\frontend-vue
+npm run build
+```
+
+构建产物位于：
+
+```text
+frontend-vue/dist/
+```
+
+`frontend-vue/.env.production` 默认指向 Java Gateway：
+
+```text
+VITE_API_MODE=java
+VITE_PYTHON_API_BASE_URL=http://localhost:8001
+VITE_JAVA_API_BASE_URL=http://localhost:8088/api
+```
+
+生产容器中使用 Nginx 托管静态资源，并通过 `nginx.conf` 支持 Vue Router history 路由回退到 `index.html`。
 
 ### 6.1 准备配置
 
@@ -625,7 +693,7 @@ DEEPSEEK_MODEL=deepseek-chat
 OFFLINE_MODE=false
 ```
 
-### 6.2 启动容器
+### 6.2 Docker Compose 多服务启动
 
 ```powershell
 docker compose up --build
@@ -634,7 +702,11 @@ docker compose up --build
 启动后浏览器访问：
 
 ```text
-http://localhost:8501
+Vue 前端: http://localhost:5174
+FastAPI Docs: http://localhost:8001/docs
+Java Gateway: http://localhost:8088/api/health
+MySQL: localhost:3306
+Streamlit v1: http://localhost:8501
 ```
 
 ### 6.3 停止容器
@@ -647,13 +719,28 @@ docker compose down
 
 - 镜像基于 `python:3.11-slim`。
 - 依赖来自 `requirements.txt`。
-- 默认启动 Web UI。
+- 根目录 `Dockerfile` 默认启动 Streamlit Web UI，也可以通过 Compose command 覆盖为 FastAPI API 服务。
+- `frontend-vue/Dockerfile` 使用 `node:20-alpine` 构建 Vue，并使用 `nginx:alpine` 运行生产静态资源。
 - `.env` 会通过 `docker-compose.yml` 传入容器。
 - Compose 会读取 `DEEPSEEK_API_KEY`、`QWEN_API_KEY`、`GLM_API_KEY` 和 `DEFAULT_MODEL_PROVIDER`。
-- Compose 服务名是 `ai-agent-pipeline`。
-- `reports/` 和 `output/` 会挂载到容器中，方便查看运行结果。
-- `runs/` 会挂载到容器中，方便保留历史状态。
+- Compose 服务包括 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue` 和 `streamlit-web`。
+- `mysql_data` volume 会保存 Java 平台层数据库数据。
+- `reports/`、`runs/`、`output/`、`config/` 会挂载到 Python 容器中，方便保留报告、历史、生成产物和配置。
+- `runner-cpp/` 会挂载到 Python 容器中，作为可选 C++ Runner Sandbox 增强模块。
 - Windows 本地启动方式不受影响，仍然可以使用 `start_demo.bat`。
+
+### 6.5 CORS 说明
+
+FastAPI API 当前允许以下前端来源：
+
+```text
+http://localhost:5173
+http://localhost:5174
+http://127.0.0.1:5173
+http://127.0.0.1:5174
+```
+
+开发阶段可以扩展来源；生产部署时应收紧到实际域名。
 
 ## 7. 演示案例选择
 
@@ -816,6 +903,82 @@ ports:
 http://localhost:8502
 ```
 
+### 报错：Vue 前端提示 API 连接失败
+
+说明当前 `VITE_API_MODE` 对应的 API 服务未启动或端口不一致。
+
+处理：
+
+```powershell
+python -m uvicorn api_server:app --reload --host 127.0.0.1 --port 8001
+```
+
+然后访问：
+
+```text
+http://localhost:8001/health
+```
+
+如果使用 Docker Compose，请确认 `ai-agent-api` 正常启动，并访问：
+
+```text
+http://localhost:8001/docs
+```
+
+如果 `VITE_API_MODE=java`，还需要确认 Java Gateway 正常启动：
+
+```text
+http://localhost:8088/api/health
+http://localhost:8088/api/agent/health
+```
+
+同时确认 MySQL 正常：
+
+```text
+localhost:3306
+```
+
+### 报错：浏览器出现 CORS 错误
+
+说明当前前端地址不在 FastAPI 允许来源中。默认已允许：
+
+```text
+http://localhost:5173
+http://localhost:5174
+http://127.0.0.1:5173
+http://127.0.0.1:5174
+```
+
+处理方式：
+
+1. 优先使用上述端口访问 Vue。
+2. 如果必须换端口，在 `api_server.py` 的 CORS `allow_origins` 中增加对应来源。
+3. 生产环境不要长期使用过宽的 CORS 配置，应收紧到实际域名。
+
+### 报错：端口 8001、5173 或 5174 被占用
+
+说明 FastAPI、Vue dev server 或 Nginx 前端端口已被占用。
+
+处理：
+
+- FastAPI 可改端口启动，并同步修改 `frontend-vue/.env.development`。
+- Vue dev server 可使用 Vite 自动分配的新端口，或关闭占用进程。
+- Docker Compose 可调整 `docker-compose.yml` 中的端口映射，例如 `"5175:80"`。
+
+### 报错：npm run build 失败
+
+常见原因是 Node 版本过低、依赖未安装或 TypeScript 类型错误。
+
+处理：
+
+```powershell
+cd frontend-vue
+npm install
+npm run build
+```
+
+推荐 Node.js 20。不要为了通过构建删除核心页面或组件；应根据 TypeScript 报错修正类型定义、组件 props 或 API 返回类型。
+
 ### 报错：docker 不是内部或外部命令
 
 说明没有安装 Docker Desktop，或 Docker 没有加入 PATH。
@@ -828,7 +991,7 @@ http://localhost:8502
 
 ### 报错：docker compose up 失败
 
-常见原因是网络问题、Docker Desktop 没有启动、或 `.env` 文件不存在。
+常见原因是网络问题、Docker Desktop 没有启动、`.env` 文件不存在，或本机 `3306` 已被其他 MySQL 服务占用。
 
 处理：
 

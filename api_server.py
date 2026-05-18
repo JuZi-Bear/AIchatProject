@@ -5,13 +5,17 @@ from schemas.run_request import RunRequest
 from schemas.run_response import RunResponse
 from services.run_service import (
     create_run,
+    get_available_agents,
     get_available_models,
     get_available_plugins,
     get_report,
     get_run,
+    get_workflow_templates,
+    instantiate_workflow_template,
     list_reports,
     list_run_history,
 )
+from utils.simple_code_agent import execute_code_agent
 
 
 app = FastAPI(
@@ -73,6 +77,29 @@ def list_plugins():
     return get_available_plugins()
 
 
+@app.get("/agents")
+def list_agents():
+    return get_available_agents()
+
+
+@app.get("/api/workflows/templates")
+def list_workflow_templates():
+    return get_workflow_templates()
+
+
+@app.post("/api/workflows/instantiate")
+def instantiate_workflow(request: dict):
+    try:
+        return instantiate_workflow_template(request)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/code-agent/execute")
+def execute_code_agent_operation(request: dict):
+    return execute_code_agent(request or {})
+
+
 @app.post("/runs", response_model=RunResponse, response_model_exclude_none=True)
 def create_workflow_run(request: RunRequest):
     try:
@@ -80,7 +107,7 @@ def create_workflow_run(request: RunRequest):
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    return _build_run_response(result, include_state=False)
+    return _build_run_response(result, include_state=True)
 
 
 @app.get("/runs", response_model=list[dict])

@@ -6,6 +6,7 @@ import {
   House,
   List,
   Operation,
+  Share,
   SetUp,
 } from "@element-plus/icons-vue";
 </script>
@@ -45,6 +46,18 @@ import {
         <el-menu-item index="/plugins">
           <el-icon><SetUp /></el-icon>
           <span>Plugins</span>
+        </el-menu-item>
+        <el-menu-item index="/agents">
+          <el-icon><Share /></el-icon>
+          <span>Agents</span>
+        </el-menu-item>
+        <el-menu-item index="/workflows/templates">
+          <el-icon><Operation /></el-icon>
+          <span>Workflows</span>
+        </el-menu-item>
+        <el-menu-item index="/workflows/editor">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>Workflow Editor</span>
         </el-menu-item>
       </el-menu>
     </el-aside>

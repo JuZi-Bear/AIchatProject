@@ -55,6 +55,18 @@ const resultType = computed(() => (success.value ? "success" : "danger"));
       <span>报告路径</span>
       <code>{{ summary.report_path || "暂无报告" }}</code>
     </div>
+    <div class="report-line">
+      <span>Runner</span>
+      <code>{{ summary.runner_mode === "cpp" ? "C++ Sandbox Runner" : "Python Runner" }}</code>
+    </div>
+    <el-alert
+      v-if="summary.runner_warning"
+      :title="summary.runner_warning"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="runner-warning"
+    />
   </section>
 </template>
 
@@ -117,5 +129,9 @@ const resultType = computed(() => (success.value ? "success" : "danger"));
   overflow-wrap: anywhere;
   color: #0f172a;
   font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.runner-warning {
+  margin-top: 10px;
 }
 </style>

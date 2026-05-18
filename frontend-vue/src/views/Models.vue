@@ -3,11 +3,30 @@ import { Refresh, Search, Star } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 
+import {
+  currentApiBaseUrl,
+  currentApiMode,
+  getApiDisconnectedHint,
+  getApiModeLabel,
+  getConfigSourceLabel,
+  getDataModeLabel,
+} from "@/api/client";
 import { getModels } from "@/api/models";
 import { useSettingsStore } from "@/stores/settings";
 import type { ModelConfig } from "@/types/model";
 
 const settingsStore = useSettingsStore();
+const apiModeLabel = getApiModeLabel();
+const dataModeLabel = getDataModeLabel();
+const dataSourceLabel = getConfigSourceLabel();
+const apiModeDescription =
+  currentApiMode === "java"
+    ? "当前通过 Java Spring Boot 平台服务读取 Java/MySQL 模型配置。"
+    : "当前直连 Python FastAPI Agent Engine。";
+const settingsStorageDescription =
+  currentApiMode === "java"
+    ? "默认模型会优先同步到 Java /api/settings；同步失败时回退到前端 localStorage。当前不会写回 Python 配置文件。"
+    : "默认模型配置保存在前端 localStorage，将作为 RunConsole 的默认模型。当前不会写回 Python 配置文件。";
 const models = ref<ModelConfig[]>([]);
 const loading = ref(false);
 const keyword = ref("");
@@ -67,6 +86,7 @@ async function loadModels() {
   loading.value = true;
 
   try {
+    await settingsStore.loadSettings();
     models.value = await getModels();
     const selectedExists = models.value.some((model) => model.provider === settingsStore.selectedModelProvider);
     const firstEnabled = models.value.find((model) => model.enabled) || models.value[0];
@@ -75,7 +95,7 @@ async function loadModels() {
       settingsStore.setSelectedModelProvider(firstEnabled.provider);
     }
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "加载模型配置失败");
+    ElMessage.error(error instanceof Error ? error.message : `${getApiDisconnectedHint()}，加载模型配置失败`);
   } finally {
     loading.value = false;
   }
@@ -100,8 +120,21 @@ onMounted(loadModels);
     </div>
 
     <el-alert
-      title="默认模型配置保存在前端 localStorage，将作为 RunConsole 的默认模型。当前不会写回 Python 配置文件。"
+      :title="settingsStorageDescription"
       type="info"
+      show-icon
+      :closable="false"
+    />
+
+    <div class="mode-tags">
+      <el-tag type="warning" effect="plain">当前数据模式：{{ dataModeLabel }}</el-tag>
+      <el-tag type="primary" effect="plain">当前数据来源：{{ dataSourceLabel }}</el-tag>
+    </div>
+
+    <el-alert
+      :title="`当前 API 模式：${apiModeLabel}`"
+      :description="`${apiModeDescription}API 地址：${currentApiBaseUrl}。模式由 .env 控制，如需切换请修改 VITE_API_MODE；后续可升级为运行时切换。`"
+      type="warning"
       show-icon
       :closable="false"
     />
@@ -166,6 +199,12 @@ onMounted(loadModels);
   grid-template-columns: 1fr 180px 140px;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.mode-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .tag-stack {

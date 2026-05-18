@@ -4,6 +4,7 @@ import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 
+import { currentApiMode, getApiDisconnectedHint, getConfigSourceLabel, getDataModeLabel } from "@/api/client";
 import { getReport, getReports } from "@/api/reports";
 import type { ReportDetail, ReportItem } from "@/types/run";
 
@@ -14,6 +15,9 @@ const loading = ref(false);
 const contentLoading = ref(false);
 const keyword = ref("");
 const route = useRoute();
+const isJavaMode = currentApiMode === "java";
+const dataModeLabel = getDataModeLabel();
+const dataSourceLabel = getConfigSourceLabel();
 
 const filteredReports = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase();
@@ -24,7 +28,9 @@ const filteredReports = computed(() => {
         return true;
       }
 
-      return `${report.report_name} ${report.run_id || ""} ${report.path}`.toLowerCase().includes(normalizedKeyword);
+      return `${report.report_name} ${report.run_id || ""} ${report.platformRunId || ""} ${report.requirement || ""} ${report.path}`
+        .toLowerCase()
+        .includes(normalizedKeyword);
     })
     .sort((left, right) => (right.created_at || "").localeCompare(left.created_at || ""));
 });
@@ -51,7 +57,7 @@ async function loadReports() {
   try {
     reports.value = await getReports();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "加载报告列表失败");
+    ElMessage.error(error instanceof Error ? error.message : `${getApiDisconnectedHint()}，加载报告列表失败`);
   } finally {
     loading.value = false;
   }
@@ -69,7 +75,7 @@ async function openReport(reportName: string) {
   try {
     selectedReport.value = await getReport(reportName);
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "加载报告内容失败");
+    ElMessage.error(error instanceof Error ? error.message : `${getApiDisconnectedHint()}，加载报告内容失败`);
   } finally {
     contentLoading.value = false;
   }
@@ -110,6 +116,13 @@ onMounted(async () => {
       <el-button :icon="Refresh" :loading="loading" @click="loadReports">刷新</el-button>
     </div>
 
+    <div class="mode-tags">
+      <el-tag type="warning" effect="plain">当前数据模式：{{ dataModeLabel }}</el-tag>
+      <el-tag type="primary" effect="plain">
+        当前数据来源：{{ isJavaMode ? "Java MySQL 报告索引" : dataSourceLabel }}
+      </el-tag>
+    </div>
+
     <el-row :gutter="16" align="top">
       <el-col :lg="9" :md="24">
         <section class="panel report-list-panel">
@@ -126,11 +139,26 @@ onMounted(async () => {
             >
               <div class="report-item-head">
                 <span class="report-name">{{ report.report_name }}</span>
-                <el-tag v-if="report.run_id" size="small" effect="plain">{{ report.run_id }}</el-tag>
+                <div class="report-tags">
+                  <el-tag v-if="report.platformRunId" size="small" effect="plain">{{ report.platformRunId }}</el-tag>
+                  <el-tag v-if="report.run_id" size="small" effect="plain">{{ report.run_id }}</el-tag>
+                  <el-tag
+                    v-if="isJavaMode && typeof report.success === 'boolean'"
+                    :type="report.success ? 'success' : 'danger'"
+                    size="small"
+                    effect="plain"
+                  >
+                    {{ report.success ? "成功" : "失败" }}
+                  </el-tag>
+                </div>
               </div>
               <div class="report-meta">
                 <span>{{ report.created_at || "未记录时间" }}</span>
-                <span>{{ formatSize(report.file_size) }}</span>
+                <span v-if="isJavaMode">质量 {{ report.qualityScore ?? 0 }}</span>
+                <span v-else>{{ formatSize(report.file_size) }}</span>
+              </div>
+              <div v-if="isJavaMode" class="requirement-text">
+                {{ report.requirement || "暂无需求摘要" }}
               </div>
               <div class="report-path">{{ report.path }}</div>
             </article>
@@ -147,6 +175,39 @@ onMounted(async () => {
                 <div class="report-path">{{ selectedReport.path }}</div>
               </div>
               <el-button :icon="CopyDocument" @click="copyReport">复制报告</el-button>
+            </div>
+
+            <div v-if="isJavaMode" class="platform-report-summary">
+              <el-tag v-if="selectedReport.platformRunId" type="primary" effect="plain">
+                platformRunId：{{ selectedReport.platformRunId }}
+              </el-tag>
+              <el-tag v-if="selectedReport.pythonRunId" effect="plain">
+                pythonRunId：{{ selectedReport.pythonRunId }}
+              </el-tag>
+              <el-tag
+                v-if="typeof selectedReport.success === 'boolean'"
+                :type="selectedReport.success ? 'success' : 'danger'"
+                effect="plain"
+              >
+                {{ selectedReport.success ? "成功" : "失败" }}
+              </el-tag>
+              <el-tag :type="(selectedReport.qualityScore || 0) >= 85 ? 'success' : 'warning'" effect="plain">
+                质量 {{ selectedReport.qualityScore ?? 0 }}
+              </el-tag>
+              <span class="created-at">{{ selectedReport.created_at || "未记录时间" }}</span>
+            </div>
+
+            <el-alert
+              v-if="selectedReport.error"
+              :title="selectedReport.error"
+              type="warning"
+              show-icon
+              :closable="false"
+              class="report-warning"
+            />
+
+            <div v-if="isJavaMode" class="requirement-detail">
+              {{ selectedReport.requirement || "暂无需求摘要" }}
             </div>
 
             <el-collapse model-value="report">
@@ -166,6 +227,14 @@ onMounted(async () => {
 .report-list-panel,
 .report-detail-panel {
   min-height: calc(100vh - 150px);
+}
+
+.mode-tags,
+.report-tags,
+.platform-report-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .report-list {
@@ -213,6 +282,32 @@ onMounted(async () => {
   margin-top: 10px;
   color: #64748b;
   font-size: 12px;
+}
+
+.requirement-text,
+.requirement-detail {
+  color: #334155;
+  line-height: 1.55;
+}
+
+.requirement-text {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.platform-report-summary {
+  align-items: center;
+  margin: 12px 0;
+}
+
+.created-at {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.report-warning,
+.requirement-detail {
+  margin-bottom: 12px;
 }
 
 .report-path {

@@ -12,6 +12,11 @@ export type RunSummary = {
   model_name?: string;
   report_path: string;
   state_path?: string;
+  runner_mode?: string;
+  runner_warning?: string;
+  event_count?: number;
+  last_event?: Record<string, unknown>;
+  workflow_event_summary?: Record<string, unknown>;
 };
 
 export type WorkflowStep = {
@@ -59,6 +64,7 @@ export type UIViewModel = {
   header?: Record<string, unknown>;
   summary_cards?: Partial<RunSummary> & Record<string, unknown>;
   workflow_steps?: WorkflowStep[];
+  workflow_events?: Array<Record<string, unknown>>;
   agent_outputs?: AgentOutputs;
   plugin_outputs?: PluginOutputs;
   report?: ReportViewModel;
@@ -68,6 +74,8 @@ export type UIViewModel = {
 
 export type RunResponse = {
   run_id: string;
+  platform_run_id?: string;
+  platformRunId?: string;
   state?: Record<string, unknown>;
   run_summary: RunSummary;
   ui_view_model: UIViewModel;
@@ -75,6 +83,9 @@ export type RunResponse = {
 
 export type RunHistoryItem = {
   run_id: string;
+  platform_run_id?: string;
+  python_run_id?: string;
+  source?: "python" | "java";
   run_summary?: RunSummary;
   success: boolean;
   retry_count: number;
@@ -85,8 +96,11 @@ export type RunHistoryItem = {
   model_name: string;
   requirement: string;
   created_at: string;
+  updated_at?: string;
   report_path: string;
   state_path: string;
+  runner_mode?: string;
+  runner_warning?: string;
 };
 
 export type ReportItem = {
@@ -98,6 +112,12 @@ export type ReportItem = {
   file_size?: number;
   size?: number;
   run_id?: string;
+  platformRunId?: string;
+  pythonRunId?: string;
+  requirement?: string;
+  success?: boolean;
+  qualityScore?: number;
+  source?: "python" | "java";
 };
 
 export type ReportDetail = {
@@ -106,6 +126,14 @@ export type ReportDetail = {
   path: string;
   content: string;
   run_id?: string;
+  platformRunId?: string;
+  pythonRunId?: string;
+  requirement?: string;
+  success?: boolean;
+  qualityScore?: number;
+  created_at?: string;
+  error?: string;
+  source?: "python" | "java";
 };
 
 export type RunRequest = {

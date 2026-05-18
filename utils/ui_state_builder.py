@@ -212,8 +212,11 @@ def build_ui_view_model(state: dict, run_summary: dict | None = None) -> dict:
             "quality_score": run_summary.get("quality_score", 0),
             "security_status": run_summary.get("security_status", "等待安全检查"),
             "report_path": run_summary.get("report_path", state.get("report_path", "未生成")),
+            "runner_mode": run_summary.get("runner_mode", state.get("runner_mode", "python")),
+            "runner_warning": run_summary.get("runner_warning", state.get("runner_warning", "")),
         },
         "workflow_steps": build_workflow_status(state),
+        "workflow_events": state.get("workflow_events", []) if isinstance(state.get("workflow_events", []), list) else [],
         "agent_outputs": {
             "product_result": state.get("product_result", ""),
             "code": state.get("code", ""),

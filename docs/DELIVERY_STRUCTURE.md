@@ -1,5 +1,7 @@
 # 最终提交目录结构
 
+> 交付历史文档：本文保留 v1.0 比赛提交时的目录说明。当前完整项目目录和双轨归属请优先阅读 `docs/PROJECT_DIRECTORY_GUIDE.md`，文档总入口见 `docs/DOCUMENT_INDEX.md`。
+
 本项目按“核心流程、智能体能力、插件扩展、工具函数、配置管理、演示入口、文档材料”组织，便于比赛提交、现场讲解和后续扩展。
 
 ## 顶层结构
@@ -118,8 +120,8 @@ AIchatProject/
 
 ## Docker 与依赖
 
-- `Dockerfile`：基于 `python:3.11-slim` 构建 Web UI 镜像。
-- `docker-compose.yml`：一键启动 `ai-agent-pipeline` 服务，并挂载 `reports/`、`runs/`、`output/`。
+- `Dockerfile`：基于 `python:3.11-slim` 构建 Python 镜像，可由 Compose command 启动 Streamlit 或 FastAPI。
+- `docker-compose.yml`：一键启动 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`、`streamlit-web` 多服务，并挂载 `reports/`、`runs/`、`output/`。
 - `.dockerignore`：避免打包虚拟环境、缓存、Git 信息和敏感 `.env`。
 - `requirements.txt`：Python 依赖清单。
 - `README.md`：项目总入口说明。

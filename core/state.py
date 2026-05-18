@@ -14,6 +14,8 @@ class AgentState(TypedDict, total=False):
     coverage_percent: int
     stdout: str
     error_log: str
+    runner_mode: str
+    runner_warning: str
     retry_count: int
     max_retry_count: int
     success: bool
@@ -34,4 +36,4 @@ class AgentState(TypedDict, total=False):
     quality_summary: str
     run_id: str
     report_path: str
-
+    workflow_events: list[dict]

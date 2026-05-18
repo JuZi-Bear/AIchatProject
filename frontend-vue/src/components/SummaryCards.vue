@@ -30,6 +30,10 @@ const testType = computed(() => {
 
   return props.summary.test_success ? "success" : "danger";
 });
+
+const runnerLabel = computed(() =>
+  props.summary?.runner_mode === "cpp" ? "C++ Sandbox Runner" : "Python Runner",
+);
 </script>
 
 <template>
@@ -58,6 +62,14 @@ const testType = computed(() => {
       <template #header>质量评分</template>
       <el-statistic :value="summary?.quality_score ?? 0" suffix="/ 100" />
       <div class="summary-meta">{{ summary?.security_status || "等待安全检查" }}</div>
+    </el-card>
+
+    <el-card shadow="never" class="summary-card">
+      <template #header>Runner</template>
+      <el-tag :type="summary?.runner_mode === 'cpp' ? 'success' : 'info'" size="large" effect="plain">
+        {{ runnerLabel }}
+      </el-tag>
+      <div class="summary-meta warning-text">{{ summary?.runner_warning || "无回退提示" }}</div>
     </el-card>
 
     <el-card shadow="never" class="summary-card wide">
@@ -104,6 +116,10 @@ const testType = computed(() => {
   color: #334155;
   font-family: "Cascadia Code", Consolas, monospace;
   overflow-wrap: anywhere;
+}
+
+.warning-text {
+  color: #b45309;
 }
 
 @media (max-width: 1280px) {

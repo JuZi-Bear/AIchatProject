@@ -21,6 +21,11 @@ class RunSummaryResponse(BaseModel):
     enabled_plugins: List[str] = Field(default_factory=list)
     model_provider: str = ""
     report_path: str = ""
+    runner_mode: str = "python"
+    runner_warning: str = ""
+    event_count: int = 0
+    last_event: Dict[str, Any] = Field(default_factory=dict)
+    workflow_event_summary: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RunResponse(BaseModel):

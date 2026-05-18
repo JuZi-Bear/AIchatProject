@@ -6,6 +6,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from config.config_loader import get_setting
+from utils.cpp_runner_adapter import run_with_cpp_runner
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -29,6 +32,12 @@ def get_timeout():
         return DEFAULT_TIMEOUT
 
     return timeout
+
+
+def get_runner_mode():
+    """Read runner mode from config/settings.yaml."""
+    runner_mode = str(get_setting("runner_mode", "python") or "python").strip().lower()
+    return "cpp" if runner_mode == "cpp" else "python"
 
 
 def check_code_safety(code):
@@ -111,6 +120,8 @@ def run_code(timeout=None):
             "stdout": "",
             "stderr": "代码文件不存在，请先生成并保存代码。",
             "returncode": 1,
+            "runner_mode": get_runner_mode(),
+            "runner_warning": "",
         }
 
     code = CODE_FILE.read_text(encoding="utf-8")
@@ -121,9 +132,30 @@ def run_code(timeout=None):
             "stdout": "",
             "stderr": "安全检查失败：\n" + "\n".join(f"- {problem}" for problem in safety_problems),
             "returncode": 1,
+            "runner_mode": get_runner_mode(),
+            "runner_warning": "",
         }
 
     run_timeout = timeout or get_timeout()
+    runner_mode = get_runner_mode()
+
+    if runner_mode == "cpp":
+        cpp_result = run_with_cpp_runner(str(CODE_FILE), timeout_seconds=run_timeout, working_dir=str(OUTPUT_DIR))
+
+        if not cpp_result.get("fallback"):
+            return {
+                "stdout": cpp_result.get("stdout", ""),
+                "stderr": cpp_result.get("stderr", ""),
+                "returncode": int(cpp_result.get("returncode", 1)),
+                "runner_mode": "cpp",
+                "runner_warning": cpp_result.get("runner_warning", ""),
+                "blocked": bool(cpp_result.get("blocked", False)),
+                "duration_ms": cpp_result.get("duration_ms", 0),
+            }
+
+        fallback_warning = cpp_result.get("runner_warning", "C++ runner unavailable; fallback to Python runner")
+    else:
+        fallback_warning = ""
 
     try:
         result = subprocess.run(
@@ -140,10 +172,14 @@ def run_code(timeout=None):
             "stdout": error.stdout or "",
             "stderr": f"代码运行超时，超过 {run_timeout} 秒，可能在等待用户输入或进入了死循环。",
             "returncode": 1,
+            "runner_mode": "python",
+            "runner_warning": fallback_warning,
         }
 
     return {
         "stdout": result.stdout,
         "stderr": result.stderr,
         "returncode": result.returncode,
+        "runner_mode": "python",
+        "runner_warning": fallback_warning,
     }

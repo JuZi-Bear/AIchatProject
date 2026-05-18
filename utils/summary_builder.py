@@ -48,9 +48,42 @@ def _build_security_status(state):
     return security_result[:120]
 
 
+def _build_workflow_event_summary(events):
+    if not isinstance(events, list):
+        events = []
+
+    agent_names = sorted(
+        {
+            str(item.get("agent", "")).strip()
+            for item in events
+            if isinstance(item, dict) and str(item.get("agent", "")).strip()
+        }
+    )
+    failed_count = sum(
+        1
+        for item in events
+        if isinstance(item, dict)
+        and (
+            str(item.get("status", "")).upper() == "FAILED"
+            or str(item.get("event_type", "")).upper() == "AGENT_FAILED"
+        )
+    )
+    last_event = events[-1] if events and isinstance(events[-1], dict) else {}
+
+    return {
+        "total": len(events),
+        "failed_count": failed_count,
+        "agents": agent_names,
+        "last_event_text": last_event.get("event_text", "") if last_event else "",
+    }
+
+
 def build_run_summary(state):
     """Build one shared summary dict for CLI, Web UI, and reports."""
     state = state or {}
+    workflow_events = state.get("workflow_events", [])
+    if not isinstance(workflow_events, list):
+        workflow_events = []
 
     return {
         "success": bool(state.get("success", False)),
@@ -62,4 +95,9 @@ def build_run_summary(state):
         "enabled_plugins": _normalize_plugins(state.get("enabled_plugins", [])),
         "model_provider": state.get("model_provider", "") or "未记录",
         "report_path": state.get("report_path", "") or "未生成",
+        "runner_mode": state.get("runner_mode", "python") or "python",
+        "runner_warning": state.get("runner_warning", "") or "",
+        "event_count": len(workflow_events),
+        "last_event": workflow_events[-1] if workflow_events else {},
+        "workflow_event_summary": _build_workflow_event_summary(workflow_events),
     }

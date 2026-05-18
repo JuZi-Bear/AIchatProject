@@ -14,6 +14,36 @@ DEFAULT_SETTINGS = {
     "demo_mode": True,
     "save_reports": True,
     "save_runs": True,
+    "runner_mode": "python",
+    "code_agent": {
+        "enabled": True,
+        "allowed_paths": [
+            "src",
+            "output",
+            "docs",
+            "frontend-vue/src",
+            "backend-java/src",
+            "utils",
+            "services",
+            "config",
+            "workflow_templates",
+            "agent_registry",
+            "plugins",
+            "tests",
+        ],
+        "blocked_paths": [
+            ".git",
+            ".venv",
+            "node_modules",
+            "frontend-vue/node_modules",
+            "frontend-vue/dist",
+            "backend-java/target",
+            "runner-cpp/build",
+            ".env",
+        ],
+        "audit_log_path": "output/code_agent_audit.jsonl",
+        "max_read_chars": 200000,
+    },
 }
 
 
@@ -39,4 +69,3 @@ def load_settings():
 def get_setting(key, default=None):
     """Read one setting value from config/settings.yaml."""
     return load_settings().get(key, default)
-

@@ -13,6 +13,7 @@ import type { WorkflowStep } from "@/types/run";
 
 const props = defineProps<{
   workflowSteps?: WorkflowStep[];
+  workflowEvents?: Array<Record<string, unknown>>;
 }>();
 
 const statusText: Record<string, string> = {
@@ -38,6 +39,31 @@ const activeKey = computed(() => {
   }
 
   return [...sortedSteps.value].reverse().find((step) => step.status.toLowerCase() === "done")?.key;
+});
+
+const stepAgentMap: Record<string, string> = {
+  product: "product",
+  coder: "coder",
+  tester: "tester",
+  runner: "runner",
+  sentry: "sentry",
+  quality: "quality",
+  report: "report",
+};
+
+const eventHints = computed(() => {
+  const hints: Record<string, string> = {};
+
+  for (const event of props.workflowEvents || []) {
+    const agent = String(event.agent || "");
+    const targetKey = Object.entries(stepAgentMap).find(([, value]) => value === agent)?.[0];
+
+    if (targetKey) {
+      hints[targetKey] = String(event.event_text || event.eventText || event.message || "");
+    }
+  }
+
+  return hints;
 });
 
 function normalizeStatus(status: string) {
@@ -93,6 +119,7 @@ function statusIcon(status: string) {
           <el-tag size="small" effect="plain">{{ displayStatus(step.status) }}</el-tag>
         </div>
         <p>{{ step.summary || "等待输出" }}</p>
+        <div v-if="eventHints[step.key]" class="event-hint">{{ eventHints[step.key] }}</div>
       </div>
     </article>
   </div>
@@ -152,6 +179,13 @@ function statusIcon(status: string) {
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+}
+
+.event-hint {
+  margin-top: 8px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .status-done {

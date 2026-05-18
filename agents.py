@@ -6,10 +6,19 @@ from model_manager import (
     get_llm_client,
     is_offline_mode,
 )
+from utils.prompt_loader import render_prompt_by_name
 
 
 DEFAULT_MODEL = get_current_model_info(DEFAULT_PROVIDER).get("model", "deepseek-chat")
 missing_api_key_warned = False
+
+
+def _render_prompt_or_fallback(prompt_name, variables, fallback):
+    try:
+        return render_prompt_by_name(prompt_name, variables)
+    except Exception as error:
+        print(f"Prompt 模板加载失败，使用内置 Prompt：{prompt_name}，原因：{error}")
+        return fallback
 
 
 def show_missing_api_key_tip(provider=None):
@@ -59,7 +68,7 @@ def ask_llm(system_prompt, user_prompt, provider=None):
 
 def product_agent(requirement, provider=None):
     """Turn the user's idea into a simple product plan."""
-    prompt = f"""
+    fallback_prompt = f"""
 请拆解下面的用户需求：
 
 {requirement}
@@ -71,6 +80,11 @@ def product_agent(requirement, provider=None):
 2. 技术需求
 3. 开发步骤
 """
+    prompt = _render_prompt_or_fallback(
+        "product_agent",
+        {"requirement": requirement},
+        fallback_prompt,
+    )
 
     if should_use_offline_demo(provider):
         return product_demo(requirement)
@@ -102,7 +116,8 @@ def coder_agent(
     has_runtime_failure = bool(error_log)
 
     if code and (has_runtime_failure or has_test_failure):
-        prompt = f"""
+        mode_instruction = "下面的 Python 代码运行或 pytest 自动测试失败了，请根据用户需求、错误日志、测试结果和修复建议重新生成完整代码。"
+        fallback_prompt = f"""
 下面的 Python 代码运行或 pytest 自动测试失败了，请根据用户需求、错误日志、测试结果和修复建议重新生成完整代码。
 
 原始用户需求：
@@ -139,7 +154,8 @@ Sentry Agent 的分析和修复建议：
 7. 只输出 Python 代码，不要使用 Markdown 代码块，不要解释
 """
     else:
-        prompt = f"""
+        mode_instruction = "请根据下面的产品方案编写一个最小可运行的 Python 示例。"
+        fallback_prompt = f"""
 请根据下面的产品方案编写一个最小可运行的 Python 示例：
 
 {product_plan}
@@ -149,6 +165,22 @@ Sentry Agent 的分析和修复建议：
 2. 不要实现复杂功能
 3. 只输出 Python 代码，不要使用 Markdown 代码块，不要解释
 """
+
+    prompt = _render_prompt_or_fallback(
+        "coder_agent",
+        {
+            "mode_instruction": mode_instruction,
+            "requirement": requirement or "未提供",
+            "product_result": product_plan,
+            "code": code or "无",
+            "error_log": error_log or "无",
+            "test_code": test_code or "未提供",
+            "test_stdout": test_stdout or "无",
+            "test_stderr": test_stderr or "无",
+            "sentry_result": sentry_result or "无",
+        },
+        fallback_prompt,
+    )
 
     if should_use_offline_demo(provider):
         repair_log = "\n".join(
@@ -176,7 +208,7 @@ Sentry Agent 的分析和修复建议：
 
 def sentry_agent(code, error_log, test_code=None, test_stdout=None, test_stderr=None, provider=None):
     """Use DeepSeek to analyze a failed Python run."""
-    prompt = f"""
+    fallback_prompt = f"""
 下面的 Python 代码运行或 pytest 自动测试失败了。
 
 原始代码：
@@ -205,6 +237,17 @@ pytest stderr：
 本项目的代码会被自动运行，不能依赖人工在终端输入。
 如果 pytest 失败，请优先建议修复业务代码，而不是修改测试用例。
 """
+    prompt = _render_prompt_or_fallback(
+        "sentry_agent",
+        {
+            "code": code,
+            "error_log": error_log,
+            "test_code": test_code or "未提供",
+            "test_stdout": test_stdout or "无",
+            "test_stderr": test_stderr or "无",
+        },
+        fallback_prompt,
+    )
 
     if should_use_offline_demo(provider):
         combined_log = "\n".join(
@@ -230,7 +273,7 @@ def tester_agent(requirement_or_code, code=None, provider=None):
     """Review code in the old flow, or generate pytest code in the LangGraph flow."""
     if code is not None:
         requirement = requirement_or_code
-        prompt = f"""
+        fallback_prompt = f"""
 请根据用户需求和生成代码，编写 pytest 测试代码。
 
 用户需求：
@@ -251,6 +294,14 @@ def tester_agent(requirement_or_code, code=None, provider=None):
 9. 如果被测代码只是脚本，可以用 subprocess 运行脚本并检查 returncode/stdout
 10. 只输出 Python 测试代码，不要使用 Markdown 代码块，不要解释
 """
+        prompt = _render_prompt_or_fallback(
+            "tester_agent",
+            {
+                "requirement": requirement,
+                "code": code,
+            },
+            fallback_prompt,
+        )
 
         if should_use_offline_demo(provider):
             return pytest_demo(requirement, code)

@@ -5,4 +5,30 @@ default_model_provider: deepseek
 demo_mode: true
 save_reports: true
 save_runs: true
-
+runner_mode: python
+code_agent:
+  enabled: true
+  allowed_paths:
+    - src
+    - output
+    - docs
+    - frontend-vue/src
+    - backend-java/src
+    - utils
+    - services
+    - config
+    - workflow_templates
+    - agent_registry
+    - plugins
+    - tests
+  blocked_paths:
+    - .git
+    - .venv
+    - node_modules
+    - frontend-vue/node_modules
+    - frontend-vue/dist
+    - backend-java/target
+    - runner-cpp/build
+    - .env
+  audit_log_path: output/code_agent_audit.jsonl
+  max_read_chars: 200000

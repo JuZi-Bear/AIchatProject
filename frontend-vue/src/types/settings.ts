@@ -5,4 +5,5 @@ export type FrontendSettings = {
   maxRetryCount: number;
   requireHumanApproval: boolean;
   offlineMode: boolean;
+  apiMode: "python" | "java" | string;
 };

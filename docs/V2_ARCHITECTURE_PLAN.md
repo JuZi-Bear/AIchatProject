@@ -1,6 +1,8 @@
 # v2.0 多技术栈架构预留规划
 
-本文用于规划项目从 v1.0 比赛演示版升级到 v2.0 多技术栈平台版的路线。当前阶段已新增 Python Agent Engine API 服务层和独立 Vue3 + TypeScript 前端骨架，但不新增 Java、C++ 工程代码，不影响 v1.0 Streamlit 演示稳定性。
+本文用于规划项目从 v1.0 比赛演示版升级到 v2.0 多技术栈平台版的路线。当前阶段已新增 Python Agent Engine API 服务层、独立 Vue3 + TypeScript 前端、Java Spring Boot API Gateway 和 C++ Runner Sandbox 雏形，不影响 v1.0 Streamlit 演示稳定性。
+
+当前 v2.0 不只是功能升级，而是平台化框架升级：通过 Vue、Java、MySQL、FastAPI、C++ Runner 和 Docker Compose 把项目从单机演示扩展为可继续演进的平台骨架。框架扩展总规划见 `docs/FRAMEWORK_EXTENSION_PLAN.md`，推荐路线见 `docs/RECOMMENDED_EXTENSION_ROADMAP.md`。
 
 ## v1.0 当前架构
 
@@ -52,6 +54,8 @@ v2.0 目标是从比赛演示工具升级为可扩展平台，支持前后端分
 - Vue3 + TypeScript 实现正式前端。
 - 消费 `ui_view_model` 渲染 Dashboard。
 - 展示 Agent 工作流时间轴、结果总览、模型对比、插件结果、报告和历史。
+- 通过 `VITE_API_MODE` 在 Python Direct 和 Java Gateway 两种 API 调用模式间切换。
+- Java Gateway 模式下优先读取 Java/MySQL 持久化数据，包括平台运行记录、前端配置、模型配置和插件配置；Python Direct 模式继续读取 Python API 和 localStorage。
 - 未来可加入更流畅的时间轴动画和交互式报告查看。
 
 边界：
@@ -211,6 +215,26 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - Dashboard 通过 `GET /health`、`GET /runs`、`GET /reports`、`GET /models`、`GET /plugins` 分模块加载数据；单个接口失败只影响对应模块，不导致页面白屏。
 - `RunConsole` 已支持比赛演示模式，新增演示案例选择、一键开始演示、DemoHero、DemoWorkflowStage、RepairHighlight、DemoResultSummary 和 DemoNarrationPanel。
 - 演示模式重点突出 Agent 工作流过程、自动修复高光时刻、最终质量评分、插件参与情况和 Markdown 报告结果；后端未流式返回时采用运行完成后的阶段回放展示。
+- Vue 前端已支持生产构建，新增 `frontend-vue/.env.production`、`frontend-vue/Dockerfile` 和 `frontend-vue/nginx.conf`。
+- FastAPI Agent Engine 已支持作为独立 Docker Compose 服务 `ai-agent-api` 启动，端口为 `8001`。
+- Docker Compose 已支持多服务启动：Streamlit v1 演示版、FastAPI Python Agent Engine API、Vue3 + Nginx 前端、Java Spring Boot 平台服务层。
+- `backend-java` 已作为 v2.0 第九阶段最小骨架加入，当前只做 API Gateway / Proxy，不接数据库、不做登录权限、不保存状态。
+- Java 层当前代理 `GET /health`、`GET /models`、`GET /plugins`、`POST /runs`、`GET /runs`、`GET /runs/{run_id}`、`GET /reports` 和 `GET /reports/{report_name}`，后续可扩展用户系统、权限控制、任务队列、配置中心、数据库存储和团队协作。
+- v2.0 第十阶段已让 Vue 支持 Python Direct 和 Java Gateway 两种 API 调用模式：过渡期推荐 Python Direct 便于调试，平台化扩展推荐 Java Gateway 承接任务管理、权限和配置中心能力。
+- v2.0 第十一步已让 Java 平台服务层增加任务记录和配置管理雏形：`POST /api/runs` 会保存 `RunRecord`，新增 `/api/platform/runs` 查询平台记录，新增 `/api/settings` 保存前端设置。
+- v2.0 第十二步已接入 MySQL 持久化：Java 平台运行记录、前端配置、模型配置和插件配置通过 JPA 保存到 MySQL；Python Agent Engine 仍负责 AI 工作流，`reports/` 与 `runs/` 文件仍保留用于大文本产物存储。
+- v2.0 第十三步已让 Vue 接入 Java + MySQL 数据视图：`VITE_API_MODE=java` 时，History 优先读取 `/api/platform/runs`，Settings 同步 `/api/settings`，Models 和 Plugins 读取 Java/MySQL 配置；`VITE_API_MODE=python` 时保持 Python Direct 与 localStorage 逻辑。
+- v2.0 第十四步已增强 Java + MySQL 任务记录详情和报告索引管理：`RunRecordEntity` 保存运行摘要、UI ViewModel、插件结果摘要、错误摘要、模型信息和审批字段；新增 `ReportIndexEntity`、`/api/platform/reports`、`/api/platform/stats`，Vue Reports 和 Dashboard 已接入平台报告索引与统计视图。
+- v2.0 第十五步已新增 C++ Runner Sandbox 最小可运行版本：`runner-cpp/` 支持任务 JSON、危险关键词扫描、调用 Python 执行目标文件和 JSON 结果输出；Python `code_runner` 通过 `runner_mode=cpp` 可选接入，未编译 runner 时自动回退 Python Runner。
+- v2.0 第十六步已完成多服务 Docker Compose 总集成：`mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`、`streamlit-web` 可通过 `docker compose up --build` 一起启动，C++ Runner 作为挂载目录和本地可选增强模块保留。
+- 技术框架扩展落地第二步已新增 Java 平台任务事件记录：`RunEventEntity` 保存任务创建、状态变化、Python 请求/响应、成功失败、报告索引和异常事件，Vue History 展示事件时间线，Dashboard 展示最近平台事件，为后续 SSE/WebSocket 实时日志、运行回放和平台审计打基础。
+- 技术框架扩展落地第三步已新增 SSE 实时事件推送雏形：`RunEventSseService` 管理任务订阅者，`GET /api/platform/runs/{platformRunId}/events/stream` 通过 `text/event-stream` 推送 Java 平台事件，Vue RunConsole 和 RunHistory 可订阅实时事件流。
+- 技术框架扩展落地第四步已新增 Python Agent Engine 细粒度事件上报：Python 工作流输出 `workflow_events`，Java 平台层保存为 `RunEventEntity` 并通过已有 SSE 机制推送，Vue 可展示 Product/Coder/Tester/Runner/Sentry/Quality/Report 等 Agent 事件。
+- 技术框架扩展落地第五步已新增工作流回放功能：Java 提供 `GET /api/platform/runs/{platformRunId}/replay`，Vue 新增 `/replay/:platformRunId` 页面，支持基于 MySQL 事件记录逐步回放工作流。
+- 技术框架扩展落地第六步已新增 Agent 注册中心与 Prompt 模板管理：Python Agent Engine 提供 `agent_registry/` 和 `prompts/`，FastAPI `/agents`、Java `/api/agents`、Vue `/agents` 已可查看 Agent 元信息。
+- 技术框架扩展落地第七步已新增 Workflow 模板管理：Python Agent Engine 提供 `workflow_templates/` 和 `/api/workflows/templates`，Vue 新增 `/workflows/templates` 页面，可查看模板、模板 Markdown、Agent 顺序和阶段顺序，并生成轻量模板任务视图；Java Gateway 通过 `/api/workflows/templates` 和 `/api/workflows/instantiate` 保持代理兼容。
+- 技术框架扩展落地第八步已新增 Vue 可视化工作流拖拽编辑器：Vue 新增 `/workflows/editor` 页面，支持从 Agent Palette 拖入节点、调整节点位置和执行顺序、编辑输入输出字段和阶段、加载模板、本地保存模板、导出 JSON，并通过现有 Workflow instantiate API 生成轻量任务视图。
+- 已新增简化 CodeAgent 执行模块：Python 提供 `/api/code-agent/execute`，支持 `read_file`、`write_file`、`list_files`；Java Gateway 提供 `/api/code-agent/execute` 并将 CodeAgent 事件写入 MySQL `run_event`、通过 SSE 推送；Vue Workflow Editor 可选中 CodeAgent 节点后触发文件操作。
 - 页面暂不实现复杂动画；后续逐步替代 Streamlit 的正式交互体验。
 
 ## 为什么当前要先保留 Streamlit
@@ -236,28 +260,55 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - 已直接消费 API 返回的 `run_summary` 和 `ui_view_model` 渲染 Dashboard 统计、摘要、工作流节点、结果详情、历史详情、Agent 输出、插件结果和报告入口。
 - 已提供前端侧模型和插件配置管理；当前配置通过 localStorage 保存，后续可升级为 Java 后端统一配置管理。
 - 已提供比赛演示模式，面向答辩现场突出多 Agent 协作、自愈修复、质量评分和报告生成。
+- 已支持 `npm run build` 生产构建，并通过 Nginx 支持 Vue Router history 路由回退。
+- 已通过 Docker Compose 将 `frontend-vue`、`backend-java` 和 `ai-agent-api` 作为 v2 预览服务联调，同时保留 `streamlit-web` 的 Streamlit v1 服务。
+- 已通过 `.env.development` / `.env.production` 支持 `VITE_API_MODE=python|java`：`python` 模式直连 FastAPI，`java` 模式通过 Spring Boot API Gateway 代理；页面组件不直接处理 API 路径差异。
+- 已在 Dashboard、History、Models、Plugins 页面展示当前数据模式和数据来源；Java Gateway 模式下展示 MySQL 平台运行记录和持久化配置视图。
+- Reports 页面在 Java Gateway 模式下优先展示 MySQL 报告索引，并在详情中显示 platformRunId、pythonRunId、需求摘要、成功状态、质量评分和 Markdown 正文。
+- Dashboard 在 Java Gateway 模式下优先读取 `/api/platform/stats`，展示 MySQL 运行统计、报告索引数量、自动修复数量和测试通过数量。
 - 后续增加更自然的时间轴动画、模型对比表格和更完整的报告阅读体验。
 
 ### 阶段 3：Java Spring Boot 接入任务管理
 
-- 增加用户、权限、任务、审计和运行记录管理。
-- Java API 负责平台层，Python Agent Engine 负责 AI 工作流。
-- Java 后端通过 API 调用 Python 服务。
+- 已新增 `backend-java/` 最小 Spring Boot 3.x 骨架。
+- 当前 Java API 负责平台层入口和 Python Agent Engine 代理，不替换现有 Python FastAPI。
+- 当前已提供 `/api/health`、`/api/agent/health`、`/api/models`、`/api/plugins`、`/api/runs`、`/api/reports`、`/api/reports/{reportName}`、`/api/platform/runs`、`/api/platform/runs/{platformRunId}`、`/api/settings`。
+- 当前已新增 `RunRecordService`、`SettingsService`、`ApiResponse` 和全局异常处理，Java 层开始承担任务记录、前端配置保存和平台接口统一响应。
+- 当前已新增 JPA 实体与 Repository：`RunRecordEntity`、`FrontendSettingsEntity`、`ModelConfigEntity`、`PluginConfigEntity`，数据保存到 MySQL。
+- 当前 `/api/models` 和 `/api/plugins` 已优先返回 MySQL 配置表数据，表为空时回退 Python Agent Engine 配置。
+- 当前已新增 `ReportIndexEntity`、`ReportIndexRepository`、`ReportIndexService` 和平台报告接口，用于保存报告索引并关联 platformRunId / pythonRunId。
+- 当前已新增 `/api/platform/stats`，从 MySQL 聚合运行总数、成功失败数、平均质量评分、测试通过数、自动修复数和报告数量。
+- 当前已新增 `RunEventEntity`、`RunEventRepository`、`RunEventService` 和 `/api/platform/runs/{platformRunId}/events`、`/api/platform/events/recent`，记录 Java 平台层可观察任务事件。
+- 当前已新增 `RunEventSseService` 和 `/api/platform/runs/{platformRunId}/events/stream`，作为 SSE 实时事件流预留接口；后续可升级为 WebSocket、实时 Agent 日志和运行回放。
+- 当前 Java 会从 Python `state.workflow_events` 或 `ui_view_model.workflow_events` 提取细粒度工作流事件并保存到 MySQL，不改变 Python Agent 输出内容和 LangGraph 分支逻辑。
+- 当前已新增工作流回放 API 和 Vue 回放页，复用 `RunRecordEntity` 与 `RunEventEntity`，用于比赛演示、问题复盘和调试分析。
+- 当前 Python Agent Engine 已开始从函数式 Agent 走向注册式 Agent 管理；Prompt 逐步从代码硬编码迁移到 `prompts/` Markdown 模板，便于后续调优和可视化编排。
+- 当前 Python Agent Engine 已开始支持 Workflow 模板管理；模板只描述可复用流程和生成轻量任务视图，不改变默认 LangGraph 主流程。
+- 当前数据流是 Vue Workflow Editor → Java Gateway 或 Python Direct → Workflow instantiate API → 返回 `run_summary` / `ui_view_model` 任务视图。当前不会让自定义模板直接驱动 LangGraph 分支，后续如需动态编排必须先确认模板协议和安全边界。
+- CodeAgent 数据流是 Vue Workflow Editor → Java Gateway 或 Python Direct → Python CodeAgent 文件操作 → 事件返回；Java Gateway 模式下事件进入 RunEvent + SSE + Replay，不需要修改 LangGraph 主流程。
+- `model_config` 和 `plugin_config` 表为空时会初始化 DeepSeek、Qwen、GLM 以及 Doc/Security/Refactor/UI Agent 默认配置。
+- 后续增加用户、权限、任务队列、配置中心、审计、团队协作和更完整的运行记录管理。
 
 ### 阶段 4：C++ Runner Sandbox 增强安全执行
 
-- 将代码运行从 Python subprocess 逐步迁移到更隔离的 Runner Sandbox。
-- 增加超时、资源限制、文件访问控制和危险操作拦截。
-- Runner 返回标准化执行结果给 Python Agent Engine。
+- 已新增 `runner-cpp/` 最小 CMake 工程。
+- 当前 Runner 是命令行程序，输入 `task.json`，输出 JSON 执行结果。
+- 已实现危险关键词扫描和 Windows 优先的 Python 进程执行。
+- Python `utils/cpp_runner_adapter.py` 负责发现 `runner.exe`、生成任务 JSON、解析结果和 fallback。
+- 默认仍使用 Python Runner；只有 `config/settings.yaml` 设置 `runner_mode: cpp` 时才尝试调用 C++ Runner。
+- 后续增加更强的进程隔离、资源限制、文件访问控制和危险操作拦截。
 
 ### 阶段 5：Docker Compose 多服务部署
 
 - 使用 Docker Compose 编排：
   - `frontend-vue`
   - `backend-java`
-  - `agent-engine-python`
-  - `runner-sandbox-cpp`
+  - `ai-agent-api`
+  - `streamlit-web`
+  - `mysql`
+  - `runner-cpp` 挂载目录
 - 统一环境变量、网络、端口和数据卷。
+- 当前 C++ Runner 采用方案 A，不单独作为服务启动；后续可升级为 `cpp-runner` 独立服务或构建阶段。
 - 保留 v1.0 单容器启动作为比赛演示备用方案。
 
 ## 兼容原则

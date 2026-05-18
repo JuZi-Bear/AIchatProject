@@ -1152,6 +1152,8 @@ def render_summary_cards(ui_view_model):
     if has_run:
         success_value = "✅ 成功" if summary_cards.get("success") else "❌ 失败"
         test_value = "通过" if summary_cards.get("test_success") else "未通过"
+    runner_mode = summary_cards.get("runner_mode", "python")
+    runner_value = "C++ Sandbox Runner" if runner_mode == "cpp" else "Python Runner"
 
     cards = [
         ("success", success_value, None),
@@ -1160,9 +1162,13 @@ def render_summary_cards(ui_view_model):
         ("coverage_percent", f"{summary_cards.get('coverage_percent', 0)}%" if has_run else "等待中", None),
         ("quality_score", f"{summary_cards.get('quality_score', 0)}/100" if has_run else "等待中", None),
         ("security_status", summary_cards.get("security_status", "等待安全检查"), None),
+        ("runner_mode", runner_value, None),
     ]
 
-    render_compact_cards(cards, columns_count=6, card_class="summary-card")
+    render_compact_cards(cards, columns_count=7, card_class="summary-card")
+
+    if summary_cards.get("runner_warning"):
+        st.warning(summary_cards["runner_warning"])
 
 
 def render_workflow_progress(workflow_status, state=None, ui_view_model=None):

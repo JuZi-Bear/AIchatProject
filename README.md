@@ -1,108 +1,131 @@
 # AI Multi-Agent Pipeline
 
-## 项目简介
+AI Multi-Agent Pipeline 是一个基于多智能体协作的自主开发流水线。项目可以从自然语言需求出发，完成需求拆解、代码生成、测试验证、错误分析、自动修复、质量评分和 Markdown 报告生成。
 
-一个面向比赛演示的多智能体自动开发流水线项目。用户输入自然语言需求后，系统会完成需求拆解、代码生成、pytest 自动测试、代码运行、错误分析、自动修复、插件扩展、质量评分和 Markdown 报告生成。
+当前项目采用“双轨并行”策略：
 
-项目默认支持 DeepSeek，也支持通义千问 Qwen 和智谱 GLM。Web UI 适合比赛现场展示，CLI 适合快速验证和调试。
+- v1.0 比赛演示轨：Python + LangGraph + Streamlit，优先稳定演示。
+- v2.0 平台化升级轨：Vue3 + TypeScript + Java Spring Boot + MySQL + FastAPI + C++ Runner Sandbox，优先工程扩展。
 
-## 核心亮点
+详细说明见 `docs/DUAL_TRACK_ARCHITECTURE.md`。
 
-- 国产大模型驱动：支持 DeepSeek、Qwen、GLM。
-- 多 Agent 协作：Product、Coder、Tester、Sentry、Quality 分工明确。
-- LangGraph 状态机：支持条件分支、自动修复循环和人工审批。
-- 测试驱动修复：自动生成 pytest 测试，用测试失败结果驱动修复。
-- Human-in-the-loop：运行 AI 生成代码前需要人工确认。
-- 插件式 AI 模块：Doc、Security、Refactor、UI Agent 可配置启用。
-- 多模型对比：同一需求下对比多个模型的成功率、修复次数、覆盖率和质量评分。
-- 质量评分：从运行、测试、覆盖率、安全和修复次数给出 100 分评价。
-- Web UI 可视化：展示 Agent 工作流、修复过程、插件结果、历史记录和报告。
-- FastAPI 服务层：新增 Python Agent Engine API，预留 Vue / Java / C++ 接入边界。
-- Vue 前端预览：基于 `ui_view_model` 展示工作流、历史、报告、平台 Dashboard 和比赛演示模式，并支持前端默认模型和插件启用状态管理。
-- Docker 部署：降低新设备环境差异导致的演示风险。
+## 核心能力
 
-## 技术架构
+- 多 Agent 协作：Product、Coder、Tester、Runner、Sentry 和插件 Agent 分工协作。
+- 自动修复闭环：测试失败后由 Sentry 分析错误，Coder 自动修复，再次验证。
+- 插件扩展：Doc Agent、Security Agent、Refactor Agent、UI Agent。
+- 质量评分：汇总测试、覆盖率、安全、修复次数和报告结果。
+- 报告生成：输出 Markdown 报告，并支持历史记录查看。
+- 平台事件记录：Java + MySQL 记录任务创建、状态变化、Python 请求/响应、成功失败和报告索引事件。
+- 实时事件流：Java Gateway 模式下通过 SSE 向 Vue 推送平台事件日志。
+- 细粒度 Agent 事件：Python Agent Engine 输出 `workflow_events`，记录 Product、Coder、Tester、Runner、Sentry、Quality 和 Report 等节点事件。
+- 工作流回放：Vue 可基于 Java + MySQL 事件记录逐步回放一次历史运行。
+- Agent 注册中心：Python 统一管理 Agent 元信息，Vue 可查看注册表。
+- Prompt 模板管理：主要 Agent Prompt 已迁移到 `prompts/` Markdown 模板。
+- Workflow 模板管理：Python 提供 `workflow_templates/`，Vue 可查看模板、Agent 顺序、阶段顺序并生成轻量模板任务视图。
+- 可视化工作流编辑器：Vue 支持从 Agent Palette 拖拽节点、调整执行顺序、编辑节点输入输出和生成模板任务视图。
+- 简化 CodeAgent：支持在 Workflow Editor 中触发 `read_file`、`write_file`、`list_files` 项目文件操作，并生成可 SSE 推送和回放的事件。
+- 双轨展示：Streamlit 稳定演示 + Vue 平台化预览。
+- 多服务部署：Docker Compose 启动 Vue、Java、MySQL、FastAPI 和 Streamlit。
 
-```text
-用户需求
-  ↓
-Product Agent：需求拆解
-  ↓
-Coder Agent：代码生成 / 修复
-  ↓
-Tester Agent：生成 pytest 并运行测试
-  ↓
-Approval Node：人工审批
-  ↓
-Runner：保存并运行代码
-  ↓
-条件判断
-  ├─ 成功：Plugins → Quality → Report
-  └─ 失败：Sentry Agent → Coder Agent，最多自动修复 N 次
-```
+## 双轨架构说明
 
-核心状态由 LangGraph 管理，最终写入 `runs/{run_id}.json`，同时生成 Markdown 报告到 `reports/`。
+| 轨道 | 技术栈 | 目标 | 入口 |
+| --- | --- | --- | --- |
+| v1-demo | Python、LangGraph、Streamlit、yaml、Python Runner | 比赛现场稳定演示 | `webui.py`、`graph_demo.py`、`start_demo.bat` |
+| v2-platform | Vue3、TypeScript、FastAPI、Spring Boot、MySQL、Docker Compose、C++ Runner | 平台化升级预览 | `frontend-vue/`、`backend-java/`、`api_server.py`、`docker-compose.yml` |
 
-## 核心功能
+当前推荐：比赛现场优先使用 v1 Streamlit；平台能力展示使用 v2 Docker Compose 或 Java Gateway 模式。
 
-- 根据自然语言需求生成 Python 代码。
-- 自动保存代码到 `output/generated_code.py`。
-- 自动生成测试文件 `tests/test_generated_code.py`。
-- 使用 pytest + coverage 验证代码正确性和覆盖率。
-- 捕获 stdout、stderr、returncode。
-- 失败后由 Sentry Agent 分析错误并触发 Coder Agent 修复。
-- 支持最大修复次数配置，默认 3 次。
-- 支持危险代码检查，拦截 `os.remove`、`shutil.rmtree`、`subprocess`、`eval`、`exec`。
-- 支持插件系统、运行历史、报告生成和模型对比。
+## 技术框架扩展方向
+
+当前 v2.0 不只是功能升级，而是平台化框架升级。项目后续优先扩展技术框架，而不是继续堆单点功能。
+
+已完成的框架能力：
+
+- Python Agent Engine 与 FastAPI API 层。
+- Streamlit v1 稳定演示入口。
+- Vue3 + TypeScript 平台前端骨架。
+- Java Spring Boot Gateway + MySQL 平台数据视图。
+- Java 平台任务事件记录与 Vue 事件时间线。
+- SSE 实时事件流预留接口。
+- Python Agent Engine 细粒度事件上报。
+- Java + MySQL + Vue 工作流回放。
+- Agent 注册中心与 Prompt 模板管理。
+- Workflow 模板管理和 Vue 模板选择页面。
+- Vue 可视化工作流拖拽编辑器最小版本。
+- 简化 CodeAgent 文件操作节点。
+- C++ Runner Sandbox 最小版本。
+- Docker Compose 多服务部署。
+
+规划中的框架能力：
+
+- Java 任务生命周期管理。
+- Java 配置中心增强。
+- Vue 接入平台配置和工作台能力。
+- Python Workflow 模板管理向可视化编排继续扩展。
+- WebSocket 实时日志升级与工作流回放增强。
+- 更强 Runner 隔离和 Docker Sandbox 预留。
+
+当前推荐扩展路线见 `docs/RECOMMENDED_EXTENSION_ROADMAP.md`，完整规划见 `docs/FRAMEWORK_EXTENSION_PLAN.md`。
+
+## 技术栈
+
+- Python 3.11：Agent Engine、LangGraph 工作流、Streamlit、FastAPI。
+- workflow_events：Python 工作流细粒度事件，用于 Java 持久化、SSE 推送和 Vue 时间线展示。
+- agent_registry / prompts：Python Agent 元信息注册和 Prompt 模板管理。
+- workflow_templates：Python Workflow 模板管理，保存可复用流程和 Markdown 描述。
+- Vue3 + TypeScript + Vite：v2 平台前端。
+- Element Plus、Pinia、Axios、Vue Router：前端 UI、状态和 API 调用。
+- Java 17 + Spring Boot 3 + Maven：平台服务层和 API Gateway。
+- MySQL 8.0：平台运行记录、报告索引、配置和统计数据。
+- C++17 + CMake：C++ Runner Sandbox 最小版本。
+- Docker Compose：多服务编排。
+
+更多技术细节见 `docs/TECH_STACK.md`。
 
 ## 快速启动
 
-Windows 推荐使用一键安装脚本：
+### v1.0 比赛演示模式
+
+安装依赖：
 
 ```powershell
-cd D:\AIchatProject
-.\install.bat
+pip install -r requirements.txt
 ```
 
-复制环境变量模板：
-
-```powershell
-copy .env.example .env
-```
-
-填写至少一个模型 API Key，例如：
-
-```text
-DEEPSEEK_API_KEY=your_deepseek_api_key
-DEFAULT_MODEL_PROVIDER=deepseek
-OFFLINE_MODE=false
-```
-
-启动 Web UI：
+启动 Streamlit：
 
 ```powershell
 python -m streamlit run webui.py
 ```
 
-浏览器访问：
-
-```text
-http://localhost:8501
-```
-
-启动 Python Agent Engine API：
+或使用 Windows 脚本：
 
 ```powershell
-python -m uvicorn api_server:app --reload --port 8000
+start_demo.bat
 ```
 
-API 健康检查：
+CLI 演示：
 
-```text
-http://localhost:8000/health
+```powershell
+python graph_demo.py
 ```
 
-启动 Vue3 + TypeScript 前端骨架：
+### v2.0 Python API 模式
+
+启动 FastAPI Agent Engine：
+
+```powershell
+python -m uvicorn api_server:app --reload --host 127.0.0.1 --port 8001
+```
+
+访问：
+
+- FastAPI Docs: http://localhost:8001/docs
+- Health: http://localhost:8001/health
+
+### v2.0 Vue 开发模式
 
 ```powershell
 cd frontend-vue
@@ -110,67 +133,93 @@ npm install
 npm run dev
 ```
 
-`frontend-vue/.env.development` 默认配置：
+默认开发配置见 `frontend-vue/.env.development`。Vue 支持两种 API 模式：
 
-```text
-VITE_API_BASE_URL=http://127.0.0.1:8001
-```
+- `VITE_API_MODE=python`：直连 Python FastAPI。
+- `VITE_API_MODE=java`：通过 Java Gateway 调用。
 
-如果使用该默认配置，请将 Python API 启动在 8001 端口，或按本地实际端口调整 `.env.development`。
+### v2.0 Java Gateway 模式
 
-如果比赛现场网络不稳定，可以设置：
-
-```text
-OFFLINE_MODE=true
-```
-
-系统会使用预置响应继续演示流程。
-
-## 本地运行方式
-
-手动安装依赖：
+先启动 Python FastAPI，再启动 Java：
 
 ```powershell
-cd D:\AIchatProject
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+cd backend-java
+mvn spring-boot:run
 ```
 
-一键启动菜单：
+访问：
 
-```powershell
-.\start_demo.bat
-```
+- Java Health: http://127.0.0.1:8088/api/health
+- Java Agent Health: http://127.0.0.1:8088/api/agent/health
 
-可选择：
+MySQL 配置见 `docs/MYSQL_SETUP.md`。
+
+Java Gateway 模式下，平台层会为每次运行记录任务事件。History 页面可查看单次运行事件时间线，Dashboard 可查看最近平台事件；RunConsole 和 History 可通过 SSE 订阅实时事件流。这只是实时日志和运行回放的基础，不会改变 Python LangGraph 执行流程。
+
+### Workflow 模板管理
+
+Vue 可访问 `/workflows/templates` 查看当前内置模板：
+
+- 简单演示流程
+- 完整多 Agent 流程
+- 自动修复重点流程
+
+模板页面会展示 Agent 执行顺序、阶段顺序和 Markdown 描述，并可生成轻量模板任务视图。当前模板实例化不直接执行 LangGraph，后续可升级为可视化工作流编辑和任务快速生成。
+
+Vue 还提供 `/workflows/editor` 可视化工作流拖拽编辑器：
+
+- 左侧 Agent Palette 从 Agent 注册中心读取节点。
+- 中间 Canvas 支持拖入节点、拖动位置、顺序连线和删除节点。
+- 右侧属性面板支持编辑输入字段、输出字段、阶段、启用状态和描述。
+- 工具栏支持新建、撤销、重做、加载模板、本地保存模板、导出 JSON 和生成任务视图。
+
+当前编辑器保存到浏览器 localStorage，生成任务时调用现有 Workflow instantiate API；它不会直接改写 LangGraph 主流程。
+
+### 简化 CodeAgent 文件操作
+
+Workflow Editor 中选中 `CodeAgent` 节点后，可以触发三类受控文件操作：
 
 ```text
-1. CLI 演示
-2. Web UI
-3. 退出
+read_file("src/moduleA.py")
+write_file("src/moduleB.py", content)
+list_files("src/")
 ```
 
-## Docker 运行方式
+每次操作都会返回摘要：
 
-先准备 `.env`：
+```json
+{
+  "success": true,
+  "filePath": "src/moduleA.py",
+  "message": "已读取/修改/生成内容"
+}
+```
+
+并生成 `AGENT_STARTED`、`AGENT_FINISHED` 或 `AGENT_FAILED` 事件。Java Gateway 模式下，这些事件会写入 MySQL `run_event` 并通过 SSE 推送给 Vue；Python Direct 模式下，前端直接展示 API 返回事件。该模块不是完整 Codex，不会自动决定修改哪些文件，只执行用户指定路径的受控操作。
+
+CodeAgent 的访问范围由 `config/settings.yaml` 中的 `code_agent.allowed_paths` 和 `code_agent.blocked_paths` 控制；审计日志默认写入 `output/code_agent_audit.jsonl`。
+
+## Docker Compose 启动
+
+复制环境变量示例：
 
 ```powershell
-copy .env.example .env
+Copy-Item .env.docker.example .env
 ```
 
-启动容器：
+启动多服务：
 
 ```powershell
 docker compose up --build
 ```
 
-访问：
+访问地址：
 
-```text
-http://localhost:8501
-```
+- Vue 前端: http://localhost:5174
+- Java 平台服务: http://localhost:8088/api/health
+- FastAPI Docs: http://localhost:8001/docs
+- Streamlit v1: http://localhost:8501
+- MySQL: localhost:3306
 
 停止：
 
@@ -178,315 +227,88 @@ http://localhost:8501
 docker compose down
 ```
 
-Docker 服务名为 `ai-agent-pipeline`，并挂载：
+完整说明见 `docs/DOCKER_COMPOSE_GUIDE.md`。
 
-- `reports/`
-- `runs/`
-- `output/`
+## 双轨启动测试
 
-## Web UI 使用方式
+修改代码或文档后，按影响范围验证 v1.0 和 v2.0 两条轨道：
 
-启动：
+- `docs/DUAL_TRACK_TEST_CHECKLIST.md`：v1.0 / v2.0 启动测试清单。
+- `docs/TEST_RESULT_LOG.md`：手动测试结果记录表。
+- `docs/STARTUP_ORDER.md`：v1.0、v2.0 本地开发和 Docker 模式推荐启动顺序。
 
-```powershell
-python -m streamlit run webui.py
-```
-
-左侧控制栏包含：
-
-- 演示案例选择
-- 自定义需求输入
-- 最大修复次数设置
-- 演示模式 / 开发模式切换
-- DeepSeek / Qwen / GLM 模型选择
-- 多模型对比模式
-- 插件开关
-- 人工审批 checkbox
-- 开始运行和清空结果按钮
-
-右侧展示区包含：
-
-- Header：当前模型、运行状态、run_id。
-- Summary Cards：success、retry_count、test_success、coverage、quality_score、security_status。
-- AI 工作流时间轴：Requirement、Product、Coder、Tester、Approval、Runner、Sentry、Plugins、Quality、Report。
-- 自动修复高光时刻：展示失败、Sentry 分析、Coder 修复和最终测试结果。
-- 最终结果总览：成功状态、修复次数、测试、覆盖率、质量评分、安全状态和报告路径。
-- 结果快速导航：最终代码、pytest、错误摘要、自动修复、插件结果、运行报告和历史记录。
-- Agent 输出 Tabs：Product、Coder、Tester、Sentry、Plugins、Report、Raw State。
-
-演示模式会隐藏完整 prompt、完整 state 和过长错误栈，只保留关键摘要；开发模式显示完整调试信息。
-
-## UI/UX 优化说明
-
-Web UI 已围绕比赛演示做过专项优化：
-
-- 页面采用左侧控制栏 + 右侧主展示区。
-- 首屏优先展示核心状态、工作流时间轴和最终结果。
-- 通过 `ui_view_model` 统一页面数据结构，减少直接解析原始 state。
-- 通过 `run_service` 统一创建运行、读取历史、查询报告、模型和插件。
-- 短指标使用横向卡片，长内容默认折叠，减少大面积空白。
-- 结果索引保证三步内找到最终代码、错误摘要和报告。
-
-## CLI 使用方式
-
-LangGraph CLI：
-
-```powershell
-python graph_demo.py
-```
-
-可选择：
-
-- 单模型运行
-- 多模型对比运行
-- 简单成功案例
-- 翻车修复案例
-- 综合案例
-- 自定义输入
-
-早期兼容入口仍保留：
-
-```powershell
-python main.py
-```
-
-## 比赛演示流程
-
-推荐现场优先使用 Web UI 演示：
-
-1. 启动 `python -m streamlit run webui.py`。
-2. 在左侧选择“翻车修复案例”。
-3. 选择 DeepSeek / Qwen / GLM 模型。
-4. 启用 Doc、Security、Refactor、UI 插件。
-5. 勾选“我确认允许运行 AI 生成的代码”。
-6. 点击“开始运行”。
-7. 展示 Agent 工作流状态变化。
-8. 展示 pytest 测试失败或 Runner 失败。
-9. 展示 Sentry Agent 错误分析。
-10. 展示 Coder Agent 自动修复。
-11. 展示测试通过、质量评分和 Markdown 报告。
-
-详细操作脚本见：
+## 项目结构
 
 ```text
-docs/DEMO_FLOW.md
-docs/DEMO_SCRIPT.md
+AIchatProject/
+├─ frontend-vue/      v2 Vue3 + TypeScript 前端
+├─ backend-java/      v2 Java Spring Boot 平台服务层
+├─ runner-cpp/        C++ Runner Sandbox 预研模块
+├─ workflow_templates/ Workflow 模板和 Markdown 描述
+├─ core/              LangGraph 状态和工作流
+├─ plugins/           插件系统
+├─ utils/             Runner、摘要、历史和 UI ViewModel 工具
+├─ config/            yaml 配置
+├─ reports/           生成报告
+├─ runs/              运行历史
+├─ output/            生成代码和临时输出
+├─ docs/              项目文档
+├─ api_server.py      Python FastAPI Agent Engine
+├─ webui.py           Streamlit v1 演示入口
+├─ graph_demo.py      CLI 演示入口
+└─ docker-compose.yml 多服务编排
 ```
 
-## 插件系统说明
+完整目录说明见 `docs/PROJECT_DIRECTORY_GUIDE.md`。
 
-插件配置文件：
+## 文档导航
 
-```text
-config/agents.yaml
-```
+优先阅读：
 
-默认插件：
+- `docs/DOCUMENT_INDEX.md`：文档总导航。
+- `docs/DUAL_TRACK_ARCHITECTURE.md`：双轨并行架构。
+- `docs/API_CONTRACT.md`：API 契约。
+- `docs/DOCKER_COMPOSE_GUIDE.md`：多服务 Docker 启动。
+- `docs/VIDEO_CODING_GUIDE.md`：录制和现场讲解。
+- `docs/DEFENSE_SCRIPT.md`：答辩讲稿。
+- `docs/RISK_AND_STABILITY.md`：风险和兜底。
+- `docs/CODEX_COLLAB_RULES.md`：Codex 协作规范。
+- `docs/CODE_HEALTH_REVIEW.md`：代码健康检查。
+- `docs/ISSUE_TRIAGE.md`：测试问题分级和归档。
+- `docs/FIX_PLAN.md`：修复计划。
+- `docs/NEXT_ACTION_QUEUE.md`：下一步行动队列。
+- `docs/REDUNDANCY_REVIEW.md`：文档冗余评审。
+- `docs/FRAMEWORK_EXTENSION_PLAN.md`：技术框架扩展总规划。
+- `docs/FRAMEWORK_EXTENSION_BOUNDARY.md`：框架扩展边界。
+- `docs/FRAMEWORK_EXTENSION_CANDIDATES.md`：候选扩展评估。
+- `docs/RECOMMENDED_EXTENSION_ROADMAP.md`：推荐扩展路线。
+- `docs/FRAMEWORK_EXTENSION_ARCHITECTURE.md`：未来架构示意图。
+- `docs/MAINTENANCE_GUIDE.md`：维护指南。
+- `docs/SAFE_CHANGE_CHECKLIST.md`：安全变更检查清单。
+- `docs/DUAL_TRACK_TEST_CHECKLIST.md`：双轨启动测试清单。
+- `docs/STARTUP_ORDER.md`：推荐启动顺序。
+- `docs/TEST_RESULT_LOG.md`：测试结果记录。
 
-- Doc Agent：生成 README 风格说明，写入 `doc_result`。
-- Security Agent：检查危险操作，写入 `security_result`。
-- Refactor Agent：分析代码结构和可读性，写入 `refactor_result`。
-- UI Agent：生成页面布局和交互建议，写入 `ui_result`。
+## Video Coding 指南入口
 
-插件统一结果写入：
+录制建议顺序：
 
-```text
-state["plugin_results"]
-```
+1. 项目总览和双轨架构。
+2. Streamlit v1 稳定演示。
+3. FastAPI Agent Engine。
+4. Vue Dashboard。
+5. Java Gateway 和 MySQL。
+6. C++ Runner Sandbox。
+7. Docker Compose 多服务部署。
 
-统一结构：
+详细脚本见 `docs/VIDEO_CODING_GUIDE.md`。
 
-```text
-plugin_name
-status: success / warning / failed / disabled
-summary
-detail
-```
+## 后续规划
 
-开发新插件可参考：
+- 保持 v1 Streamlit 作为稳定演示轨。
+- 继续增强 v2 Vue 平台前端体验。
+- 让 Java 平台层逐步承担任务管理、配置中心和团队协作能力。
+- 增强 C++ Runner 的隔离、超时和资源限制。
+- 在 v2 稳定后再评估是否收敛 Streamlit 为 legacy demo。
 
-```text
-plugins/plugin_template.py
-docs/PLUGIN_GUIDE.md
-```
-
-## 多模型切换说明
-
-模型配置文件：
-
-```text
-config/models.yaml
-```
-
-支持模型：
-
-- DeepSeek：`deepseek-chat`
-- Qwen：`qwen-plus`
-- GLM：`glm-4-flash`
-
-环境变量：
-
-```text
-DEEPSEEK_API_KEY=your_deepseek_api_key
-QWEN_API_KEY=your_qwen_api_key
-GLM_API_KEY=your_glm_api_key
-DEFAULT_MODEL_PROVIDER=deepseek
-```
-
-Web UI 可以在侧边栏选择模型。多模型对比会为每个模型独立运行完整流程，并生成对比报告：
-
-```text
-reports/report_compare_{run_id}.md
-```
-
-## 自动测试与质量评分说明
-
-Tester Agent 会根据需求和代码生成 pytest 测试，并运行：
-
-```powershell
-python -m coverage run -m pytest tests/test_generated_code.py -q
-python -m coverage report
-```
-
-最终成功需要同时满足：
-
-- Runner 运行成功。
-- pytest 测试通过。
-
-Quality Node 使用 100 分制评分：
-
-- pytest 通过：30 分
-- 程序运行成功：20 分
-- 覆盖率：最高 20 分
-- 安全检查通过：15 分
-- 自动修复次数：最高 15 分
-
-评分结果保存为：
-
-- `coverage_percent`
-- `quality_score`
-- `quality_summary`
-
-## 自动修复闭环说明
-
-当 Runner 或 pytest 失败时：
-
-1. Sentry Agent 读取代码、stderr、pytest 输出和测试代码。
-2. Sentry Agent 输出错误原因和修复建议。
-3. Coder Agent 根据需求、原始代码、错误日志和 Sentry 建议修复代码。
-4. 系统重新保存、测试并运行。
-5. 达到最大修复次数后仍失败，则停止并生成最终报告。
-
-最大修复次数配置在：
-
-```text
-config/settings.yaml
-```
-
-## 后续架构升级方向
-
-v1.0 先保留 Streamlit，是为了保证比赛现场稳定、部署简单、演示快速。当前已经抽离 `services/run_service.py`、`run_summary` 和 `ui_view_model`，后续可以平滑升级为前后端分离架构：
-
-- FastAPI 包装 Python Agent Engine，当前已提供 `api_server.py` 预览接口。
-- Vue3 + TypeScript 前端骨架，当前已提供 `frontend-vue/` 独立项目，并支持 Dashboard 总览、工作流可视化、历史记录、报告查看、默认模型选择和插件开关。
-- Vue Dashboard 已支持运行统计、最近运行、最近报告、模型状态、插件状态和快捷操作；各模块独立容错，API 未连接时不会白屏。
-- Vue RunConsole 已支持比赛演示模式，突出 Agent 工作流阶段、自动修复高光、最终质量评分、报告入口和答辩讲解提示。
-- Vue 前端配置当前保存于浏览器 localStorage，后续可升级为 Java 后端统一配置管理。
-- Java Spring Boot 承担平台服务层、任务管理和权限审计。
-- C++ Runner Sandbox 增强 AI 生成代码的隔离执行能力。
-- Docker Compose 编排多服务部署。
-
-详细规划见：
-
-```text
-docs/V2_ARCHITECTURE_PLAN.md
-docs/API_CONTRACT.md
-```
-
-## 目录结构
-
-```text
-core/                 LangGraph 核心状态和工作流
-agents.py             Product / Coder / Tester / Sentry Agent
-plugins/              自定义 AI 插件模块
-utils/                代码运行、测试、报告、摘要和历史工具
-config/               模型、插件和默认运行配置
-docs/                 操作手册、答辩材料、设计文档
-frontend-vue/         Vue3 + TypeScript 前端骨架
-reports/              Markdown 运行报告
-runs/                 每次运行的完整 state JSON
-output/               生成代码和兼容输出
-tests/                自动生成的 pytest 测试
-graph_demo.py         CLI 演示入口
-webui.py              Streamlit Web UI
-api_server.py         FastAPI Python Agent Engine API
-schemas/              API 请求和响应 Pydantic Schema
-Dockerfile            Docker 镜像配置
-docker-compose.yml    Docker Compose 启动配置
-requirements.txt      Python 依赖
-.env.example          环境变量模板
-```
-
-完整提交结构见：
-
-```text
-docs/DELIVERY_STRUCTURE.md
-```
-
-## 答辩与交付材料
-
-- `docs/PRESENTATION_OUTLINE.md`：答辩大纲。
-- `docs/DEFENSE_QA.md`：评委问答。
-- `docs/DEMO_FLOW.md`：比赛现场演示流程。
-- `docs/FINAL_CHECKLIST.md`：交付前检查清单。
-- `docs/V1_RELEASE_NOTES.md`：v1.0 发布说明。
-- `docs/V1_FINAL_ACCEPTANCE.md`：v1.0 最终验收清单。
-- `docs/V1_FREEZE_RULES.md`：v1.0 版本冻结规则。
-- `docs/INNOVATION_POINTS.md`：创新点总结。
-- `docs/RISK_AND_SOLUTION.md`：风险与解决方案。
-- `docs/TECH_STACK.md`：技术栈说明。
-- `docs/V2_ARCHITECTURE_PLAN.md`：v2.0 多技术栈架构规划。
-- `docs/OPERATION_GUIDE.md`：部署和操作指南。
-- `docs/USER_MANUAL.md`：跨设备部署手册。
-
-## 常见问题
-
-### 1. 没有 API Key 能演示吗？
-
-可以。设置 `OFFLINE_MODE=true` 后，系统会使用预置响应完成演示流程。
-
-### 2. Web UI 打不开怎么办？
-
-确认命令是否正在运行：
-
-```powershell
-python -m streamlit run webui.py
-```
-
-再访问 `http://localhost:8501`。如果端口被占用，可以关闭占用进程或修改启动端口。
-
-### 3. 为什么必须勾选人工审批？
-
-因为系统会运行 AI 生成的 Python 代码。人工审批用于防止未经确认就执行潜在危险代码。
-
-### 4. 自动修复一定成功吗？
-
-不保证。系统默认最多修复 3 次，仍失败会停止并生成报告，方便人工接管。
-
-### 5. 生成代码安全吗？
-
-系统在运行前会拦截危险关键词，并通过 Security Agent 再做一次安全检查。但比赛项目仍建议只运行单文件、低风险 Python 示例。
-
-### 6. Docker 和本地启动选哪个？
-
-比赛现场推荐优先使用本地已验证环境；新设备部署或环境不稳定时使用 Docker 更稳。
-
-### 7. 报告和历史记录在哪里？
-
-- 报告：`reports/`
-- 运行状态：`runs/`
-- 生成代码：`output/generated_code.py`
-
-### 8. 如何新增插件？
-
-复制 `plugins/plugin_template.py`，实现 `run(state)`，在 `plugin_loader.py` 注册，并在 `config/agents.yaml` 启用。
+路线图见 `docs/V2_ARCHITECTURE_PLAN.md` 和 `docs/TASKS.md`。

@@ -22,7 +22,7 @@
 
 ## 6. 如何处理代码运行安全问题？
 
-答：第一，Runner 执行前会拦截 `os.remove`、`shutil.rmtree`、`subprocess`、`eval`、`exec`。第二，执行前有人工审批节点。第三，Security Agent 会在插件阶段再做安全检查。
+答：第一，Runner 执行前会拦截 `os.remove`、`shutil.rmtree`、`subprocess`、`eval`、`exec`。第二，执行前有人工审批节点。第三，Security Agent 会在插件阶段再做安全检查。v2.0 还新增了 C++ Runner Sandbox 最小版本，后续可以把执行隔离、资源限制和审计放到独立 Runner 层。
 
 ## 7. 自动修复的依据是什么？
 
@@ -96,18 +96,22 @@
 
 答：系统有明确状态流转、pytest 执行、coverage 统计、代码运行、错误反馈、自动修复、插件执行、质量评分和历史报告。它是一个可执行的工程流程，而不是单次提示词输出。
 
-## 25. 为什么现在没有直接使用 Vue / Java / C++？
+## 25. 为什么 v1.0 仍保留 Streamlit，而 v2.0 才引入 Vue / Java / C++？
 
-答：v1.0 的目标是比赛稳定演示。Streamlit 能快速完成可视化、部署简单、现场风险低；Python 也最适合直接承载 LangGraph 和模型调用。Vue、Java、C++ 已经在架构文档中预留，但当前不引入实际代码，避免增加联调和部署风险。
+答：v1.0 的目标是比赛稳定演示。Streamlit 启动快、部署简单、现场风险低；Python 也最适合直接承载 LangGraph 和模型调用。v2.0 已逐步新增 Vue、Java 和 C++ 雏形，但它们通过 API 和配置可选接入，不破坏 v1.0 演示链路。
 
 ## 26. 后续如何升级为多语言平台？
 
 答：升级路线是先用 FastAPI 包装 Python Agent Engine，再用 Vue3 + TypeScript 替换 Streamlit 前端，随后引入 Java Spring Boot 做平台服务层，最后使用 C++ Runner Sandbox 增强代码运行隔离。各层通过 `docs/API_CONTRACT.md` 中的接口契约连接。
 
-## 27. 当前架构是否支持前后端分离？
+## 27. C++ Runner Sandbox 现在完成到什么程度？
+
+答：当前是最小可运行版本，位于 `runner-cpp/`。它可以读取任务 JSON、检查代码文件、扫描危险关键词、调用 Python 执行目标文件并输出 JSON 结果。默认仍使用 Python Runner，只有 `runner_mode=cpp` 时才尝试调用 C++ Runner；如果未编译，会自动回退并显示 warning。
+
+## 28. 当前架构是否支持前后端分离？
 
 答：支持。我们已经抽离了 `services/run_service.py` 作为 Application Service 层，并统一输出 `state`、`run_summary` 和 `ui_view_model`。未来只需要把 run_service 包装成 HTTP API，Vue 或 Java 就可以复用同样的数据结构。
 
-## 28. ui_view_model 和 run_service 的作用是什么？
+## 29. ui_view_model 和 run_service 的作用是什么？
 
 答：`run_service` 负责统一创建运行、读取历史、查询模型、插件和报告，是未来 API 层的服务边界。`ui_view_model` 负责把复杂 state 转成稳定的前端展示结构，避免 Web UI 或未来 Vue 前端直接解析 LangGraph 原始状态。

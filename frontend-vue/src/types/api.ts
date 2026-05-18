@@ -4,9 +4,20 @@ export type HealthResponse = {
   version: string;
 };
 
+export type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+};
+
 export type { ModelConfig } from "./model";
+export type { PlatformRunRecord, PlatformStats, RawPlatformRunResponse } from "./platformRun";
 export type { PluginConfig } from "./plugin";
 export type { FrontendSettings } from "./settings";
+export type { RunEvent } from "./runEvent";
+export type { InstantiateWorkflowRequest, InstantiateWorkflowResponse, WorkflowTemplate } from "./workflow";
+export type { AgentNodeData, ConnectionData, WorkflowEditorState, WorkflowTemplateData } from "./workflowEditor";
+export type { CodeAgentOperation, CodeAgentOperationResult, CodeAgentRequest, CodeAgentResponse } from "./codeAgent";
 export type {
   DemoCase,
   DemoCaseKey,

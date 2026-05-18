@@ -48,6 +48,12 @@ const requirementText = computed(() => {
       </el-descriptions-item>
       <el-descriptions-item label="覆盖率">{{ summary?.coverage_percent ?? 0 }}%</el-descriptions-item>
       <el-descriptions-item label="质量评分">{{ summary?.quality_score ?? 0 }}</el-descriptions-item>
+      <el-descriptions-item label="Runner">
+        {{ summary?.runner_mode === "cpp" ? "C++ Sandbox Runner" : "Python Runner" }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="summary?.runner_warning" label="Runner Warning" :span="2">
+        <span class="inline-long">{{ summary.runner_warning }}</span>
+      </el-descriptions-item>
       <el-descriptions-item label="报告路径">
         <span class="inline-long">{{ summary?.report_path || "暂无报告" }}</span>
       </el-descriptions-item>
