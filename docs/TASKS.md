@@ -857,6 +857,12 @@
 - [x] Vue RunConsole 集成 CodeAgentPanel
 - [x] Vue 高亮 CodeAgent 阻断路径和违规操作
 - [x] Vue 支持点击查看 CodeAgent 生成或修改文件
+- [x] Vue CodeAgentPanel 增加审计日志预览
+- [x] Vue CodeAgentPanel 增加违规路径快捷测试
+- [x] Vue CodeAgentPanel 增加生成文件 before/after diff 展示
+- [x] Vue CodeAgentPanel 增加复制审计日志和复制 diff
+- [x] Workflow Replay 单独高亮 CodeAgent 节点
+- [x] Dashboard 增加最近 CodeAgent 操作卡片
 - [x] 新增 CodeAgent 节点集成说明文档
 - [x] 更新 API、架构、技术栈和 README 文档
 

@@ -25,11 +25,31 @@ const selectedNode = computed(() => store.selectedNode);
 const visible = computed(() => props.alwaysVisible || selectedNode.value?.agentKey === "code_agent");
 const loading = ref(false);
 const previewLoading = ref(false);
+const auditLoading = ref(false);
 const sseStatus = ref("");
 const result = ref<CodeAgentResponse | null>(null);
 const filePreview = ref<{ filePath: string; content: string; truncated?: boolean } | null>(null);
+const auditPreview = ref<{ path: string; content: string; lines: string[]; truncated?: boolean } | null>(null);
+const diffPreview = ref<{
+  filePath: string;
+  before: string;
+  after: string;
+  beforeMissing: boolean;
+  beforeTruncated?: boolean;
+  afterTruncated?: boolean;
+  rows: Array<{ type: "added" | "removed" | "unchanged"; text: string; lineNo: number }>;
+} | null>(null);
 const events = ref<RunEvent[]>([]);
 let subscription: RunEventSubscription | null = null;
+
+const auditLogPath = "output/code_agent_audit.jsonl";
+const blockedPathExample = ".env";
+const demoWritePath = "output/code_agent_demo.txt";
+const demoWriteContent = `# CodeAgent demo file
+
+def my_func():
+    return "created by CodeAgent"
+`;
 
 const form = reactive({
   operation: "read_file" as CodeAgentOperation,
@@ -60,6 +80,9 @@ const hasViolation = computed(() => {
       (!result.value.success || /禁止|阻断|白名单|blocked|denied|FAILED/i.test(failureText)),
   );
 });
+const latestAuditPath = computed(
+  () => result.value?.results.find((item) => item.auditPath)?.auditPath || auditLogPath,
+);
 
 function nextPlatformRunId() {
   return `code_agent_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
@@ -75,6 +98,43 @@ function appendEvent(event: RunEvent) {
   if (!currentKeys.has(eventKey(event))) {
     events.value.push(event);
   }
+}
+
+async function copyText(text: string, successMessage: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+
+    ElMessage.success(successMessage);
+  } catch {
+    ElMessage.error("复制失败，请手动选择内容复制");
+  }
+}
+
+function fillDemoWrite() {
+  form.operation = "write_file";
+  form.filePath = demoWritePath;
+  form.content = demoWriteContent;
+  form.recursive = false;
+}
+
+async function runBlockedPathCheck() {
+  form.operation = "read_file";
+  form.filePath = blockedPathExample;
+  form.content = "";
+  form.recursive = false;
+  await runCodeAgent();
 }
 
 function closeSubscription() {
@@ -99,10 +159,14 @@ async function runCodeAgent() {
   loading.value = true;
   result.value = null;
   filePreview.value = null;
+  auditPreview.value = null;
+  diffPreview.value = null;
   events.value = [];
   sseStatus.value = "";
   closeSubscription();
   const platformRunId = nextPlatformRunId();
+  const targetPath = form.filePath.trim();
+  let beforeRead: Awaited<ReturnType<typeof readFileContentForDiff>> | null = null;
 
   if (currentApiMode === "java") {
     subscription = subscribeRunEvents(
@@ -118,9 +182,13 @@ async function runCodeAgent() {
   }
 
   try {
+    if (form.operation === "write_file" && targetPath) {
+      beforeRead = await readFileContentForDiff(targetPath);
+    }
+
     const response = await executeCodeAgent({
       operation: form.operation,
-      filePath: form.filePath.trim(),
+      filePath: targetPath,
       content: form.content,
       recursive: form.recursive,
       platformRunId,
@@ -129,6 +197,10 @@ async function runCodeAgent() {
     result.value = response;
     response.events.forEach(appendEvent);
     await loadHistoryEvents(response.platformRunId || platformRunId);
+
+    if (form.operation === "write_file" && targetPath) {
+      await buildDiffPreview(targetPath, beforeRead);
+    }
 
     if (response.success) {
       ElMessage.success(response.message || "CodeAgent 操作完成");
@@ -141,6 +213,158 @@ async function runCodeAgent() {
     loading.value = false;
     closeSubscription();
   }
+}
+
+async function readFileContentForDiff(filePath: string) {
+  try {
+    const response = await executeCodeAgent({
+      operation: "read_file",
+      filePath,
+      platformRunId: nextPlatformRunId(),
+    });
+    const readResult = response.results.find((item) => typeof item.content === "string");
+
+    return {
+      success: response.success && Boolean(readResult),
+      content: readResult?.content || "",
+      truncated: readResult?.truncated,
+      missing: !response.success,
+      message: response.message,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      content: "",
+      truncated: false,
+      missing: true,
+      message: error instanceof Error ? error.message : "读取写入前内容失败",
+    };
+  }
+}
+
+async function buildDiffPreview(
+  filePath: string,
+  beforeRead: Awaited<ReturnType<typeof readFileContentForDiff>> | null,
+) {
+  const afterRead = await readFileContentForDiff(filePath);
+  const before = beforeRead?.content || "";
+  const after = afterRead.content || form.content || "";
+
+  diffPreview.value = {
+    filePath,
+    before,
+    after,
+    beforeMissing: Boolean(beforeRead?.missing),
+    beforeTruncated: beforeRead?.truncated,
+    afterTruncated: afterRead.truncated,
+    rows: buildLineDiff(before, after),
+  };
+}
+
+function buildLineDiff(before: string, after: string) {
+  const beforeLines = before.split(/\r?\n/);
+  const afterLines = after.split(/\r?\n/);
+  let prefix = 0;
+
+  while (
+    prefix < beforeLines.length &&
+    prefix < afterLines.length &&
+    beforeLines[prefix] === afterLines[prefix]
+  ) {
+    prefix += 1;
+  }
+
+  let beforeSuffix = beforeLines.length - 1;
+  let afterSuffix = afterLines.length - 1;
+
+  while (
+    beforeSuffix >= prefix &&
+    afterSuffix >= prefix &&
+    beforeLines[beforeSuffix] === afterLines[afterSuffix]
+  ) {
+    beforeSuffix -= 1;
+    afterSuffix -= 1;
+  }
+
+  const rows: Array<{ type: "added" | "removed" | "unchanged"; text: string; lineNo: number }> = [];
+
+  beforeLines.slice(0, prefix).forEach((line, index) => {
+    rows.push({ type: "unchanged", text: line, lineNo: index + 1 });
+  });
+
+  beforeLines.slice(prefix, beforeSuffix + 1).forEach((line, index) => {
+    rows.push({ type: "removed", text: line, lineNo: prefix + index + 1 });
+  });
+
+  afterLines.slice(prefix, afterSuffix + 1).forEach((line, index) => {
+    rows.push({ type: "added", text: line, lineNo: prefix + index + 1 });
+  });
+
+  beforeLines.slice(beforeSuffix + 1).forEach((line, index) => {
+    rows.push({ type: "unchanged", text: line, lineNo: beforeSuffix + index + 2 });
+  });
+
+  return rows.length ? rows : [{ type: "unchanged" as const, text: "", lineNo: 1 }];
+}
+
+function formatDiffText() {
+  if (!diffPreview.value) {
+    return "";
+  }
+
+  const header = [
+    `--- before/${diffPreview.value.filePath}`,
+    `+++ after/${diffPreview.value.filePath}`,
+  ];
+  const body = diffPreview.value.rows.map((row) => {
+    const marker = row.type === "added" ? "+" : row.type === "removed" ? "-" : " ";
+    return `${marker}${row.text}`;
+  });
+
+  return [...header, ...body].join("\n");
+}
+
+function copyDiff() {
+  copyText(formatDiffText(), "已复制 diff");
+}
+
+async function previewAuditLog() {
+  auditLoading.value = true;
+
+  try {
+    const response = await executeCodeAgent({
+      operation: "read_file",
+      filePath: latestAuditPath.value,
+      platformRunId: nextPlatformRunId(),
+    });
+    const readResult = response.results.find((item) => typeof item.content === "string");
+    const content = readResult?.content || response.message || "";
+    auditPreview.value = {
+      path: latestAuditPath.value,
+      content,
+      lines: content.split(/\r?\n/).filter(Boolean).slice(-12),
+      truncated: readResult?.truncated,
+    };
+
+    response.events.forEach(appendEvent);
+
+    if (!response.success) {
+      ElMessage.warning(response.message || "审计日志暂不可读");
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "读取审计日志失败");
+  } finally {
+    auditLoading.value = false;
+  }
+}
+
+function copyAuditLog() {
+  if (!auditPreview.value) {
+    ElMessage.warning("请先预览审计日志");
+    return;
+  }
+
+  copyText(auditPreview.value.content, "已复制审计日志");
 }
 
 async function previewFile(filePath: string) {
@@ -203,6 +427,16 @@ onBeforeUnmount(closeSubscription);
       class="panel-alert"
     />
 
+    <div class="quick-actions">
+      <el-button size="small" plain @click="fillDemoWrite">填入 Demo 写文件</el-button>
+      <el-button size="small" type="danger" plain :loading="loading" @click="runBlockedPathCheck">
+        测试阻断路径 .env
+      </el-button>
+      <el-button size="small" plain :loading="auditLoading" @click="previewAuditLog">
+        预览审计日志
+      </el-button>
+    </div>
+
     <el-form label-position="top" class="code-agent-form">
       <el-form-item label="操作">
         <el-select v-model="form.operation" class="full-width">
@@ -262,6 +496,28 @@ onBeforeUnmount(closeSubscription);
           </el-button>
         </div>
       </el-collapse-item>
+      <el-collapse-item v-if="diffPreview" title="生成/修改前后对比" name="diff">
+        <div class="preview-title">
+          <el-tag effect="plain">{{ diffPreview.filePath }}</el-tag>
+          <el-tag v-if="diffPreview.beforeMissing" type="info" effect="plain">写入前无可读内容</el-tag>
+          <el-tag v-if="diffPreview.beforeTruncated || diffPreview.afterTruncated" type="warning" effect="plain">
+            内容可能已截断
+          </el-tag>
+          <el-button size="small" plain @click="copyDiff">复制 diff</el-button>
+        </div>
+        <div class="diff-view">
+          <div
+            v-for="(row, index) in diffPreview.rows"
+            :key="`${row.type}-${row.lineNo}-${index}`"
+            class="diff-line"
+            :class="`diff-${row.type}`"
+          >
+            <span class="diff-mark">{{ row.type === "added" ? "+" : row.type === "removed" ? "-" : " " }}</span>
+            <span class="diff-number">{{ row.lineNo }}</span>
+            <code>{{ row.text || " " }}</code>
+          </div>
+        </div>
+      </el-collapse-item>
       <el-collapse-item
         v-if="result.results.some((item) => item.content)"
         title="读取内容"
@@ -291,6 +547,18 @@ onBeforeUnmount(closeSubscription);
           <el-tag v-if="filePreview.truncated" type="warning" effect="plain">已截断</el-tag>
         </div>
         <pre class="output-block">{{ filePreview.content }}</pre>
+      </el-collapse-item>
+    </el-collapse>
+
+    <el-collapse v-if="auditPreview" class="result-collapse">
+      <el-collapse-item title="审计日志预览" name="audit-preview">
+        <div class="preview-title">
+          <el-tag effect="plain">{{ auditPreview.path }}</el-tag>
+          <el-tag v-if="auditPreview.truncated" type="warning" effect="plain">已截断</el-tag>
+          <el-tag type="info" effect="plain">最近 {{ auditPreview.lines.length }} 条</el-tag>
+          <el-button size="small" plain @click="copyAuditLog">复制审计日志</el-button>
+        </div>
+        <pre class="output-block">{{ auditPreview.lines.join("\n") || auditPreview.content }}</pre>
       </el-collapse-item>
     </el-collapse>
 
@@ -333,11 +601,18 @@ onBeforeUnmount(closeSubscription);
 }
 
 .panel-alert,
+.quick-actions,
 .result-alert,
 .result-collapse,
 .event-section,
 .sse-tag {
   margin-top: 12px;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .code-agent-form {
@@ -363,6 +638,44 @@ onBeforeUnmount(closeSubscription);
 
 .preview-title {
   margin-bottom: 10px;
+}
+
+.diff-view {
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-family: Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.diff-line {
+  display: grid;
+  grid-template-columns: 24px 46px minmax(0, 1fr);
+  gap: 8px;
+  min-height: 24px;
+  padding: 3px 8px;
+  white-space: pre-wrap;
+}
+
+.diff-added {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.diff-removed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.diff-unchanged {
+  color: #475569;
+}
+
+.diff-mark,
+.diff-number {
+  color: #64748b;
+  user-select: none;
 }
 
 .section-title {

@@ -133,6 +133,13 @@ console.log(response.results);
 - 实时展示 CodeAgent 事件时间线。
 - 高亮路径阻断、白名单违规和失败事件。
 - 点击操作结果中的文件路径查看生成或修改后的内容。
+- 快捷填入 Demo 写文件内容，用于现场快速生成文件。
+- 一键测试 `.env` 阻断路径，用于展示安全策略和失败事件高亮。
+- 预览 `output/code_agent_audit.jsonl` 最近审计记录。
+- `write_file` 后展示生成/修改前后的简单行级 diff。
+- 支持一键复制审计日志和 diff，便于答辩时粘贴展示。
+- Workflow Replay 会用黄色高亮 `code_agent` 文件操作节点。
+- Dashboard 在 Java Gateway 模式下展示最近 CodeAgent 操作和事件入口。
 - Java 模式下通过 History / Replay 查看 CodeAgent 事件顺序。
 
 ## 路径安全策略
@@ -170,4 +177,5 @@ code_agent:
 - CodeAgent 不会自动决定修改哪些文件，必须由用户或前端节点配置指定路径。
 - 当前执行是同步请求，SSE 用于推送 Java 已保存事件，不是 Python 进程内逐 token 日志。
 - 文件预览会额外触发一次 `read_file` 操作，也会产生审计记录。
+- before/after diff 通过受控 `read_file` 获取写入前后内容，属于演示级行级对比，不是完整 Git diff 引擎。
 - 当前不包含多用户权限系统，适合单人演示和本地受控开发场景。

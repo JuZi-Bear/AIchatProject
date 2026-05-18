@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import { computed } from "vue";
+
 import type { ReplayEvent } from "@/types/replay";
 
 const props = defineProps<{
   event: ReplayEvent;
   active?: boolean;
 }>();
+
+const isCodeAgent = computed(
+  () => props.event.agent === "code_agent" || props.event.platformRunId?.startsWith("code_agent"),
+);
 
 function eventTagType(eventType: string) {
   if (eventType === "AGENT_FINISHED" || eventType === "RUNNER_FINISHED" || eventType === "TEST_FINISHED" || eventType === "REPORT_GENERATED" || eventType === "WORKFLOW_FINISHED") {
@@ -36,6 +42,7 @@ function agentLabel(agent?: string) {
     quality: "Quality",
     report: "Report",
     workflow: "Workflow",
+    code_agent: "CodeAgent",
   };
 
   return labels[agent || ""] || agent || "Platform";
@@ -51,6 +58,7 @@ function agentTagType(agent?: string) {
     quality: "success",
     report: "primary",
     workflow: "info",
+    code_agent: "warning",
   };
 
   return types[agent || ""] || "info";
@@ -58,9 +66,10 @@ function agentTagType(agent?: string) {
 </script>
 
 <template>
-  <article class="replay-event-card" :class="{ active }">
+  <article class="replay-event-card" :class="{ active, 'code-agent': isCodeAgent }">
     <div class="event-card-head">
       <div class="event-tags">
+        <el-tag v-if="isCodeAgent" type="warning" effect="dark" size="small">文件操作节点</el-tag>
         <el-tag :type="agentTagType(props.event.agent)" effect="plain" size="small">
           {{ agentLabel(props.event.agent) }}
         </el-tag>
@@ -95,6 +104,16 @@ function agentTagType(agent?: string) {
   border-color: #2563eb;
   border-left-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.replay-event-card.code-agent {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.replay-event-card.code-agent.active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
 }
 
 .event-card-head,

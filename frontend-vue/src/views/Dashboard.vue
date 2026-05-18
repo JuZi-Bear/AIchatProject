@@ -103,6 +103,21 @@ const recentRuns = computed(() => sortedRuns.value.slice(0, 5));
 const recentReports = computed(() => sortedReports.value.slice(0, 5));
 const recentPlatformRuns = computed(() => platformRuns.value.slice(0, 5));
 const recentPlatformEvents = computed(() => recentEvents.value.slice(0, 10));
+const recentCodeAgentRuns = computed(() =>
+  platformRuns.value
+    .filter(
+      (record) =>
+        record.runnerMode === "code_agent" ||
+        record.modelProvider === "code_agent" ||
+        record.platformRunId.startsWith("code_agent"),
+    )
+    .slice(0, 5),
+);
+const recentCodeAgentEvents = computed(() =>
+  recentEvents.value
+    .filter((event) => event.agent === "code_agent" || event.platformRunId.startsWith("code_agent"))
+    .slice(0, 5),
+);
 
 const apiConnected = computed(() => health.value?.status === "ok" && !errors.health);
 const apiStatusLabel = computed(() => {
@@ -154,6 +169,7 @@ function agentLabel(agent?: string) {
     quality: "Quality",
     report: "Report",
     workflow: "Workflow",
+    code_agent: "CodeAgent",
   };
 
   return labels[agent || ""] || agent || "";
@@ -169,6 +185,7 @@ function agentTagType(agent?: string) {
     quality: "success",
     report: "primary",
     workflow: "info",
+    code_agent: "warning",
   };
 
   return types[agent || ""] || "info";
@@ -345,6 +362,59 @@ onMounted(() => {
             </router-link>
           </div>
         </article>
+      </div>
+    </el-card>
+
+    <el-card v-if="isJavaMode" shadow="never" class="platform-record-card code-agent-card">
+      <template #header>
+        <div class="platform-record-head">
+          <span>最近 CodeAgent 操作</span>
+          <div class="platform-record-tags">
+            <el-tag type="warning" effect="plain">文件操作 {{ recentCodeAgentRuns.length }}</el-tag>
+            <el-tag type="info" effect="plain">事件 {{ recentCodeAgentEvents.length }}</el-tag>
+          </div>
+        </div>
+      </template>
+
+      <el-empty
+        v-if="!recentCodeAgentRuns.length && !recentCodeAgentEvents.length && !loading.platformRuns && !loading.events"
+        description="暂无 CodeAgent 操作"
+      />
+      <div v-else class="code-agent-grid">
+        <div class="code-agent-column">
+          <div class="code-agent-column-title">最近运行</div>
+          <article v-for="record in recentCodeAgentRuns" :key="record.platformRunId" class="code-agent-run-item">
+            <div>
+              <div class="platform-run-id">{{ record.platformRunId }}</div>
+              <div class="platform-run-subtitle">{{ record.requirement || "CodeAgent 文件操作" }}</div>
+            </div>
+            <div class="platform-run-tags">
+              <el-tag :type="record.success ? 'success' : 'danger'" effect="plain" size="small">
+                {{ record.success ? "成功" : "失败" }}
+              </el-tag>
+              <el-tag type="warning" effect="plain" size="small">{{ record.runnerMode || "code_agent" }}</el-tag>
+              <router-link :to="`/replay/${record.platformRunId}`">
+                <el-button size="small" type="warning" plain>回放</el-button>
+              </router-link>
+            </div>
+          </article>
+        </div>
+
+        <div class="code-agent-column">
+          <div class="code-agent-column-title">最近事件</div>
+          <article v-for="event in recentCodeAgentEvents" :key="event.id || `${event.platformRunId}-${event.createdAt}`" class="code-agent-event-item">
+            <div class="platform-run-id">{{ event.eventText || event.eventType }}</div>
+            <div class="platform-run-subtitle">{{ event.message || event.platformRunId }}</div>
+            <div class="platform-run-tags">
+              <el-tag :type="event.status === 'FAILED' ? 'danger' : event.status === 'SUCCESS' ? 'success' : 'warning'" effect="plain" size="small">
+                {{ event.status || "UNKNOWN" }}
+              </el-tag>
+              <router-link :to="`/replay/${event.platformRunId}`">
+                <el-button size="small" text>查看回放</el-button>
+              </router-link>
+            </div>
+          </article>
+        </div>
       </div>
     </el-card>
 
@@ -550,6 +620,39 @@ onMounted(() => {
   text-decoration: none;
 }
 
+.code-agent-card {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.code-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.code-agent-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.code-agent-column-title {
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.code-agent-run-item,
+.code-agent-event-item {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .platform-event-main {
   display: flex;
   flex-wrap: wrap;
@@ -558,5 +661,11 @@ onMounted(() => {
   gap: 8px;
   color: #334155;
   font-size: 13px;
+}
+
+@media (max-width: 980px) {
+  .code-agent-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
