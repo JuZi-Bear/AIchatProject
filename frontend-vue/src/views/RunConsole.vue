@@ -7,6 +7,7 @@ import DemoHero from "@/components/DemoHero.vue";
 import DemoNarrationPanel from "@/components/DemoNarrationPanel.vue";
 import DemoResultSummary from "@/components/DemoResultSummary.vue";
 import DemoWorkflowStage from "@/components/DemoWorkflowStage.vue";
+import CodeAgentPanel from "@/components/WorkflowEditor/CodeAgentPanel.vue";
 import RepairHighlight from "@/components/RepairHighlight.vue";
 import ReportPreview from "@/components/ReportPreview.vue";
 import ResultOverview from "@/components/ResultOverview.vue";
@@ -165,6 +166,7 @@ function agentLabel(agent?: string) {
     quality: "Quality",
     report: "Report",
     workflow: "Workflow",
+    code_agent: "CodeAgent",
   };
 
   return labels[agent || ""] || agent || "";
@@ -180,6 +182,7 @@ function agentTagType(agent?: string) {
     quality: "success",
     report: "primary",
     workflow: "info",
+    code_agent: "warning",
   };
 
   return types[agent || ""] || "info";
@@ -496,6 +499,10 @@ watch(
             </el-button>
           </el-form>
         </section>
+
+        <div class="code-agent-runconsole">
+          <CodeAgentPanel always-visible />
+        </div>
       </el-col>
 
       <el-col :lg="16" :md="24">
@@ -645,6 +652,10 @@ watch(
 <style scoped>
 .run-alert {
   margin-bottom: 16px;
+}
+
+.code-agent-runconsole {
+  margin-top: 16px;
 }
 
 .demo-case-option {

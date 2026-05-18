@@ -39,6 +39,10 @@ public class RunEventSseController {
 
         RunRecordEntity record = runRecordService.getRecord(platformRunId).orElse(null);
         if (record == null) {
+            if (isPreCreatableRun(platformRunId)) {
+                return emitter;
+            }
+
             runEventSseService.sendErrorEvent(emitter, platformRunId, "任务不存在：" + platformRunId);
             runEventSseService.completeEmitter(platformRunId, emitter);
             return emitter;
@@ -53,6 +57,10 @@ public class RunEventSseController {
         }
 
         return emitter;
+    }
+
+    private boolean isPreCreatableRun(String platformRunId) {
+        return platformRunId != null && platformRunId.startsWith("code_agent");
     }
 
     private boolean isTerminalStatus(String status) {

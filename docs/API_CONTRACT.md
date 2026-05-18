@@ -205,7 +205,7 @@ GET http://127.0.0.1:8001/health
 
 ### POST /api/code-agent/execute
 
-代理调用 Python `POST /api/code-agent/execute`，执行简化 CodeAgent 文件操作。Java Gateway 模式下会把 Python 返回的 `AGENT_STARTED`、`AGENT_FINISHED`、`AGENT_FAILED` 事件保存到 MySQL `run_event` 表，并通过已有 SSE 通道推送给 Vue。
+代理调用 Python `POST /api/code-agent/execute`，执行简化 CodeAgent 文件操作。Java Gateway 模式下会把本次操作登记为一条 `run_record`，并把 Python 返回的 `AGENT_STARTED`、`AGENT_FINISHED`、`AGENT_FAILED` 事件保存到 MySQL `run_event` 表，通过已有 SSE 通道推送给 Vue。该 `platformRunId` 可直接用于 History 和 `/replay/{platformRunId}` 查看 CodeAgent 操作顺序。
 
 ```json
 {

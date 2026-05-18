@@ -126,6 +126,61 @@ public class RunRecordService {
         return savedRecord;
     }
 
+    public RunRecordEntity saveCodeAgentRecord(
+            String platformRunId,
+            Map<String, Object> request,
+            Map<String, Object> response
+    ) {
+        Map<String, Object> safeRequest = request == null ? Map.of() : request;
+        Map<String, Object> safeResponse = response == null ? Map.of() : response;
+        boolean success = asBoolean(safeResponse.get("success"));
+        String operation = firstNonBlank(asString(safeResponse.get("operation")), asString(safeRequest.get("operation")));
+        String filePath = firstNonBlank(
+                asString(safeResponse.get("filePath")),
+                asString(safeRequest.get("filePath")),
+                asString(safeRequest.get("file_path"))
+        );
+        String message = asString(safeResponse.get("message"));
+        Object workflowEvents = safeResponse.get("events");
+        String securityStatus = success ? "path_policy_passed" : "path_policy_blocked_or_failed";
+
+        RunRecordEntity record = runRecordRepository.findByPlatformRunId(platformRunId)
+                .orElseGet(RunRecordEntity::new);
+        record.setPlatformRunId(platformRunId);
+        record.setPythonRunId("");
+        record.setStatus(success ? "SUCCESS" : "FAILED");
+        record.setRequirement(buildCodeAgentRequirement(operation, filePath));
+        record.setModelProvider("code_agent");
+        record.setModelName("Simple CodeAgent");
+        record.setModelBaseUrl("");
+        record.setSuccess(success);
+        record.setRetryCount(0);
+        record.setTestSuccess(success);
+        record.setCoveragePercent(0);
+        record.setQualityScore(success ? 100 : 0);
+        record.setSecurityStatus(securityStatus);
+        record.setReportPath("");
+        record.setStatePath("");
+        record.setRunnerMode("code_agent");
+        record.setRunnerWarning(success ? "" : message);
+        record.setRunSummaryJson(serializeObject(buildCodeAgentSummary(
+                success,
+                operation,
+                filePath,
+                message,
+                securityStatus,
+                workflowEvents
+        )));
+        record.setUiViewModelJson(serializeObject(buildCodeAgentUiViewModel(success, message, workflowEvents, safeResponse)));
+        record.setPluginResultsJson("[]");
+        record.setErrorSummary(success ? "" : message);
+        record.setApproved(true);
+        record.setRequireHumanApproval(false);
+        record.setRawResponse(serializeObject(safeResponse));
+
+        return runRecordRepository.save(record);
+    }
+
     @SuppressWarnings("unchecked")
     private void savePythonWorkflowEvents(
             String platformRunId,
@@ -216,6 +271,77 @@ public class RunRecordService {
 
     private boolean isTerminalStatus(String status) {
         return "SUCCESS".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status);
+    }
+
+    private String buildCodeAgentRequirement(String operation, String filePath) {
+        return "CodeAgent " + firstNonBlank(operation, "operation") + " -> " + firstNonBlank(filePath, "project file");
+    }
+
+    private Map<String, Object> buildCodeAgentSummary(
+            boolean success,
+            String operation,
+            String filePath,
+            String message,
+            String securityStatus,
+            Object workflowEvents
+    ) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("success", success);
+        summary.put("retry_count", 0);
+        summary.put("test_success", success);
+        summary.put("coverage_percent", 0);
+        summary.put("quality_score", success ? 100 : 0);
+        summary.put("security_status", securityStatus);
+        summary.put("model_provider", "code_agent");
+        summary.put("runner_mode", "code_agent");
+        summary.put("runner_warning", success ? "" : message);
+        summary.put("report_path", "");
+        summary.put("event_count", listSize(workflowEvents));
+        summary.put("last_event", lastWorkflowEvent(workflowEvents));
+        summary.put("code_agent_operation", operation);
+        summary.put("code_agent_file_path", filePath);
+        summary.put("message", message);
+
+        return summary;
+    }
+
+    private Map<String, Object> buildCodeAgentUiViewModel(
+            boolean success,
+            String message,
+            Object workflowEvents,
+            Map<String, Object> response
+    ) {
+        Map<String, Object> workflowStep = new LinkedHashMap<>();
+        workflowStep.put("key", "code_agent");
+        workflowStep.put("label", "CodeAgent 文件操作");
+        workflowStep.put("status", success ? "done" : "failed");
+        workflowStep.put("summary", message);
+        workflowStep.put("order", 1);
+
+        Map<String, Object> agentOutputs = new LinkedHashMap<>();
+        agentOutputs.put("stdout", serializeObject(response));
+        agentOutputs.put("error_summary", success ? "" : message);
+        agentOutputs.put("code_agent_result", response);
+
+        Map<String, Object> uiViewModel = new LinkedHashMap<>();
+        uiViewModel.put("workflow_steps", List.of(workflowStep));
+        uiViewModel.put("workflow_events", workflowEvents instanceof List<?> ? workflowEvents : List.of());
+        uiViewModel.put("agent_outputs", agentOutputs);
+        uiViewModel.put("raw", response);
+
+        return uiViewModel;
+    }
+
+    private int listSize(Object value) {
+        return value instanceof List<?> listValue ? listValue.size() : 0;
+    }
+
+    private Object lastWorkflowEvent(Object value) {
+        if (value instanceof List<?> listValue && !listValue.isEmpty()) {
+            return listValue.get(listValue.size() - 1);
+        }
+
+        return Map.of();
     }
 
     private Map<String, Object> eventToReplayRow(com.aichat.platform.entity.RunEventEntity event) {

@@ -851,6 +851,11 @@
 - [x] Workflow 模板新增 CodeAgent 文件操作流程
 - [x] Java Gateway 新增 `/api/code-agent/execute`
 - [x] Java 保存 CodeAgent 事件到 RunEvent 并推送 SSE
+- [x] Java 为 CodeAgent 操作登记可回放的 platform run
 - [x] Vue Workflow Editor 新增 CodeAgentPanel
 - [x] Vue 支持触发 CodeAgent 节点并展示事件时间线
+- [x] Vue RunConsole 集成 CodeAgentPanel
+- [x] Vue 高亮 CodeAgent 阻断路径和违规操作
+- [x] Vue 支持点击查看 CodeAgent 生成或修改文件
+- [x] 新增 CodeAgent 节点集成说明文档
 - [x] 更新 API、架构、技术栈和 README 文档

@@ -1,6 +1,7 @@
 package com.aichat.platform.controller;
 
 import com.aichat.platform.dto.ApiResponse;
+import com.aichat.platform.model.RunEventType;
 import com.aichat.platform.service.PythonAgentClient;
 import com.aichat.platform.service.RunEventService;
 import com.aichat.platform.service.RunRecordService;
@@ -47,7 +48,9 @@ public class CodeAgentController {
         Map<String, Object> response = pythonAgentClient.executeCodeAgent(safeRequest);
         Map<String, Object> data = response == null ? new LinkedHashMap<>() : new LinkedHashMap<>(response);
         data.put("platformRunId", platformRunId);
+        runRecordService.saveCodeAgentRecord(platformRunId, safeRequest, data);
         persistWorkflowEvents(platformRunId, data.get("events"));
+        completeCodeAgentRun(platformRunId, data);
 
         return ApiResponse.ok(data);
     }
@@ -63,6 +66,24 @@ public class CodeAgentController {
                 runEventService.addPythonWorkflowEvent(platformRunId, "", (Map<String, Object>) eventMap);
             }
         }
+    }
+
+    private void completeCodeAgentRun(String platformRunId, Map<String, Object> data) {
+        boolean success = Boolean.parseBoolean(asString(data.get("success")));
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("operation", asString(data.get("operation")));
+        detail.put("filePath", asString(data.get("filePath")));
+        detail.put("message", asString(data.get("message")));
+        detail.put("agent", asString(data.get("agent")));
+
+        runEventService.addEvent(
+                platformRunId,
+                "",
+                success ? RunEventType.RUN_SUCCESS : RunEventType.RUN_FAILED,
+                success ? "SUCCESS" : "FAILED",
+                success ? "CodeAgent 文件操作完成" : "CodeAgent 文件操作失败",
+                detail
+        );
     }
 
     private String asString(Object value) {

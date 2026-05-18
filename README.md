@@ -199,6 +199,8 @@ list_files("src/")
 
 CodeAgent 的访问范围由 `config/settings.yaml` 中的 `code_agent.allowed_paths` 和 `code_agent.blocked_paths` 控制；审计日志默认写入 `output/code_agent_audit.jsonl`。
 
+RunConsole 也提供 CodeAgent 操作面板，便于比赛现场快速演示“拖拽/触发 -> 文件生成或修改 -> SSE 事件 -> 审计日志 -> 回放”的闭环。Java Gateway 模式下，每次 CodeAgent 操作会登记为平台运行记录，可在 History 和 Workflow Replay 中查看事件顺序。完整说明见 `docs/CODE_AGENT_NODE_GUIDE.md`。
+
 ## Docker Compose 启动
 
 复制环境变量示例：
@@ -283,6 +285,7 @@ AIchatProject/
 - `docs/FRAMEWORK_EXTENSION_CANDIDATES.md`：候选扩展评估。
 - `docs/RECOMMENDED_EXTENSION_ROADMAP.md`：推荐扩展路线。
 - `docs/FRAMEWORK_EXTENSION_ARCHITECTURE.md`：未来架构示意图。
+- `docs/CODE_AGENT_NODE_GUIDE.md`：CodeAgent 节点集成和演示闭环。
 - `docs/MAINTENANCE_GUIDE.md`：维护指南。
 - `docs/SAFE_CHANGE_CHECKLIST.md`：安全变更检查清单。
 - `docs/DUAL_TRACK_TEST_CHECKLIST.md`：双轨启动测试清单。

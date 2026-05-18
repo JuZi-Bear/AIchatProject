@@ -11,12 +11,23 @@ import { useWorkflowEditorStore } from "@/components/WorkflowEditor/WorkflowEdit
 import type { CodeAgentOperation, CodeAgentResponse } from "@/types/codeAgent";
 import type { RunEvent } from "@/types/runEvent";
 
+const props = withDefaults(
+  defineProps<{
+    alwaysVisible?: boolean;
+  }>(),
+  {
+    alwaysVisible: false,
+  },
+);
+
 const store = useWorkflowEditorStore();
 const selectedNode = computed(() => store.selectedNode);
-const visible = computed(() => selectedNode.value?.agentKey === "code_agent");
+const visible = computed(() => props.alwaysVisible || selectedNode.value?.agentKey === "code_agent");
 const loading = ref(false);
+const previewLoading = ref(false);
 const sseStatus = ref("");
 const result = ref<CodeAgentResponse | null>(null);
+const filePreview = ref<{ filePath: string; content: string; truncated?: boolean } | null>(null);
 const events = ref<RunEvent[]>([]);
 let subscription: RunEventSubscription | null = null;
 
@@ -32,6 +43,23 @@ const operationOptions = [
   { label: "write_file", value: "write_file" },
   { label: "list_files", value: "list_files" },
 ] as const;
+
+const resultFiles = computed(
+  () => result.value?.results.filter((item) => item.filePath && item.operation !== "list_files") || [],
+);
+const hasViolation = computed(() => {
+  const failureText = [
+    result.value?.message,
+    ...events.value.map((event) => `${event.eventText} ${event.message} ${event.status}`),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return Boolean(
+    result.value &&
+      (!result.value.success || /禁止|阻断|白名单|blocked|denied|FAILED/i.test(failureText)),
+  );
+});
 
 function nextPlatformRunId() {
   return `code_agent_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
@@ -70,6 +98,7 @@ async function loadHistoryEvents(platformRunId?: string) {
 async function runCodeAgent() {
   loading.value = true;
   result.value = null;
+  filePreview.value = null;
   events.value = [];
   sseStatus.value = "";
   closeSubscription();
@@ -114,6 +143,36 @@ async function runCodeAgent() {
   }
 }
 
+async function previewFile(filePath: string) {
+  previewLoading.value = true;
+  const platformRunId = nextPlatformRunId();
+
+  try {
+    const response = await executeCodeAgent({
+      operation: "read_file",
+      filePath,
+      platformRunId,
+    });
+    response.events.forEach(appendEvent);
+    await loadHistoryEvents(response.platformRunId || platformRunId);
+
+    const readResult = response.results.find((item) => typeof item.content === "string");
+    filePreview.value = {
+      filePath,
+      content: readResult?.content || response.message || "",
+      truncated: readResult?.truncated,
+    };
+
+    if (!response.success) {
+      ElMessage.error(response.message || "文件预览失败");
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "文件预览失败");
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
 onBeforeUnmount(closeSubscription);
 </script>
 
@@ -129,6 +188,16 @@ onBeforeUnmount(closeSubscription);
     <el-alert
       title="仅支持项目目录内 read_file / write_file / list_files，不是完整 Codex。Java 模式下事件会进入 RunEvent + SSE。"
       type="info"
+      show-icon
+      :closable="false"
+      class="panel-alert"
+    />
+
+    <el-alert
+      v-if="hasViolation"
+      title="CodeAgent 操作被阻断或失败"
+      description="请检查路径是否在白名单内，或是否命中了 .env、.git、node_modules、构建产物等阻断路径。"
+      type="error"
       show-icon
       :closable="false"
       class="panel-alert"
@@ -180,6 +249,18 @@ onBeforeUnmount(closeSubscription);
     <el-collapse v-if="result" class="result-collapse">
       <el-collapse-item title="操作摘要" name="summary">
         <pre class="output-block">{{ JSON.stringify(result.results, null, 2) }}</pre>
+        <div v-if="resultFiles.length" class="preview-actions">
+          <el-button
+            v-for="item in resultFiles"
+            :key="`${item.operation}-${item.filePath}`"
+            size="small"
+            plain
+            :loading="previewLoading"
+            @click="previewFile(item.filePath)"
+          >
+            查看 {{ item.filePath }}
+          </el-button>
+        </div>
       </el-collapse-item>
       <el-collapse-item
         v-if="result.results.some((item) => item.content)"
@@ -204,6 +285,13 @@ onBeforeUnmount(closeSubscription);
           </el-tag>
         </div>
       </el-collapse-item>
+      <el-collapse-item v-if="filePreview" title="文件内容预览" name="preview">
+        <div class="preview-title">
+          <el-tag effect="plain">{{ filePreview.filePath }}</el-tag>
+          <el-tag v-if="filePreview.truncated" type="warning" effect="plain">已截断</el-tag>
+        </div>
+        <pre class="output-block">{{ filePreview.content }}</pre>
+      </el-collapse-item>
     </el-collapse>
 
     <div v-if="events.length" class="event-section">
@@ -215,7 +303,7 @@ onBeforeUnmount(closeSubscription);
           :timestamp="event.createdAt"
           :type="event.status === 'FAILED' ? 'danger' : event.status === 'SUCCESS' ? 'success' : 'primary'"
         >
-          <div class="event-row">
+          <div class="event-row" :class="{ 'event-row-danger': event.status === 'FAILED' }">
             <el-tag effect="plain" size="small">{{ event.eventText || event.eventType }}</el-tag>
             <span>{{ event.message }}</span>
           </div>
@@ -262,6 +350,21 @@ onBeforeUnmount(closeSubscription);
   gap: 6px;
 }
 
+.preview-actions,
+.preview-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preview-actions {
+  margin-top: 10px;
+}
+
+.preview-title {
+  margin-bottom: 10px;
+}
+
 .section-title {
   margin-bottom: 10px;
   color: #475569;
@@ -271,5 +374,10 @@ onBeforeUnmount(closeSubscription);
 .event-row {
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.event-row-danger {
+  color: #b91c1c;
+  font-weight: 700;
 }
 </style>
