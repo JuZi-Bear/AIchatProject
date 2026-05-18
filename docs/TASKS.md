@@ -859,3 +859,14 @@
 - [x] Vue 支持点击查看 CodeAgent 生成或修改文件
 - [x] 新增 CodeAgent 节点集成说明文档
 - [x] 更新 API、架构、技术栈和 README 文档
+
+## v2 本地联调一键化
+
+- [x] 新增 `scripts/start_v2_local.ps1`
+- [x] 新增 `scripts/stop_v2_local.ps1`
+- [x] 新增 `scripts/smoke_codeagent.ps1`
+- [x] 新增 Java `application-local.yml`
+- [x] 默认支持临时 MySQL 3307，避开本机 3306 凭据不确定问题
+- [x] 启动脚本自动拉起 Python API、Java Gateway、Vue Java 模式
+- [x] 启动脚本自动执行 CodeAgent smoke test
+- [x] 新增 `docs/LOCAL_V2_STARTUP.md`

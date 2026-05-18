@@ -156,6 +156,30 @@ MySQL 配置见 `docs/MYSQL_SETUP.md`。
 
 Java Gateway 模式下，平台层会为每次运行记录任务事件。History 页面可查看单次运行事件时间线，Dashboard 可查看最近平台事件；RunConsole 和 History 可通过 SSE 订阅实时事件流。这只是实时日志和运行回放的基础，不会改变 Python LangGraph 执行流程。
 
+### v2.0 本地一键联调
+
+推荐用脚本启动 Java Gateway 演示链路：
+
+```powershell
+.\scripts\start_v2_local.ps1
+```
+
+默认会启动 Python API、临时 MySQL `3307`、Java Gateway、Vue Java 模式，并执行一次 CodeAgent smoke test。
+
+停止：
+
+```powershell
+.\scripts\stop_v2_local.ps1
+```
+
+单独验证 CodeAgent：
+
+```powershell
+.\scripts\smoke_codeagent.ps1 -ApiMode java -CheckBlockedPath
+```
+
+详细说明见 `docs/LOCAL_V2_STARTUP.md`。
+
 ### Workflow 模板管理
 
 Vue 可访问 `/workflows/templates` 查看当前内置模板：
@@ -271,6 +295,7 @@ AIchatProject/
 - `docs/DUAL_TRACK_ARCHITECTURE.md`：双轨并行架构。
 - `docs/API_CONTRACT.md`：API 契约。
 - `docs/DOCKER_COMPOSE_GUIDE.md`：多服务 Docker 启动。
+- `docs/LOCAL_V2_STARTUP.md`：v2 本地一键联调脚本。
 - `docs/VIDEO_CODING_GUIDE.md`：录制和现场讲解。
 - `docs/DEFENSE_SCRIPT.md`：答辩讲稿。
 - `docs/RISK_AND_STABILITY.md`：风险和兜底。
