@@ -899,3 +899,10 @@
 - [x] README 增加三分钟演示脚本入口
 - [x] DOCUMENT_INDEX 增加 v2 平台演示文档入口
 - [x] LOCAL_V2_STARTUP 关联演示数据脚本和现场演示流程
+
+## v2.0 比赛前最终验收脚本
+
+- [x] 新增 `scripts/final_v2_acceptance.ps1`
+- [x] 串联 v2 本地启动、API 健康检查、CodeAgent smoke、Workflow 模板 smoke、演示数据生成和 Vue 页面检查
+- [x] 修正 `start_v2_local.ps1` 中 RunConsole 路径为 `/runs/new`
+- [x] README 和 LOCAL_V2_STARTUP 增加最终验收命令

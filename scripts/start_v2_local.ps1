@@ -248,7 +248,7 @@ Write-Host ""
 Write-Host "== URLs =="
 Write-Host "FastAPI Docs: http://127.0.0.1:$PythonPort/docs"
 Write-Host "Java Health:  http://127.0.0.1:$JavaPort/api/health"
-Write-Host "Vue RunConsole: http://127.0.0.1:$VuePort/run"
+Write-Host "Vue RunConsole: http://127.0.0.1:$VuePort/runs/new"
 Write-Host "PID file: $PidFile"
 
 if (-not $SkipSmoke) {

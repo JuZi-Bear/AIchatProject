@@ -192,6 +192,14 @@ Java Gateway 模式下，平台层会为每次运行记录任务事件。History
 
 该脚本会生成真实 Agent 工作流运行、CodeAgent 文件操作和 Workflow 模板回放三类平台记录，便于比赛现场直接展示。
 
+比赛前最终验收：
+
+```powershell
+.\scripts\final_v2_acceptance.ps1
+```
+
+该脚本会启动或复用 v2 本地链路，检查 API 和 Vue 页面，执行 CodeAgent / Workflow 模板 smoke，并生成演示数据。
+
 详细说明见 `docs/LOCAL_V2_STARTUP.md`。三分钟现场演示话术见 `docs/V2_3_MIN_DEMO_SCRIPT.md`。
 
 ### Workflow 模板管理

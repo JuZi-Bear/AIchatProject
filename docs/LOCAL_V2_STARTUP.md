@@ -13,7 +13,7 @@
 - 启动 Python FastAPI：`http://127.0.0.1:8001`
 - 启动临时 MySQL：`127.0.0.1:3307`
 - 启动 Java Gateway：`http://127.0.0.1:8088/api`
-- 启动 Vue Java 模式：`http://127.0.0.1:5174/run`
+- 启动 Vue Java 模式：`http://127.0.0.1:5174/runs/new`
 - 自动执行一次 CodeAgent smoke test
 
 临时 MySQL 数据目录：
@@ -130,7 +130,36 @@ VITE_JAVA_API_BASE_URL=http://127.0.0.1:8088/api
 访问：
 
 ```text
-http://127.0.0.1:5174/run
+http://127.0.0.1:5174/runs/new
+```
+
+## 比赛前最终验收
+
+比赛或录屏前推荐执行：
+
+```powershell
+.\scripts\final_v2_acceptance.ps1
+```
+
+该脚本会串联：
+
+- 启动或复用 Python API、Java Gateway、MySQL、Vue。
+- 检查 Python / Java / 平台接口健康状态。
+- 执行 CodeAgent smoke，包括阻断路径检查。
+- 执行 Workflow 模板 smoke，包括保存、版本递增、实例化、回放和删除。
+- 生成 Dashboard / History / Replay 演示数据。
+- 检查 Dashboard、RunConsole、History、Reports、Models、Plugins、Agents、Workflow Templates、Workflow Editor 页面可访问。
+
+如果已经启动服务，只想复用当前服务：
+
+```powershell
+.\scripts\final_v2_acceptance.ps1 -SkipStartup
+```
+
+如果想缩短验收时间并跳过真实 Agent 运行数据生成：
+
+```powershell
+.\scripts\final_v2_acceptance.ps1 -FastDemoSeed
 ```
 
 ### CodeAgent smoke 失败
