@@ -60,6 +60,28 @@ Python Direct 模式：
 .\scripts\smoke_codeagent.ps1 -ApiMode python
 ```
 
+## 一键生成演示数据
+
+启动 v2 Java Gateway 链路后，可以执行：
+
+```powershell
+.\scripts\seed_v2_demo_data.ps1
+```
+
+脚本会生成三类平台记录：
+
+- 真实 Agent 工作流运行：走 `POST /api/runs`，用于展示普通 Agent 运行。
+- CodeAgent 文件操作：走 `POST /api/code-agent/execute`，用于展示审计日志、文件操作和回放。
+- Workflow 模板回放：保存 MySQL 模板并实例化为可回放任务，用于展示模板中心和 Replay。
+
+脚本输出会包含 Dashboard、History 和 Replay 链接。若只想生成其中一类数据，可使用：
+
+```powershell
+.\scripts\seed_v2_demo_data.ps1 -SkipAgentRun
+.\scripts\seed_v2_demo_data.ps1 -SkipCodeAgent
+.\scripts\seed_v2_demo_data.ps1 -SkipWorkflowTemplate
+```
+
 ## 停止本地联调服务
 
 ```powershell

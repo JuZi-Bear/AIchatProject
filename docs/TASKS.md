@@ -885,8 +885,10 @@
 - [x] 新增 `scripts/start_v2_local.ps1`
 - [x] 新增 `scripts/stop_v2_local.ps1`
 - [x] 新增 `scripts/smoke_codeagent.ps1`
+- [x] 新增 `scripts/seed_v2_demo_data.ps1`
 - [x] 新增 Java `application-local.yml`
 - [x] 默认支持临时 MySQL 3307，避开本机 3306 凭据不确定问题
 - [x] 启动脚本自动拉起 Python API、Java Gateway、Vue Java 模式
 - [x] 启动脚本自动执行 CodeAgent smoke test
+- [x] 演示数据脚本可生成 Agent 运行、CodeAgent 操作和 Workflow 模板回放三类记录
 - [x] 新增 `docs/LOCAL_V2_STARTUP.md`

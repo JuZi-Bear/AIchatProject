@@ -184,6 +184,14 @@ Java Gateway 模式下，平台层会为每次运行记录任务事件。History
 .\scripts\smoke_workflow_template.ps1
 ```
 
+一键生成 Dashboard / History / Replay 演示数据：
+
+```powershell
+.\scripts\seed_v2_demo_data.ps1
+```
+
+该脚本会生成真实 Agent 工作流运行、CodeAgent 文件操作和 Workflow 模板回放三类平台记录，便于比赛现场直接展示。
+
 详细说明见 `docs/LOCAL_V2_STARTUP.md`。
 
 ### Workflow 模板管理
