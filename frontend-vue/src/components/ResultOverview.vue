@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import type { RunResponse } from "@/types/run";
+import { runnerDisplayLabel } from "@/utils/runKind";
 
 const props = defineProps<{
   response?: RunResponse | null;
@@ -25,6 +26,7 @@ const requirementText = computed(() => {
 
   return props.requirement || summary.value?.requirement || "未记录";
 });
+const runnerLabel = computed(() => runnerDisplayLabel(summary.value?.runner_mode));
 </script>
 
 <template>
@@ -49,7 +51,7 @@ const requirementText = computed(() => {
       <el-descriptions-item label="覆盖率">{{ summary?.coverage_percent ?? 0 }}%</el-descriptions-item>
       <el-descriptions-item label="质量评分">{{ summary?.quality_score ?? 0 }}</el-descriptions-item>
       <el-descriptions-item label="Runner">
-        {{ summary?.runner_mode === "cpp" ? "C++ Sandbox Runner" : "Python Runner" }}
+        {{ runnerLabel }}
       </el-descriptions-item>
       <el-descriptions-item v-if="summary?.runner_warning" label="Runner Warning" :span="2">
         <span class="inline-long">{{ summary.runner_warning }}</span>

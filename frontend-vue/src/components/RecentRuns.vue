@@ -2,6 +2,7 @@
 import { useRouter } from "vue-router";
 
 import type { RunHistoryItem } from "@/types/run";
+import { runKindLabel, runKindTagType } from "@/utils/runKind";
 
 defineProps<{
   runs: RunHistoryItem[];
@@ -58,6 +59,7 @@ function openHistory(runId: string) {
         </div>
         <div class="run-requirement">{{ shortRequirement(run.requirement) }}</div>
         <div class="run-meta">
+          <el-tag :type="runKindTagType(run)" size="small" effect="plain">{{ runKindLabel(run) }}</el-tag>
           <el-tag size="small" effect="plain">{{ run.model_provider || "model" }}</el-tag>
           <el-tag :type="run.retry_count > 0 ? 'warning' : 'info'" size="small" effect="plain">
             修复 {{ run.retry_count }}

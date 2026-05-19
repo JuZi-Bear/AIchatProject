@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import type { RunSummary } from "@/types/run";
+import { runnerDisplayLabel, runnerTagType } from "@/utils/runKind";
 
 const props = defineProps<{
   summary?: Partial<RunSummary> | null;
@@ -31,9 +32,8 @@ const testType = computed(() => {
   return props.summary.test_success ? "success" : "danger";
 });
 
-const runnerLabel = computed(() =>
-  props.summary?.runner_mode === "cpp" ? "C++ Sandbox Runner" : "Python Runner",
-);
+const runnerLabel = computed(() => runnerDisplayLabel(props.summary?.runner_mode));
+const runnerType = computed(() => runnerTagType(props.summary?.runner_mode));
 </script>
 
 <template>
@@ -66,7 +66,7 @@ const runnerLabel = computed(() =>
 
     <el-card shadow="never" class="summary-card">
       <template #header>Runner</template>
-      <el-tag :type="summary?.runner_mode === 'cpp' ? 'success' : 'info'" size="large" effect="plain">
+      <el-tag :type="runnerType" size="large" effect="plain">
         {{ runnerLabel }}
       </el-tag>
       <div class="summary-meta warning-text">{{ summary?.runner_warning || "无回退提示" }}</div>

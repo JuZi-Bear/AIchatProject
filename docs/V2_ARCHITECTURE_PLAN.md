@@ -285,6 +285,7 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - 当前 Python Agent Engine 已开始从函数式 Agent 走向注册式 Agent 管理；Prompt 逐步从代码硬编码迁移到 `prompts/` Markdown 模板，便于后续调优和可视化编排。
 - 当前 Python Agent Engine 已开始支持 Workflow 模板管理；模板只描述可复用流程和生成轻量任务视图，不改变默认 LangGraph 主流程。
 - 当前数据流是 Vue Workflow Editor → Java Gateway 或 Python Direct → Workflow instantiate API → 返回 `run_summary` / `ui_view_model` 任务视图。Java Gateway 模式下，自定义模板也可以通过 `/api/platform/workflows/templates` 保存到 MySQL，并通过 `/api/platform/workflows/templates/{templateKey}/instantiate` 生成可回放平台任务。当前不会让自定义模板直接驱动 LangGraph 分支，后续如需动态编排必须先确认模板协议和安全边界。
+- 当前 Dashboard 和 History 会将 `runnerMode=workflow_template` 的记录标记为“模板回放”，与真实 Agent 运行、CodeAgent 文件操作区分，避免比赛讲解时混淆“回放任务”和“真实 LangGraph 执行”。
 - CodeAgent 数据流是 Vue Workflow Editor → Java Gateway 或 Python Direct → Python CodeAgent 文件操作 → 事件返回；Java Gateway 模式下事件进入 RunEvent + SSE + Replay，不需要修改 LangGraph 主流程。
 - `model_config` 和 `plugin_config` 表为空时会初始化 DeepSeek、Qwen、GLM 以及 Doc/Security/Refactor/UI Agent 默认配置。
 - 后续增加用户、权限、任务队列、配置中心、审计、团队协作和更完整的运行记录管理。

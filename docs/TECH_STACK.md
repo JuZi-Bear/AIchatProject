@@ -61,6 +61,7 @@ v1.0 比赛交付版已经落地的技术栈如下：
 - `Agents`：支持查看 Agent 注册中心、按 stage 筛选和按名称搜索。
 - `WorkflowTemplates`：支持查看 Workflow 模板、搜索筛选模板、查看模板 Markdown，并生成轻量模板任务视图。
 - `WorkflowEditor`：支持 Agent Palette、拖拽画布、节点位置调整、顺序调整、属性编辑、Pinia 状态管理、本地模板保存、Java/MySQL 模板保存、模板详情预览、MySQL 模板删除、MySQL 模板生成可回放任务、JSON 导出和模板任务视图实例化。
+- `Dashboard` / `RunHistory`：Java Gateway 模式下会区分真实 Agent 运行、Workflow 模板回放任务和 CodeAgent 文件操作，便于比赛演示时解释不同运行类型。
 - `CodeAgentPanel`：Workflow Editor 中选中 CodeAgent 节点后可触发 read/write/list 文件操作，并显示操作摘要、返回内容、文件列表和事件时间线。
 - `Reports`：支持 Markdown 报告列表、报告名搜索、run_id 解析、内容查看和复制报告内容。
 - `Models`：支持模型列表、provider/启用状态筛选、模型搜索、API Key 提示和前端默认模型选择。

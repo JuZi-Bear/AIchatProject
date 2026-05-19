@@ -28,6 +28,7 @@ import type { HealthResponse, ModelConfig, PluginConfig } from "@/types/api";
 import type { PlatformRunRecord, PlatformStats } from "@/types/platformRun";
 import type { ReportItem, RunHistoryItem } from "@/types/run";
 import type { RunEvent } from "@/types/runEvent";
+import { isCodeAgentRun, isWorkflowTemplateRun, runKindLabel, runKindTagType } from "@/utils/runKind";
 
 const settingsStore = useSettingsStore();
 const apiModeLabel = getApiModeLabel();
@@ -103,15 +104,11 @@ const recentRuns = computed(() => sortedRuns.value.slice(0, 5));
 const recentReports = computed(() => sortedReports.value.slice(0, 5));
 const recentPlatformRuns = computed(() => platformRuns.value.slice(0, 5));
 const recentPlatformEvents = computed(() => recentEvents.value.slice(0, 10));
+const recentWorkflowTemplateRuns = computed(() =>
+  platformRuns.value.filter((record) => isWorkflowTemplateRun(record)).slice(0, 5),
+);
 const recentCodeAgentRuns = computed(() =>
-  platformRuns.value
-    .filter(
-      (record) =>
-        record.runnerMode === "code_agent" ||
-        record.modelProvider === "code_agent" ||
-        record.platformRunId.startsWith("code_agent"),
-    )
-    .slice(0, 5),
+  platformRuns.value.filter((record) => isCodeAgentRun(record)).slice(0, 5),
 );
 const recentCodeAgentEvents = computed(() =>
   recentEvents.value
@@ -317,6 +314,7 @@ onMounted(() => {
             <el-tag type="primary" effect="plain">MySQL 报告索引 {{ platformStats?.totalReports ?? reports.length }}</el-tag>
             <el-tag type="success" effect="plain">测试通过 {{ platformStats?.testSuccessRuns ?? 0 }}</el-tag>
             <el-tag type="warning" effect="plain">自动修复 {{ platformStats?.repairedRuns ?? 0 }}</el-tag>
+            <el-tag type="primary" effect="plain">模板回放 {{ recentWorkflowTemplateRuns.length }}</el-tag>
             <el-tag type="success" effect="plain">Settings：Java MySQL</el-tag>
             <el-tag type="success" effect="plain">Models：Java MySQL</el-tag>
             <el-tag type="success" effect="plain">Plugins：Java MySQL</el-tag>
@@ -347,6 +345,9 @@ onMounted(() => {
             <div class="platform-run-subtitle">{{ record.pythonRunId || "尚无 Python run_id" }}</div>
           </div>
           <div class="platform-run-tags">
+            <el-tag :type="runKindTagType(record)" effect="plain" size="small">
+              {{ runKindLabel(record) }}
+            </el-tag>
             <el-tag :type="record.success ? 'success' : 'danger'" effect="plain" size="small">
               {{ record.success ? "成功" : "失败" }}
             </el-tag>
@@ -359,6 +360,44 @@ onMounted(() => {
             </router-link>
             <router-link :to="`/replay/${record.platformRunId}`">
               <el-button size="small" type="primary" plain>回放</el-button>
+            </router-link>
+          </div>
+        </article>
+      </div>
+    </el-card>
+
+    <el-card v-if="isJavaMode" shadow="never" class="platform-record-card workflow-template-card">
+      <template #header>
+        <div class="platform-record-head">
+          <span>最近 Workflow 模板回放</span>
+          <div class="platform-record-tags">
+            <el-tag type="primary" effect="plain">模板任务 {{ recentWorkflowTemplateRuns.length }}</el-tag>
+            <router-link to="/workflows/editor">
+              <el-button size="small" type="primary" plain>打开编辑器</el-button>
+            </router-link>
+          </div>
+        </div>
+      </template>
+
+      <el-empty
+        v-if="!recentWorkflowTemplateRuns.length && !loading.platformRuns"
+        description="暂无 Workflow 模板回放任务"
+      />
+      <div v-else class="workflow-template-list">
+        <article v-for="record in recentWorkflowTemplateRuns" :key="record.platformRunId" class="workflow-template-item">
+          <div>
+            <div class="platform-run-id">{{ record.platformRunId }}</div>
+            <div class="platform-run-subtitle">{{ record.requirement || "Workflow 模板回放任务" }}</div>
+          </div>
+          <div class="platform-run-tags">
+            <el-tag type="primary" effect="plain" size="small">模板回放</el-tag>
+            <el-tag type="info" effect="plain" size="small">不执行 LangGraph</el-tag>
+            <el-tag effect="plain" size="small">事件回放</el-tag>
+            <router-link :to="`/replay/${record.platformRunId}`">
+              <el-button size="small" type="primary" plain>回放</el-button>
+            </router-link>
+            <router-link :to="{ path: '/history', query: { run_id: record.platformRunId } }">
+              <el-button size="small" text>详情</el-button>
             </router-link>
           </div>
         </article>
@@ -623,6 +662,26 @@ onMounted(() => {
 .code-agent-card {
   border-color: #fde68a;
   background: #fffbeb;
+}
+
+.workflow-template-card {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.workflow-template-list {
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-template-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .code-agent-grid {

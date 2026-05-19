@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import type { RunResponse } from "@/types/run";
+import { runnerDisplayLabel } from "@/utils/runKind";
 
 const props = defineProps<{
   response?: RunResponse | null;
@@ -10,6 +11,7 @@ const props = defineProps<{
 const summary = computed(() => props.response?.run_summary);
 const success = computed(() => Boolean(summary.value?.success));
 const resultType = computed(() => (success.value ? "success" : "danger"));
+const runnerLabel = computed(() => runnerDisplayLabel(summary.value?.runner_mode));
 </script>
 
 <template>
@@ -57,7 +59,7 @@ const resultType = computed(() => (success.value ? "success" : "danger"));
     </div>
     <div class="report-line">
       <span>Runner</span>
-      <code>{{ summary.runner_mode === "cpp" ? "C++ Sandbox Runner" : "Python Runner" }}</code>
+      <code>{{ runnerLabel }}</code>
     </div>
     <el-alert
       v-if="summary.runner_warning"

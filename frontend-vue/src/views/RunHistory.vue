@@ -23,6 +23,7 @@ import {
 import type { PlatformRunRecord } from "@/types/platformRun";
 import type { RunHistoryItem, RunResponse } from "@/types/run";
 import type { RunEvent } from "@/types/runEvent";
+import { isWorkflowTemplateRun, runKindLabel, runKindTagType } from "@/utils/runKind";
 
 const runs = ref<RunHistoryItem[]>([]);
 const platformRuns = ref<PlatformRunRecord[]>([]);
@@ -61,6 +62,7 @@ const selectedRunEnded = computed(() => {
   const status = selectedPlatformRun.value?.status;
   return status === "SUCCESS" || status === "FAILED" || status === "CANCELLED";
 });
+const selectedIsTemplateReplay = computed(() => isWorkflowTemplateRun(selectedPlatformRun.value || selectedRun.value?.run_summary));
 let eventSubscription: RunEventSubscription | null = null;
 
 const modelOptions = computed(() => {
@@ -378,6 +380,12 @@ onBeforeUnmount(() => {
                   {{ run.success ? "成功" : "失败" }}
                 </el-tag>
               </div>
+              <div class="run-kind-row">
+                <el-tag :type="runKindTagType(run)" effect="plain" size="small">{{ runKindLabel(run) }}</el-tag>
+                <el-tag v-if="isWorkflowTemplateRun(run)" type="primary" effect="plain" size="small">
+                  不执行 LangGraph
+                </el-tag>
+              </div>
               <div v-if="run.python_run_id" class="python-run-id">Python run：{{ run.python_run_id }}</div>
               <div class="requirement-text">{{ shortRequirement(run.requirement) }}</div>
               <div class="history-meta">
@@ -414,6 +422,14 @@ onBeforeUnmount(() => {
             <el-alert
               v-if="isJavaMode"
               :title="selectedPlatformRun?.rawResponse ? '已读取 Java MySQL 记录，并解析 rawResponse 展示详情' : '该平台记录缺少 rawResponse，已使用摘要字段兼容展示'"
+              type="info"
+              show-icon
+              :closable="false"
+              class="detail-source-alert"
+            />
+            <el-alert
+              v-if="selectedIsTemplateReplay"
+              title="这是 Workflow 模板回放任务：由 Java/MySQL 模板生成运行记录和事件，用于演示与复盘，不执行 LangGraph、不调用模型。"
               type="info"
               show-icon
               :closable="false"
@@ -611,6 +627,13 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
+}
+
+.run-kind-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .history-submeta {
