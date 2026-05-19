@@ -1,23 +1,41 @@
 package com.aichat.platform.service;
 
 import com.aichat.platform.entity.WorkflowTemplateEntity;
+import com.aichat.platform.entity.RunRecordEntity;
 import com.aichat.platform.repository.WorkflowTemplateRepository;
+import com.aichat.platform.repository.RunRecordRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
 public class WorkflowTemplateService {
 
+    private static final DateTimeFormatter RUN_ID_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").withZone(ZoneOffset.UTC);
+
     private final WorkflowTemplateRepository workflowTemplateRepository;
+    private final RunRecordRepository runRecordRepository;
+    private final RunEventService runEventService;
     private final ObjectMapper objectMapper;
 
-    public WorkflowTemplateService(WorkflowTemplateRepository workflowTemplateRepository, ObjectMapper objectMapper) {
+    public WorkflowTemplateService(
+            WorkflowTemplateRepository workflowTemplateRepository,
+            RunRecordRepository runRecordRepository,
+            RunEventService runEventService,
+            ObjectMapper objectMapper
+    ) {
         this.workflowTemplateRepository = workflowTemplateRepository;
+        this.runRecordRepository = runRecordRepository;
+        this.runEventService = runEventService;
         this.objectMapper = objectMapper;
     }
 
@@ -89,11 +107,217 @@ public class WorkflowTemplateService {
         return entity.map(this::toResponse);
     }
 
+    @SuppressWarnings("unchecked")
+    public Optional<Map<String, Object>> instantiateTemplate(String templateKey, Map<String, Object> request) {
+        return workflowTemplateRepository.findByTemplateKey(templateKey).map(entity -> {
+            Map<String, Object> template = toResponse(entity);
+            Map<String, Object> safeRequest = request == null ? Map.of() : request;
+            Map<String, Object> inputData = safeRequest.get("inputData") instanceof Map<?, ?> inputDataMap
+                    ? (Map<String, Object>) inputDataMap
+                    : safeRequest.get("input_data") instanceof Map<?, ?> snakeInputDataMap
+                            ? (Map<String, Object>) snakeInputDataMap
+                            : Map.of();
+            List<Map<String, Object>> nodes = template.get("nodes") instanceof List<?> nodeList
+                    ? nodeList.stream()
+                            .filter(item -> item instanceof Map<?, ?>)
+                            .map(item -> (Map<String, Object>) item)
+                            .toList()
+                    : List.of();
+            String platformRunId = "workflow_template_" + RUN_ID_FORMATTER.format(Instant.now())
+                    + "_" + UUID.randomUUID().toString().substring(0, 8);
+            String requirement = firstNonBlank(
+                    asString(inputData.get("requirement")),
+                    "基于 Workflow 模板生成可回放任务视图: " + asString(template.get("name"))
+            );
+            List<Map<String, Object>> workflowEvents = buildWorkflowEvents(platformRunId, template, nodes);
+            Map<String, Object> runSummary = buildTemplateRunSummary(platformRunId, template, workflowEvents);
+            Map<String, Object> uiViewModel = buildTemplateUiViewModel(template, nodes, workflowEvents);
+
+            RunRecordEntity record = new RunRecordEntity();
+            record.setPlatformRunId(platformRunId);
+            record.setPythonRunId("");
+            record.setStatus("SUCCESS");
+            record.setRequirement(requirement);
+            record.setModelProvider("workflow_template");
+            record.setModelName("Workflow Template Replay");
+            record.setModelBaseUrl("");
+            record.setSuccess(true);
+            record.setRetryCount(0);
+            record.setTestSuccess(true);
+            record.setCoveragePercent(0);
+            record.setQualityScore(100);
+            record.setSecurityStatus("not_applicable");
+            record.setReportPath("");
+            record.setStatePath("");
+            record.setRunnerMode("workflow_template");
+            record.setRunnerWarning("模板实例化不会执行 LangGraph 或模型调用");
+            record.setRunSummaryJson(serializeObject(runSummary));
+            record.setUiViewModelJson(serializeObject(uiViewModel));
+            record.setPluginResultsJson("[]");
+            record.setErrorSummary("");
+            record.setApproved(true);
+            record.setRequireHumanApproval(false);
+            record.setRawResponse(serializeObject(Map.of(
+                    "platformRunId", platformRunId,
+                    "template", template,
+                    "input_data", inputData,
+                    "run_summary", runSummary,
+                    "ui_view_model", uiViewModel,
+                    "workflow_events", workflowEvents
+            )));
+            runRecordRepository.save(record);
+            workflowEvents.forEach(event -> runEventService.addPythonWorkflowEvent(platformRunId, "", event));
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("platformRunId", platformRunId);
+            response.put("run_id", platformRunId);
+            response.put("template_key", templateKey);
+            response.put("input_data", inputData);
+            response.put("workflow_events", workflowEvents);
+            response.put("run_summary", runSummary);
+            response.put("ui_view_model", uiViewModel);
+
+            return response;
+        });
+    }
+
     private List<String> extractValues(List<Map<String, Object>> nodes, String key) {
         return nodes.stream()
                 .map(node -> asString(node.get(key)))
                 .filter(value -> !value.isBlank())
                 .toList();
+    }
+
+    private List<Map<String, Object>> buildWorkflowEvents(
+            String platformRunId,
+            Map<String, Object> template,
+            List<Map<String, Object>> nodes
+    ) {
+        List<Map<String, Object>> events = new java.util.ArrayList<>();
+        events.add(workflowEvent(
+                "WORKFLOW_STARTED",
+                "Workflow 模板任务开始",
+                "workflow",
+                "RUNNING",
+                "从 MySQL Workflow 模板生成可回放任务视图",
+                Map.of("platformRunId", platformRunId, "templateKey", asString(template.get("templateKey")))
+        ));
+
+        for (Map<String, Object> node : nodes) {
+            String agentKey = asString(node.get("agentKey"));
+            String nodeName = firstNonBlank(asString(node.get("name")), agentKey);
+            String stage = asString(node.get("stage"));
+            events.add(workflowEvent(
+                    "AGENT_STARTED",
+                    nodeName + " 开始执行",
+                    agentKey,
+                    "RUNNING",
+                    "模板回放节点进入阶段: " + firstNonBlank(stage, "custom"),
+                    Map.of("nodeId", asString(node.get("nodeId")), "stage", stage)
+            ));
+            events.add(workflowEvent(
+                    "AGENT_FINISHED",
+                    nodeName + " 执行完成",
+                    agentKey,
+                    "SUCCESS",
+                    "模板回放节点已完成",
+                    Map.of(
+                            "nodeId", asString(node.get("nodeId")),
+                            "input_fields", node.getOrDefault("input_fields", List.of()),
+                            "output_fields", node.getOrDefault("output_fields", List.of())
+                    )
+            ));
+        }
+
+        events.add(workflowEvent(
+                "WORKFLOW_FINISHED",
+                "Workflow 模板任务完成",
+                "workflow",
+                "SUCCESS",
+                "可回放任务视图已生成",
+                Map.of("platformRunId", platformRunId, "nodeCount", nodes.size())
+        ));
+
+        return events;
+    }
+
+    private Map<String, Object> workflowEvent(
+            String eventType,
+            String eventText,
+            String agent,
+            String status,
+            String message,
+            Object detail
+    ) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("event_type", eventType);
+        event.put("event_text", eventText);
+        event.put("agent", agent);
+        event.put("status", status);
+        event.put("message", message);
+        event.put("detail", detail);
+        event.put("created_at", java.time.LocalDateTime.now().toString());
+
+        return event;
+    }
+
+    private Map<String, Object> buildTemplateRunSummary(
+            String platformRunId,
+            Map<String, Object> template,
+            List<Map<String, Object>> workflowEvents
+    ) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("success", true);
+        summary.put("retry_count", 0);
+        summary.put("test_success", true);
+        summary.put("coverage_percent", 0);
+        summary.put("quality_score", 100);
+        summary.put("security_status", "not_applicable");
+        summary.put("model_provider", "workflow_template");
+        summary.put("runner_mode", "workflow_template");
+        summary.put("runner_warning", "模板实例化不会执行 LangGraph 或模型调用");
+        summary.put("report_path", "");
+        summary.put("platformRunId", platformRunId);
+        summary.put("workflow_template", template.get("templateKey"));
+        summary.put("workflow_template_name", template.get("name"));
+        summary.put("event_count", workflowEvents.size());
+        summary.put("last_event", workflowEvents.isEmpty() ? Map.of() : workflowEvents.get(workflowEvents.size() - 1));
+
+        return summary;
+    }
+
+    private Map<String, Object> buildTemplateUiViewModel(
+            Map<String, Object> template,
+            List<Map<String, Object>> nodes,
+            List<Map<String, Object>> workflowEvents
+    ) {
+        List<Map<String, Object>> workflowSteps = new java.util.ArrayList<>();
+
+        for (int index = 0; index < nodes.size(); index += 1) {
+            Map<String, Object> node = nodes.get(index);
+            Map<String, Object> step = new LinkedHashMap<>();
+            step.put("key", firstNonBlank(asString(node.get("nodeId")), asString(node.get("agentKey")) + "_" + (index + 1)));
+            step.put("agent_key", asString(node.get("agentKey")));
+            step.put("label", firstNonBlank(asString(node.get("name")), asString(node.get("agentKey"))));
+            step.put("status", "done");
+            step.put("summary", "模板回放节点已完成");
+            step.put("order", index + 1);
+            workflowSteps.add(step);
+        }
+
+        Map<String, Object> uiViewModel = new LinkedHashMap<>();
+        uiViewModel.put("workflow_template", template);
+        uiViewModel.put("workflow_steps", workflowSteps);
+        uiViewModel.put("workflow_events", workflowEvents);
+        uiViewModel.put("agent_outputs", Map.of(
+                "stdout", serializeObject(template),
+                "error_summary", ""
+        ));
+        uiViewModel.put("plugin_outputs", Map.of("plugin_results", List.of()));
+        uiViewModel.put("report", Map.of());
+        uiViewModel.put("raw", template);
+
+        return uiViewModel;
     }
 
     @SuppressWarnings("unchecked")

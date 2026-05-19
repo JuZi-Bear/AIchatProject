@@ -39,6 +39,16 @@ public class PlatformWorkflowController {
         return ApiResponse.ok(workflowTemplateService.saveTemplate(request));
     }
 
+    @PostMapping("/templates/{templateKey}/instantiate")
+    public ApiResponse<Map<String, Object>> instantiateTemplate(
+            @PathVariable String templateKey,
+            @RequestBody(required = false) Map<String, Object> request
+    ) {
+        return workflowTemplateService.instantiateTemplate(templateKey, request)
+                .map(ApiResponse::ok)
+                .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
+    }
+
     @DeleteMapping("/templates/{templateKey}")
     public ApiResponse<Map<String, Object>> deleteTemplate(@PathVariable String templateKey) {
         return workflowTemplateService.deleteTemplate(templateKey)

@@ -107,6 +107,31 @@ $success = $null -ne $found `
     -and ($stageSequence -contains "file_operation") `
     -and $firstVersion -ne $secondVersion
 
+$instantiateResponse = Invoke-JsonPost `
+    -Url "$baseUrl/platform/workflows/templates/$TemplateKey/instantiate" `
+    -Payload @{
+        input_data = @{
+            requirement = "Smoke test replay from MySQL workflow template"
+        }
+    }
+Assert-ApiResponse -Response $instantiateResponse -StepName "instantiate workflow template"
+
+$platformRunId = $instantiateResponse.data.platformRunId
+$replayResponse = Invoke-RestMethod -Method Get -Uri "$baseUrl/platform/runs/$platformRunId/replay" -TimeoutSec 30
+Assert-ApiResponse -Response $replayResponse -StepName "get workflow replay"
+
+$replayEvents = @($replayResponse.data.events)
+$replayAgents = @($replayEvents | ForEach-Object { $_.agent } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$replayEventTypes = @($replayEvents | ForEach-Object { $_.eventType })
+
+$success = $success `
+    -and -not [string]::IsNullOrWhiteSpace($platformRunId) `
+    -and $replayResponse.data.success `
+    -and ($replayAgents -contains "product") `
+    -and ($replayAgents -contains "code_agent") `
+    -and ($replayEventTypes -contains "WORKFLOW_STARTED") `
+    -and ($replayEventTypes -contains "WORKFLOW_FINISHED")
+
 $deleteResponse = Invoke-RestMethod -Method Delete -Uri "$baseUrl/platform/workflows/templates/$TemplateKey" -TimeoutSec 30
 Assert-ApiResponse -Response $deleteResponse -StepName "delete workflow template"
 
@@ -126,6 +151,10 @@ $summary = [ordered]@{
     agentSequence = $agentSequence
     stageSequence = $stageSequence
     source = $detail.source
+    platformRunId = $platformRunId
+    replayEventCount = $replayEvents.Count
+    replayAgents = $replayAgents
+    replayEventTypes = $replayEventTypes
     deleted = $deleted
 }
 

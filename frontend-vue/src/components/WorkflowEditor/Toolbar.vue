@@ -2,9 +2,15 @@
 import { Delete, Download, FolderOpened, Plus, Refresh, Upload, View } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, reactive, ref } from "vue";
+import { useRouter } from "vue-router";
 
 import { currentApiMode } from "@/api/client";
-import { deletePlatformWorkflowTemplate, instantiateWorkflow, savePlatformWorkflowTemplate } from "@/api/workflows";
+import {
+  deletePlatformWorkflowTemplate,
+  instantiatePlatformWorkflowTemplate,
+  instantiateWorkflow,
+  savePlatformWorkflowTemplate,
+} from "@/api/workflows";
 import type { InstantiateWorkflowResponse, WorkflowTemplate } from "@/types/workflow";
 import type { WorkflowTemplateData } from "@/types/workflowEditor";
 
@@ -22,6 +28,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useWorkflowEditorStore();
+const router = useRouter();
 const templateSelection = ref("");
 const saveDialogVisible = ref(false);
 const detailDialogVisible = ref(false);
@@ -29,6 +36,7 @@ const instantiateDialogVisible = ref(false);
 const instantiating = ref(false);
 const savingPlatform = ref(false);
 const deletingPlatform = ref(false);
+const instantiatingPlatform = ref(false);
 const lastResult = ref<InstantiateWorkflowResponse | null>(null);
 const isJavaMode = currentApiMode === "java";
 
@@ -197,6 +205,34 @@ async function deleteSelectedPlatformTemplate() {
     }
   } finally {
     deletingPlatform.value = false;
+  }
+}
+
+async function instantiateSelectedPlatformTemplate() {
+  const template = selectedTemplateInfo.value;
+
+  if (!template || template.source !== "platform") {
+    ElMessage.warning("只有 MySQL 模板支持生成可回放任务");
+    return;
+  }
+
+  instantiatingPlatform.value = true;
+
+  try {
+    const result = await instantiatePlatformWorkflowTemplate(template.key, {
+      requirement: `从 MySQL Workflow 模板生成回放任务: ${template.name}`,
+      editor_mode: true,
+      replay_only: true,
+    });
+    lastResult.value = result;
+    emit("instantiated", result);
+    detailDialogVisible.value = false;
+    ElMessage.success("已生成可回放任务视图");
+    await router.push(`/replay/${result.platformRunId}`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "生成可回放任务失败");
+  } finally {
+    instantiatingPlatform.value = false;
   }
 }
 
@@ -387,6 +423,14 @@ async function createTask() {
     </section>
     <template #footer>
       <el-button @click="detailDialogVisible = false">关闭</el-button>
+      <el-button
+        v-if="isJavaMode && selectedTemplateInfo?.source === 'platform'"
+        type="success"
+        :loading="instantiatingPlatform"
+        @click="instantiateSelectedPlatformTemplate"
+      >
+        生成可回放任务
+      </el-button>
       <el-button
         v-if="isJavaMode && selectedTemplateInfo?.source === 'platform'"
         type="danger"

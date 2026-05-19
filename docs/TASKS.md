@@ -840,6 +840,8 @@
 - [x] Vue Workflow Editor 支持保存自定义模板到 MySQL
 - [x] Vue Workflow Editor 支持模板详情预览
 - [x] Vue Workflow Editor 支持删除 MySQL 自定义模板
+- [x] MySQL Workflow 模板支持一键生成可回放任务视图
+- [x] Vue Workflow Editor 支持从 MySQL 模板跳转 Replay
 - [x] 新增 Workflow 模板 MySQL 持久化 smoke test
 - [x] 支持调用 Workflow instantiate API 生成任务视图
 - [x] Dashboard / 侧边栏增加 Workflow Editor 入口

@@ -903,6 +903,59 @@ Java Gateway 模式下，Vue `WorkflowEditor` 可以把自定义模板保存到 
 }
 ```
 
+### POST /api/platform/workflows/templates/{templateKey}/instantiate
+
+从 MySQL 自定义 Workflow 模板生成一条轻量平台任务记录和可回放事件。该接口不会执行 LangGraph、不会调用模型、不会生成报告，只用于演示“模板中心 → 平台运行记录 → Replay”的闭环。
+
+### Request
+
+```json
+{
+  "input_data": {
+    "requirement": "从 MySQL Workflow 模板生成回放任务"
+  }
+}
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "ok",
+  "data": {
+    "platformRunId": "workflow_template_20260519_105500_ab12cd34",
+    "run_id": "workflow_template_20260519_105500_ab12cd34",
+    "template_key": "custom_repair_flow",
+    "workflow_events": [
+      {
+        "event_type": "WORKFLOW_STARTED",
+        "event_text": "Workflow 模板任务开始",
+        "agent": "workflow",
+        "status": "RUNNING"
+      },
+      {
+        "event_type": "AGENT_STARTED",
+        "event_text": "Product Agent 开始执行",
+        "agent": "product",
+        "status": "RUNNING"
+      }
+    ],
+    "run_summary": {
+      "success": true,
+      "workflow_template": "custom_repair_flow",
+      "runner_mode": "workflow_template"
+    },
+    "ui_view_model": {
+      "workflow_steps": [],
+      "workflow_events": []
+    }
+  }
+}
+```
+
+Vue `WorkflowEditor` 在 Java Gateway 模式下会在 MySQL 模板详情弹窗中显示“生成可回放任务”，成功后跳转 `/replay/{platformRunId}`。
+
 ## POST /api/code-agent/execute
 
 执行简化 CodeAgent 文件操作。该接口不是完整 Codex，只提供受控的项目文件操作能力。
