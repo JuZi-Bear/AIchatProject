@@ -892,3 +892,10 @@
 - [x] 启动脚本自动执行 CodeAgent smoke test
 - [x] 演示数据脚本可生成 Agent 运行、CodeAgent 操作和 Workflow 模板回放三类记录
 - [x] 新增 `docs/LOCAL_V2_STARTUP.md`
+
+## v2.0 三分钟平台演示脚本
+
+- [x] 新增 `docs/V2_3_MIN_DEMO_SCRIPT.md`
+- [x] README 增加三分钟演示脚本入口
+- [x] DOCUMENT_INDEX 增加 v2 平台演示文档入口
+- [x] LOCAL_V2_STARTUP 关联演示数据脚本和现场演示流程

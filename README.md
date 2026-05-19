@@ -192,7 +192,7 @@ Java Gateway 模式下，平台层会为每次运行记录任务事件。History
 
 该脚本会生成真实 Agent 工作流运行、CodeAgent 文件操作和 Workflow 模板回放三类平台记录，便于比赛现场直接展示。
 
-详细说明见 `docs/LOCAL_V2_STARTUP.md`。
+详细说明见 `docs/LOCAL_V2_STARTUP.md`。三分钟现场演示话术见 `docs/V2_3_MIN_DEMO_SCRIPT.md`。
 
 ### Workflow 模板管理
 
@@ -310,6 +310,7 @@ AIchatProject/
 - `docs/API_CONTRACT.md`：API 契约。
 - `docs/DOCKER_COMPOSE_GUIDE.md`：多服务 Docker 启动。
 - `docs/LOCAL_V2_STARTUP.md`：v2 本地一键联调脚本。
+- `docs/V2_3_MIN_DEMO_SCRIPT.md`：v2 平台三分钟现场演示脚本。
 - `docs/VIDEO_CODING_GUIDE.md`：录制和现场讲解。
 - `docs/DEFENSE_SCRIPT.md`：答辩讲稿。
 - `docs/RISK_AND_STABILITY.md`：风险和兜底。

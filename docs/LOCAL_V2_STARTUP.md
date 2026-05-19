@@ -82,6 +82,8 @@ Python Direct 模式：
 .\scripts\seed_v2_demo_data.ps1 -SkipWorkflowTemplate
 ```
 
+比赛现场推荐配合 `docs/V2_3_MIN_DEMO_SCRIPT.md` 使用，按 Dashboard、History、CodeAgent、Replay 的顺序完成三分钟平台化演示。
+
 ## 停止本地联调服务
 
 ```powershell
