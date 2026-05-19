@@ -203,7 +203,7 @@ Vue 还提供 `/workflows/editor` 可视化工作流拖拽编辑器：
 - 右侧属性面板支持编辑输入字段、输出字段、阶段、启用状态和描述。
 - 工具栏支持新建、撤销、重做、加载模板、本地保存模板、导出 JSON 和生成任务视图。
 
-当前编辑器在 Python Direct 模式下保存到浏览器 localStorage；在 Java Gateway 模式下可额外保存到 MySQL，接口为 `POST /api/platform/workflows/templates`。生成任务时仍调用现有 Workflow instantiate API；它不会直接改写 LangGraph 主流程。
+当前编辑器在 Python Direct 模式下保存到浏览器 localStorage；在 Java Gateway 模式下可额外保存到 MySQL，接口为 `POST /api/platform/workflows/templates`。MySQL 模板支持详情预览、覆盖保存版本递增和删除。生成任务时仍调用现有 Workflow instantiate API；它不会直接改写 LangGraph 主流程。
 
 ### 简化 CodeAgent 文件操作
 

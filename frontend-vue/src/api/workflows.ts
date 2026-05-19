@@ -162,3 +162,13 @@ export function savePlatformWorkflowTemplate(template: WorkflowTemplateData): Pr
     .post<ApiResponse<RawPlatformWorkflowTemplate>>(platformWorkflowPath("/templates"), template)
     .then((response) => normalizePlatformTemplate(unwrapApiResponse<RawPlatformWorkflowTemplate>(response.data)));
 }
+
+export function deletePlatformWorkflowTemplate(templateKey: string): Promise<WorkflowTemplateData> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("删除 MySQL 模板仅 Java Gateway 模式支持"));
+  }
+
+  return apiClient
+    .delete<ApiResponse<RawPlatformWorkflowTemplate>>(platformWorkflowPath(`/templates/${templateKey}`))
+    .then((response) => normalizePlatformTemplate(unwrapApiResponse<RawPlatformWorkflowTemplate>(response.data)));
+}

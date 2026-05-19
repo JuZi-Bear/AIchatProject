@@ -60,18 +60,33 @@ public class WorkflowTemplateService {
             throw new IllegalArgumentException("workflow template must contain at least one node");
         }
 
-        WorkflowTemplateEntity entity = workflowTemplateRepository.findByTemplateKey(templateKey)
-                .orElseGet(WorkflowTemplateEntity::new);
+        Optional<WorkflowTemplateEntity> existingEntity = workflowTemplateRepository.findByTemplateKey(templateKey);
+        WorkflowTemplateEntity entity = existingEntity.orElseGet(WorkflowTemplateEntity::new);
+        String nextVersion = existingEntity
+                .map(existing -> nextVersion(existing.getVersion()))
+                .orElse(firstNonBlank(asString(request.get("version")), "1.0"));
+        Map<String, Object> normalizedRequest = new LinkedHashMap<>(request);
+        normalizedRequest.put("workflowTemplateKey", templateKey);
+        normalizedRequest.put("templateKey", templateKey);
+        normalizedRequest.put("key", templateKey);
+        normalizedRequest.put("version", nextVersion);
+
         entity.setTemplateKey(templateKey);
-        entity.setName(firstNonBlank(asString(request.get("name")), templateKey));
-        entity.setDescription(asString(request.get("description")));
-        entity.setTemplateJson(serializeObject(request));
+        entity.setName(firstNonBlank(asString(normalizedRequest.get("name")), templateKey));
+        entity.setDescription(asString(normalizedRequest.get("description")));
+        entity.setTemplateJson(serializeObject(normalizedRequest));
         entity.setAgentSequenceJson(serializeObject(extractValues(nodes, "agentKey")));
         entity.setStageSequenceJson(serializeObject(extractValues(nodes, "stage")));
         entity.setEnabled(true);
-        entity.setVersion(firstNonBlank(asString(request.get("version")), "1.0"));
+        entity.setVersion(nextVersion);
 
         return toResponse(workflowTemplateRepository.save(entity));
+    }
+
+    public Optional<Map<String, Object>> deleteTemplate(String templateKey) {
+        Optional<WorkflowTemplateEntity> entity = workflowTemplateRepository.findByTemplateKey(templateKey);
+        entity.ifPresent(workflowTemplateRepository::delete);
+        return entity.map(this::toResponse);
     }
 
     private List<String> extractValues(List<Map<String, Object>> nodes, String key) {
@@ -159,5 +174,23 @@ public class WorkflowTemplateService {
         }
 
         return "";
+    }
+
+    private String nextVersion(String currentVersion) {
+        String normalizedVersion = firstNonBlank(currentVersion, "1.0");
+        String[] parts = normalizedVersion.split("\\.");
+
+        if (parts.length == 0) {
+            return "1.1";
+        }
+
+        try {
+            int lastIndex = parts.length - 1;
+            int patch = Integer.parseInt(parts[lastIndex]);
+            parts[lastIndex] = String.valueOf(patch + 1);
+            return String.join(".", parts);
+        } catch (NumberFormatException error) {
+            return normalizedVersion + ".1";
+        }
     }
 }

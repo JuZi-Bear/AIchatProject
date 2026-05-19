@@ -70,6 +70,12 @@ $payload = [ordered]@{
 
 $saveResponse = Invoke-JsonPost -Url "$baseUrl/platform/workflows/templates" -Payload $payload
 Assert-ApiResponse -Response $saveResponse -StepName "save workflow template"
+$firstVersion = $saveResponse.data.version
+
+$payload.description = "Updated by scripts/smoke_workflow_template.ps1 to verify version bump and overwrite behavior."
+$secondSaveResponse = Invoke-JsonPost -Url "$baseUrl/platform/workflows/templates" -Payload $payload
+Assert-ApiResponse -Response $secondSaveResponse -StepName "overwrite workflow template"
+$secondVersion = $secondSaveResponse.data.version
 
 $listResponse = Invoke-RestMethod -Method Get -Uri "$baseUrl/platform/workflows/templates" -TimeoutSec 30
 Assert-ApiResponse -Response $listResponse -StepName "list workflow templates"
@@ -98,18 +104,29 @@ $success = $null -ne $found `
     -and ($agentSequence -contains "product") `
     -and ($agentSequence -contains "code_agent") `
     -and ($stageSequence -contains "analysis") `
-    -and ($stageSequence -contains "file_operation")
+    -and ($stageSequence -contains "file_operation") `
+    -and $firstVersion -ne $secondVersion
+
+$deleteResponse = Invoke-RestMethod -Method Delete -Uri "$baseUrl/platform/workflows/templates/$TemplateKey" -TimeoutSec 30
+Assert-ApiResponse -Response $deleteResponse -StepName "delete workflow template"
+
+$afterDeleteResponse = Invoke-RestMethod -Method Get -Uri "$baseUrl/platform/workflows/templates/$TemplateKey" -TimeoutSec 30
+$deleted = -not $afterDeleteResponse.success
+$success = $success -and $deleted
 
 $summary = [ordered]@{
     success = $success
     templateKey = $TemplateKey
     savedName = $saveResponse.data.name
+    firstVersion = $firstVersion
+    secondVersion = $secondVersion
     listed = $null -ne $found
     nodeCount = $nodeCount
     connectionCount = $connectionCount
     agentSequence = $agentSequence
     stageSequence = $stageSequence
     source = $detail.source
+    deleted = $deleted
 }
 
 $summary | ConvertTo-Json -Depth 20

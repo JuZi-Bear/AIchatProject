@@ -4,6 +4,7 @@ import com.aichat.platform.dto.ApiResponse;
 import com.aichat.platform.service.WorkflowTemplateService;
 import java.util.List;
 import java.util.Map;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,5 +37,12 @@ public class PlatformWorkflowController {
     @PostMapping("/templates")
     public ApiResponse<Map<String, Object>> saveTemplate(@RequestBody Map<String, Object> request) {
         return ApiResponse.ok(workflowTemplateService.saveTemplate(request));
+    }
+
+    @DeleteMapping("/templates/{templateKey}")
+    public ApiResponse<Map<String, Object>> deleteTemplate(@PathVariable String templateKey) {
+        return workflowTemplateService.deleteTemplate(templateKey)
+                .map(ApiResponse::ok)
+                .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
     }
 }

@@ -839,7 +839,7 @@ Java Gateway 模式下，Vue `WorkflowEditor` 可以把自定义模板保存到 
 
 ### POST /api/platform/workflows/templates
 
-保存或覆盖一个自定义 Workflow 模板。Vue 在 Java Gateway 模式下点击“保存到 MySQL”会调用该接口；Python Direct 模式继续使用 localStorage。
+保存或覆盖一个自定义 Workflow 模板。Vue 在 Java Gateway 模式下点击“保存到 MySQL”会调用该接口；Python Direct 模式继续使用 localStorage。首次保存默认版本为 `1.0`；覆盖保存同一 `templateKey` 时，Java 会自动递增版本号并更新 `updatedAt`。
 
 ### Request
 
@@ -863,6 +863,24 @@ Java Gateway 模式下，Vue `WorkflowEditor` 可以把自定义模板保存到 
   ],
   "connections": [],
   "version": "1.0"
+}
+```
+
+### DELETE /api/platform/workflows/templates/{templateKey}
+
+删除一个 MySQL 自定义 Workflow 模板。该接口只影响 Java 平台层保存的自定义模板，不删除 Python `workflow_templates/` 中的内置模板，也不影响浏览器 localStorage。
+
+```json
+{
+  "success": true,
+  "message": "ok",
+  "data": {
+    "workflowTemplateKey": "custom_repair_flow",
+    "templateKey": "custom_repair_flow",
+    "name": "自定义修复流程",
+    "version": "1.1",
+    "source": "java-mysql"
+  }
 }
 ```
 
