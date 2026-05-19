@@ -4,8 +4,8 @@ import { ElMessage } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 
 import { getAgents } from "@/api/agents";
-import { getApiModeLabel } from "@/api/client";
-import { getWorkflowTemplates } from "@/api/workflows";
+import { currentApiMode, getApiModeLabel } from "@/api/client";
+import { getPlatformWorkflowTemplates, getWorkflowTemplates } from "@/api/workflows";
 import CodeAgentPanel from "@/components/WorkflowEditor/CodeAgentPanel.vue";
 import NodePropertiesPanel from "@/components/WorkflowEditor/NodePropertiesPanel.vue";
 import EditorToolbar from "@/components/WorkflowEditor/Toolbar.vue";
@@ -13,11 +13,14 @@ import WorkflowCanvas from "@/components/WorkflowEditor/WorkflowCanvas.vue";
 import { useWorkflowEditorStore } from "@/components/WorkflowEditor/WorkflowEditorStore";
 import type { AgentMeta } from "@/types/agent";
 import type { InstantiateWorkflowResponse, WorkflowTemplate } from "@/types/workflow";
+import type { WorkflowTemplateData } from "@/types/workflowEditor";
 
 const store = useWorkflowEditorStore();
 const apiModeLabel = getApiModeLabel();
+const isJavaMode = currentApiMode === "java";
 const agents = ref<AgentMeta[]>([]);
 const templates = ref<WorkflowTemplate[]>([]);
+const platformTemplates = ref<WorkflowTemplateData[]>([]);
 const keyword = ref("");
 const stageFilter = ref("all");
 const lastInstantiateResult = ref<InstantiateWorkflowResponse | null>(null);
@@ -75,14 +78,32 @@ async function loadAgents() {
 async function loadTemplates() {
   loading.templates = true;
 
-  try {
-    templates.value = await getWorkflowTemplates();
-  } catch (error) {
+  const [apiTemplatesResult, platformTemplatesResult] = await Promise.allSettled([
+    getWorkflowTemplates(),
+    getPlatformWorkflowTemplates(),
+  ]);
+
+  if (apiTemplatesResult.status === "fulfilled") {
+    templates.value = apiTemplatesResult.value;
+  } else {
     templates.value = [];
-    ElMessage.error(error instanceof Error ? error.message : "加载 Workflow 模板失败");
-  } finally {
-    loading.templates = false;
+    ElMessage.error(apiTemplatesResult.reason instanceof Error ? apiTemplatesResult.reason.message : "加载 API Workflow 模板失败");
   }
+
+  if (platformTemplatesResult.status === "fulfilled") {
+    platformTemplates.value = platformTemplatesResult.value;
+  } else {
+    platformTemplates.value = [];
+    if (isJavaMode) {
+      ElMessage.error(
+        platformTemplatesResult.reason instanceof Error
+          ? platformTemplatesResult.reason.message
+          : "加载 MySQL Workflow 模板失败",
+      );
+    }
+  }
+
+  loading.templates = false;
 }
 
 async function refreshAll() {
@@ -110,11 +131,13 @@ onMounted(refreshAll);
       <el-tag type="primary" effect="plain">API 模式：{{ apiModeLabel }}</el-tag>
       <el-tag type="success" effect="plain">Agent Palette：{{ agents.length }}</el-tag>
       <el-tag type="success" effect="plain">Workflow 模板：{{ templates.length }}</el-tag>
+      <el-tag v-if="isJavaMode" type="success" effect="plain">MySQL 模板：{{ platformTemplates.length }}</el-tag>
       <el-tag type="warning" effect="plain">当前编辑器不改变默认 LangGraph 流程</el-tag>
     </div>
 
     <EditorToolbar
       :templates="templates"
+      :platform-templates="platformTemplates"
       :loading-templates="loading.templates"
       @reload-templates="loadTemplates"
       @instantiated="handleInstantiated"

@@ -831,6 +831,12 @@
 - [x] 支持节点输入输出、阶段、描述和启用状态编辑
 - [x] 支持加载 API Workflow 模板
 - [x] 支持本地保存模板和导出 JSON
+- [x] 新增 Java WorkflowTemplateEntity
+- [x] 新增 WorkflowTemplateRepository / WorkflowTemplateService
+- [x] 新增 `/api/platform/workflows/templates` 平台模板接口
+- [x] Vue Workflow Editor 支持加载 Java/MySQL 自定义模板
+- [x] Vue Workflow Editor 支持保存自定义模板到 MySQL
+- [x] 新增 Workflow 模板 MySQL 持久化 smoke test
 - [x] 支持调用 Workflow instantiate API 生成任务视图
 - [x] Dashboard / 侧边栏增加 Workflow Editor 入口
 - [x] 更新 API、架构、技术栈和 README 文档

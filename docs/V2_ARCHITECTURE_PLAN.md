@@ -233,7 +233,7 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - 技术框架扩展落地第五步已新增工作流回放功能：Java 提供 `GET /api/platform/runs/{platformRunId}/replay`，Vue 新增 `/replay/:platformRunId` 页面，支持基于 MySQL 事件记录逐步回放工作流。
 - 技术框架扩展落地第六步已新增 Agent 注册中心与 Prompt 模板管理：Python Agent Engine 提供 `agent_registry/` 和 `prompts/`，FastAPI `/agents`、Java `/api/agents`、Vue `/agents` 已可查看 Agent 元信息。
 - 技术框架扩展落地第七步已新增 Workflow 模板管理：Python Agent Engine 提供 `workflow_templates/` 和 `/api/workflows/templates`，Vue 新增 `/workflows/templates` 页面，可查看模板、模板 Markdown、Agent 顺序和阶段顺序，并生成轻量模板任务视图；Java Gateway 通过 `/api/workflows/templates` 和 `/api/workflows/instantiate` 保持代理兼容。
-- 技术框架扩展落地第八步已新增 Vue 可视化工作流拖拽编辑器：Vue 新增 `/workflows/editor` 页面，支持从 Agent Palette 拖入节点、调整节点位置和执行顺序、编辑输入输出字段和阶段、加载模板、本地保存模板、导出 JSON，并通过现有 Workflow instantiate API 生成轻量任务视图。
+- 技术框架扩展落地第八步已新增 Vue 可视化工作流拖拽编辑器：Vue 新增 `/workflows/editor` 页面，支持从 Agent Palette 拖入节点、调整节点位置和执行顺序、编辑输入输出字段和阶段、加载模板、本地保存模板、Java/MySQL 保存自定义模板、导出 JSON，并通过现有 Workflow instantiate API 生成轻量任务视图。
 - 已新增简化 CodeAgent 执行模块：Python 提供 `/api/code-agent/execute`，支持 `read_file`、`write_file`、`list_files`；Java Gateway 提供 `/api/code-agent/execute` 并将 CodeAgent 事件写入 MySQL `run_event`、通过 SSE 推送；Vue Workflow Editor 可选中 CodeAgent 节点后触发文件操作。
 - 页面暂不实现复杂动画；后续逐步替代 Streamlit 的正式交互体验。
 
@@ -284,7 +284,7 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - 当前已新增工作流回放 API 和 Vue 回放页，复用 `RunRecordEntity` 与 `RunEventEntity`，用于比赛演示、问题复盘和调试分析。
 - 当前 Python Agent Engine 已开始从函数式 Agent 走向注册式 Agent 管理；Prompt 逐步从代码硬编码迁移到 `prompts/` Markdown 模板，便于后续调优和可视化编排。
 - 当前 Python Agent Engine 已开始支持 Workflow 模板管理；模板只描述可复用流程和生成轻量任务视图，不改变默认 LangGraph 主流程。
-- 当前数据流是 Vue Workflow Editor → Java Gateway 或 Python Direct → Workflow instantiate API → 返回 `run_summary` / `ui_view_model` 任务视图。当前不会让自定义模板直接驱动 LangGraph 分支，后续如需动态编排必须先确认模板协议和安全边界。
+- 当前数据流是 Vue Workflow Editor → Java Gateway 或 Python Direct → Workflow instantiate API → 返回 `run_summary` / `ui_view_model` 任务视图。Java Gateway 模式下，自定义模板也可以通过 `/api/platform/workflows/templates` 保存到 MySQL。当前不会让自定义模板直接驱动 LangGraph 分支，后续如需动态编排必须先确认模板协议和安全边界。
 - CodeAgent 数据流是 Vue Workflow Editor → Java Gateway 或 Python Direct → Python CodeAgent 文件操作 → 事件返回；Java Gateway 模式下事件进入 RunEvent + SSE + Replay，不需要修改 LangGraph 主流程。
 - `model_config` 和 `plugin_config` 表为空时会初始化 DeepSeek、Qwen、GLM 以及 Doc/Security/Refactor/UI Agent 默认配置。
 - 后续增加用户、权限、任务队列、配置中心、审计、团队协作和更完整的运行记录管理。

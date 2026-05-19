@@ -60,7 +60,7 @@ v1.0 比赛交付版已经落地的技术栈如下：
 - `RunHistory`：支持历史运行列表、成功/失败筛选、模型筛选、需求搜索、倒序排序和详情复用 `ui_view_model` 展示。
 - `Agents`：支持查看 Agent 注册中心、按 stage 筛选和按名称搜索。
 - `WorkflowTemplates`：支持查看 Workflow 模板、搜索筛选模板、查看模板 Markdown，并生成轻量模板任务视图。
-- `WorkflowEditor`：支持 Agent Palette、拖拽画布、节点位置调整、顺序调整、属性编辑、Pinia 状态管理、本地模板保存、JSON 导出和模板任务视图实例化。
+- `WorkflowEditor`：支持 Agent Palette、拖拽画布、节点位置调整、顺序调整、属性编辑、Pinia 状态管理、本地模板保存、Java/MySQL 模板保存、JSON 导出和模板任务视图实例化。
 - `CodeAgentPanel`：Workflow Editor 中选中 CodeAgent 节点后可触发 read/write/list 文件操作，并显示操作摘要、返回内容、文件列表和事件时间线。
 - `Reports`：支持 Markdown 报告列表、报告名搜索、run_id 解析、内容查看和复制报告内容。
 - `Models`：支持模型列表、provider/启用状态筛选、模型搜索、API Key 提示和前端默认模型选择。
@@ -80,6 +80,7 @@ v1.0 比赛交付版已经落地的技术栈如下：
 - `PythonAgentClient`：通过 Spring `RestClient` 调用 Python FastAPI Agent Engine。
 - `AgentController`：提供 `/api/agents`，代理 Python Agent 注册中心。
 - `WorkflowController`：提供 `/api/workflows/templates` 和 `/api/workflows/instantiate`，代理 Python Workflow 模板管理接口。
+- `PlatformWorkflowController` / `WorkflowTemplateService` / `WorkflowTemplateEntity`：提供 `/api/platform/workflows/templates`，将 Vue Workflow Editor 自定义模板保存到 MySQL。
 - `CodeAgentController`：提供 `/api/code-agent/execute`，代理 Python CodeAgent 文件操作，并把返回事件写入 `RunEventEntity`。
 - `RunService`：代理运行创建、历史列表和历史详情，并在创建运行后写入 Java 平台记录。
 - `RunRecordService` / `RunRecordEntity`：使用 Spring Data JPA 保存平台运行记录到 MySQL，并保存 Python `RunResponse` 的 `rawResponse` 供 Vue 历史详情复用 `ui_view_model`。
@@ -135,7 +136,7 @@ v2.0 平台化升级继续预留的技术栈如下：
 
 - Streamlit：仅作为 v1.0 比赛演示前端，优势是启动快、部署简单、适合现场演示。
 - Vue3 + TypeScript：v2.0 正式前端方向，当前已支持 Dashboard 总览、比赛演示模式、工作流可视化、工作流回放、细粒度 Agent 事件时间线、历史记录、结果详情、模型默认选择、插件状态管理、报告查看、API 调用模式切换和 Java/MySQL 数据视图。
-- Vue Canvas + Pinia：Workflow Editor 当前使用 HTML5 Drag/Drop、Pointer Events、SVG 连线和 Pinia Store 管理节点、连接、选中状态、undo/redo、本地模板保存和 API 实例化。
+- Vue Canvas + Pinia：Workflow Editor 当前使用 HTML5 Drag/Drop、Pointer Events、SVG 连线和 Pinia Store 管理节点、连接、选中状态、undo/redo、本地模板保存、Java/MySQL 模板保存和 API 实例化。
 - Python Agent Engine：长期保留，负责 LangGraph、多 Agent、模型调用、测试修复、质量评分、报告生成、`workflow_events` 生成、Agent 注册中心和 Prompt 模板管理，并通过 FastAPI 暴露 Agent Engine 接口。
 - Workflow Templates：当前只管理模板元信息和 Markdown 描述，供 Vue 查看和轻量实例化，不直接改变默认 LangGraph 主流程。
 - CodeAgent：当前是简化文件操作模块，不是完整 Codex；只操作项目目录内显式指定且通过白名单校验的路径，并输出 Agent 事件供 SSE 和回放消费。
@@ -160,7 +161,7 @@ v2.0 平台化升级继续预留的技术栈如下：
 - Java：从 Gateway 升级为平台服务层，优先做任务生命周期、任务事件记录、回放 API 和配置中心。
 - SSE / WebSocket：当前先用 SSE 做单向任务事件推送，后续需要双向控制、多人协作或更高频日志时再升级 WebSocket。
 - Vue：从结果展示升级为平台工作台，优先接入平台配置和运行统计。
-- Workflow Editor：当前先作为前端模板编辑器，不直接改变 Python LangGraph；后续可在模板 schema 稳定后接入后端模板保存、版本管理和动态编排。
+- Workflow Editor：当前先作为前端模板编辑器，不直接改变 Python LangGraph；Java Gateway 模式已支持把自定义模板保存到 MySQL，后续可继续扩展版本管理和动态编排。
 - Python：从单流程 Agent Engine 升级为可注册 Agent、Prompt 模板化和 Workflow 模板化的执行核心，并负责生成工作流事件。
 - C++ / Docker：从最小 Runner 预览升级为更强隔离的执行安全层。
 - MySQL：从基础记录表升级为任务、任务事件、工作流回放、配置、报告索引、审计事件的持久化基础。

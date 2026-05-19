@@ -3,13 +3,16 @@ import { Download, FolderOpened, Plus, Refresh, Upload } from "@element-plus/ico
 import { ElMessage } from "element-plus";
 import { computed, reactive, ref } from "vue";
 
-import { instantiateWorkflow } from "@/api/workflows";
+import { currentApiMode } from "@/api/client";
+import { instantiateWorkflow, savePlatformWorkflowTemplate } from "@/api/workflows";
 import type { InstantiateWorkflowResponse, WorkflowTemplate } from "@/types/workflow";
+import type { WorkflowTemplateData } from "@/types/workflowEditor";
 
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
 
 const props = defineProps<{
   templates: WorkflowTemplate[];
+  platformTemplates: WorkflowTemplateData[];
   loadingTemplates: boolean;
 }>();
 
@@ -23,7 +26,9 @@ const templateSelection = ref("");
 const saveDialogVisible = ref(false);
 const instantiateDialogVisible = ref(false);
 const instantiating = ref(false);
+const savingPlatform = ref(false);
 const lastResult = ref<InstantiateWorkflowResponse | null>(null);
+const isJavaMode = currentApiMode === "java";
 
 const saveForm = reactive({
   key: "",
@@ -39,6 +44,10 @@ const templateOptions = computed(() => [
   ...props.templates.map((template) => ({
     value: `api::${template.key}`,
     label: `API · ${template.name}`,
+  })),
+  ...props.platformTemplates.map((template) => ({
+    value: `platform::${template.workflowTemplateKey}`,
+    label: `MySQL · ${template.name}`,
   })),
   ...store.savedTemplates.map((template) => ({
     value: `local::${template.workflowTemplateKey}`,
@@ -61,6 +70,13 @@ function loadSelectedTemplate() {
       store.loadTemplate(template);
       ElMessage.success("已加载 API Workflow 模板");
     }
+  } else if (source === "platform") {
+    const template = props.platformTemplates.find((item) => item.workflowTemplateKey === key);
+
+    if (template) {
+      store.loadTemplateData(template);
+      ElMessage.success("已加载 MySQL Workflow 模板");
+    }
   } else {
     const template = store.savedTemplates.find((item) => item.workflowTemplateKey === key);
 
@@ -82,6 +98,22 @@ function saveTemplate() {
   store.saveCurrentTemplate(saveForm.key, saveForm.name, saveForm.description);
   saveDialogVisible.value = false;
   ElMessage.success("Workflow 模板已保存到浏览器 localStorage");
+}
+
+async function saveTemplateToPlatform() {
+  savingPlatform.value = true;
+
+  try {
+    const template = store.saveCurrentTemplate(saveForm.key, saveForm.name, saveForm.description);
+    await savePlatformWorkflowTemplate(template);
+    saveDialogVisible.value = false;
+    emit("reloadTemplates");
+    ElMessage.success("Workflow 模板已保存到 Java + MySQL");
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "保存 Workflow 模板到 MySQL 失败");
+  } finally {
+    savingPlatform.value = false;
+  }
 }
 
 function exportJson() {
@@ -148,6 +180,13 @@ async function createTask() {
   </el-card>
 
   <el-dialog v-model="saveDialogVisible" title="保存 Workflow 模板" width="520px">
+    <el-alert
+      :title="isJavaMode ? 'Java Gateway 模式下可同步保存到 MySQL。' : 'Python Direct 模式仅支持保存到本地浏览器。'"
+      type="info"
+      show-icon
+      :closable="false"
+      class="dialog-hint"
+    />
     <el-form label-position="top">
       <el-form-item label="模板 Key">
         <el-input v-model="saveForm.key" placeholder="custom_workflow_key" />
@@ -162,6 +201,9 @@ async function createTask() {
     <template #footer>
       <el-button @click="saveDialogVisible = false">取消</el-button>
       <el-button type="primary" @click="saveTemplate">保存到本地</el-button>
+      <el-button v-if="isJavaMode" type="success" :loading="savingPlatform" @click="saveTemplateToPlatform">
+        保存到 MySQL
+      </el-button>
     </template>
   </el-dialog>
 

@@ -27,6 +27,9 @@ export type WorkflowTemplateData = {
   nodes: AgentNodeData[];
   connections: ConnectionData[];
   version: string;
+  source?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type WorkflowEditorState = {

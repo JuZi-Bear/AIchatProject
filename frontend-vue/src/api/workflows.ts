@@ -6,6 +6,7 @@ import type {
   InstantiateWorkflowResponse,
   WorkflowTemplate,
 } from "@/types/workflow";
+import type { AgentNodeData, ConnectionData, WorkflowTemplateData } from "@/types/workflowEditor";
 
 type RawWorkflowTemplate = Partial<WorkflowTemplate> & {
   agentSequence?: string[];
@@ -17,8 +18,21 @@ type RawInstantiateWorkflowResponse = Partial<InstantiateWorkflowResponse> & {
   platform_run_id?: string;
 };
 
+type RawPlatformWorkflowTemplate = Partial<WorkflowTemplateData> & {
+  id?: number;
+  key?: string;
+  templateKey?: string;
+  workflow_template_key?: string;
+  agent_sequence?: string[];
+  stage_sequence?: string[];
+};
+
 function workflowPath(path: string) {
   return currentApiMode === "java" ? `/workflows${path}` : `/api/workflows${path}`;
+}
+
+function platformWorkflowPath(path: string) {
+  return `/platform/workflows${path}`;
 }
 
 function unwrapApiResponse<T>(response: ApiResponse<T> | T): T {
@@ -63,6 +77,47 @@ function normalizeInstantiateResponse(response: RawInstantiateWorkflowResponse):
   };
 }
 
+function normalizeNode(node: Partial<AgentNodeData>, index: number): AgentNodeData {
+  return {
+    nodeId: node.nodeId || `${node.agentKey || "agent"}_${index + 1}`,
+    agentKey: node.agentKey || "",
+    name: node.name || node.agentKey || `Agent ${index + 1}`,
+    position: {
+      x: Number(node.position?.x ?? 80 + (index % 3) * 260),
+      y: Number(node.position?.y ?? 80 + Math.floor(index / 3) * 150),
+    },
+    input_fields: node.input_fields || [],
+    output_fields: node.output_fields || [],
+    stage: node.stage || "custom",
+    enabled: node.enabled ?? true,
+    description: node.description || "",
+  };
+}
+
+function normalizeConnection(connection: Partial<ConnectionData>): ConnectionData {
+  return {
+    fromNodeId: connection.fromNodeId || "",
+    toNodeId: connection.toNodeId || "",
+  };
+}
+
+function normalizePlatformTemplate(template: RawPlatformWorkflowTemplate): WorkflowTemplateData {
+  const workflowTemplateKey =
+    template.workflowTemplateKey || template.templateKey || template.workflow_template_key || template.key || "";
+
+  return {
+    workflowTemplateKey,
+    name: template.name || workflowTemplateKey || "未命名工作流模板",
+    description: template.description || "",
+    nodes: (template.nodes || []).map(normalizeNode),
+    connections: (template.connections || []).map(normalizeConnection),
+    version: template.version || "1.0",
+    source: template.source || "java-mysql",
+    createdAt: template.createdAt || "",
+    updatedAt: template.updatedAt || "",
+  };
+}
+
 export function getWorkflowTemplates(): Promise<WorkflowTemplate[]> {
   return apiClient
     .get<ApiResponse<RawWorkflowTemplate[]> | RawWorkflowTemplate[]>(workflowPath("/templates"))
@@ -86,4 +141,24 @@ export function instantiateWorkflow(
       payload,
     )
     .then((response) => normalizeInstantiateResponse(unwrapApiResponse<RawInstantiateWorkflowResponse>(response.data)));
+}
+
+export function getPlatformWorkflowTemplates(): Promise<WorkflowTemplateData[]> {
+  if (currentApiMode !== "java") {
+    return Promise.resolve([]);
+  }
+
+  return apiClient
+    .get<ApiResponse<RawPlatformWorkflowTemplate[]>>(platformWorkflowPath("/templates"))
+    .then((response) => unwrapApiResponse<RawPlatformWorkflowTemplate[]>(response.data).map(normalizePlatformTemplate));
+}
+
+export function savePlatformWorkflowTemplate(template: WorkflowTemplateData): Promise<WorkflowTemplateData> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("保存到 MySQL 仅 Java Gateway 模式支持"));
+  }
+
+  return apiClient
+    .post<ApiResponse<RawPlatformWorkflowTemplate>>(platformWorkflowPath("/templates"), template)
+    .then((response) => normalizePlatformTemplate(unwrapApiResponse<RawPlatformWorkflowTemplate>(response.data)));
 }
