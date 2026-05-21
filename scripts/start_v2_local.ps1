@@ -22,6 +22,8 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $OutputDir = Join-Path $ProjectRoot "output"
 $PidFile = Join-Path $OutputDir "local_v2_pids.json"
+$VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+$PythonExe = if (Test-Path $VenvPython) { $VenvPython } else { "python" }
 $Launched = @()
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -196,11 +198,12 @@ function Start-TempMySql {
 Write-Host "== AIchatProject v2 local startup =="
 Write-Host "Project root: $ProjectRoot"
 Write-Host "API mode: $ApiMode"
+Write-Host "Python executable: $PythonExe"
 
 if (-not (Test-TcpPort -Port $PythonPort)) {
     Start-LoggedProcess `
         -Name "python-api" `
-        -FilePath "python" `
+        -FilePath $PythonExe `
         -ArgumentList @("-m", "uvicorn", "api_server:app", "--host", "127.0.0.1", "--port", "$PythonPort") `
         -WorkingDirectory $ProjectRoot | Out-Null
 }

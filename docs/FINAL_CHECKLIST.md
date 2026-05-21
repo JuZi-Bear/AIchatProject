@@ -2,6 +2,21 @@
 
 用于比赛提交前逐项确认项目是否可以稳定演示。
 
+## v2-demo-rc1 验收结论
+
+- [x] 已执行 `.\scripts\final_v2_acceptance.ps1`。
+- [x] Python API `http://127.0.0.1:8001/health` 通过。
+- [x] Java Gateway `http://127.0.0.1:8088/api/health` 通过。
+- [x] 临时 MySQL `127.0.0.1:3307` 监听，Java 平台记录可查询。
+- [x] Vue Dashboard、RunConsole、History、Reports、Models、Plugins、Agents、Workflow Templates、Workflow Editor 均返回 HTTP 200。
+- [x] CodeAgent smoke 通过，包括文件写入、阻断路径、SSE、RunEvent、Replay 和 JSONL 审计日志。
+- [x] Workflow 模板 smoke 通过，包括保存、版本递增、实例化、回放和删除。
+- [x] 演示数据脚本通过，生成 Agent 运行、CodeAgent 文件操作和 Workflow 模板回放三类平台记录。
+- [x] seed 脚本中的真实 Agent 示例已替换为稳定 hello world 成功样例，当前记录 `success=true`、`qualityScore=100`。
+- [x] v2 演示脚本入口、三分钟演示脚本和本地联调文档已更新。
+
+备注：2026-05-21 已将 `scripts/seed_v2_demo_data.ps1` 的 Agent 示例需求替换为 ASCII hello world 成功样例，并让 `start_v2_local.ps1` 优先使用 `.venv\Scripts\python.exe`，避免系统 Python 缺少 `coverage` 导致 pytest 阶段失败。
+
 ## 环境检查
 
 - [ ] 确认 Python 版本为 3.11 或兼容版本。

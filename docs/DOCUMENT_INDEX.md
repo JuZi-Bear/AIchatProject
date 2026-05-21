@@ -38,6 +38,7 @@
 | `DEMO_FLOW.md` | 主文档 | 比赛现场演示流程 |
 | `DEMO_SCRIPT.md` | 主文档 | 演示脚本 |
 | `V2_3_MIN_DEMO_SCRIPT.md` | 主文档 | v2 平台化三分钟现场演示脚本 |
+| `V2_DEMO_RELEASE_NOTES.md` | 主文档 | v2-demo-rc1 发布说明、验收结果和现场兜底 |
 | `DEFENSE_SCRIPT.md` | 主文档 | 答辩讲稿 |
 | `DEFENSE_QA.md` | 主文档 | 答辩问答 |
 | `PRESENTATION_OUTLINE.md` | 主文档 | 答辩 PPT 大纲 |

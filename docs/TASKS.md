@@ -906,3 +906,14 @@
 - [x] 串联 v2 本地启动、API 健康检查、CodeAgent smoke、Workflow 模板 smoke、演示数据生成和 Vue 页面检查
 - [x] 修正 `start_v2_local.ps1` 中 RunConsole 路径为 `/runs/new`
 - [x] README 和 LOCAL_V2_STARTUP 增加最终验收命令
+
+## v2-demo-rc1 验收记录与发布说明
+
+- [x] 执行 `.\scripts\final_v2_acceptance.ps1`
+- [x] 替换 `scripts/seed_v2_demo_data.ps1` 中的 Agent 示例需求为稳定 hello world 成功样例
+- [x] `start_v2_local.ps1` 优先使用 `.venv\Scripts\python.exe`，避免系统 Python 缺少 coverage
+- [x] 更新 `docs/TEST_RESULT_LOG.md`
+- [x] 更新 `docs/FINAL_CHECKLIST.md`
+- [x] 新增 `docs/V2_DEMO_RELEASE_NOTES.md`
+- [x] 更新 `docs/V2_ARCHITECTURE_PLAN.md`
+- [x] 更新 README 和 DOCUMENT_INDEX 文档入口

@@ -235,6 +235,7 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - 技术框架扩展落地第七步已新增 Workflow 模板管理：Python Agent Engine 提供 `workflow_templates/` 和 `/api/workflows/templates`，Vue 新增 `/workflows/templates` 页面，可查看模板、模板 Markdown、Agent 顺序和阶段顺序，并生成轻量模板任务视图；Java Gateway 通过 `/api/workflows/templates` 和 `/api/workflows/instantiate` 保持代理兼容。
 - 技术框架扩展落地第八步已新增 Vue 可视化工作流拖拽编辑器：Vue 新增 `/workflows/editor` 页面，支持从 Agent Palette 拖入节点、调整节点位置和执行顺序、编辑输入输出字段和阶段、加载模板、本地保存模板、Java/MySQL 保存自定义模板、模板详情预览、MySQL 模板删除、MySQL 模板生成可回放任务、导出 JSON，并通过现有 Workflow instantiate API 生成轻量任务视图。
 - 已新增简化 CodeAgent 执行模块：Python 提供 `/api/code-agent/execute`，支持 `read_file`、`write_file`、`list_files`；Java Gateway 提供 `/api/code-agent/execute` 并将 CodeAgent 事件写入 MySQL `run_event`、通过 SSE 推送；Vue Workflow Editor 可选中 CodeAgent 节点后触发文件操作。
+- 2026-05-21 已完成 `v2-demo-rc1` 最终验收记录：`scripts/final_v2_acceptance.ps1` 可启动本地 v2 链路，检查 Python API、Java Gateway、MySQL、Vue 页面、CodeAgent smoke、Workflow 模板 smoke、演示数据生成和 Replay 页面；seed 脚本当前可生成 `success=true`、`qualityScore=100` 的真实 Agent 成功样例；验收记录见 `docs/TEST_RESULT_LOG.md`，发布说明见 `docs/V2_DEMO_RELEASE_NOTES.md`。
 - 页面暂不实现复杂动画；后续逐步替代 Streamlit 的正式交互体验。
 
 ## 为什么当前要先保留 Streamlit

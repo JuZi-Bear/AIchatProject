@@ -319,6 +319,7 @@ AIchatProject/
 - `docs/DOCKER_COMPOSE_GUIDE.md`：多服务 Docker 启动。
 - `docs/LOCAL_V2_STARTUP.md`：v2 本地一键联调脚本。
 - `docs/V2_3_MIN_DEMO_SCRIPT.md`：v2 平台三分钟现场演示脚本。
+- `docs/V2_DEMO_RELEASE_NOTES.md`：v2-demo-rc1 发布说明和验收结果。
 - `docs/VIDEO_CODING_GUIDE.md`：录制和现场讲解。
 - `docs/DEFENSE_SCRIPT.md`：答辩讲稿。
 - `docs/RISK_AND_STABILITY.md`：风险和兜底。

@@ -76,7 +76,7 @@ $summary = [ordered]@{
 
 if (-not $SkipAgentRun) {
     $agentPayload = [ordered]@{
-        requirement = "演示任务：写一个 Python 函数 calculate_discount(price, rate)，返回折扣后的价格，并处理非法输入。"
+        requirement = "Demo task: create a minimal Python script that prints Hello World and exits without user input."
         model_provider = "deepseek"
         enabled_plugins = @("Doc Agent", "Security Agent")
         max_retry_count = 2
