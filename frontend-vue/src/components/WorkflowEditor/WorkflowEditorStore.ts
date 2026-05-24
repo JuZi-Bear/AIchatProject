@@ -99,6 +99,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
     connections: [],
     viewport: defaultViewport(),
     selectedNodeId: "",
+    selectedNodeIds: [],
     undoStack: [],
     redoStack: [],
     savedTemplates: readSavedTemplates(),
@@ -139,7 +140,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.nodes = template.nodes.map((node) => ({ ...node, position: { ...node.position } }));
       this.connections = template.connections.map((connection) => ({ ...connection }));
       this.viewport = defaultViewport();
-      this.selectedNodeId = this.nodes[0]?.nodeId || "";
+      this.setSelection(this.nodes[0]?.nodeId ? [this.nodes[0].nodeId] : []);
     },
     refreshConnections() {
       this.connections = buildSequentialConnections(this.nodes);
@@ -152,7 +153,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.nodes = [];
       this.connections = [];
       this.viewport = defaultViewport();
-      this.selectedNodeId = "";
+      this.clearSelection();
     },
     loadTemplate(template: WorkflowTemplate) {
       this.commitHistory();
@@ -172,7 +173,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       }));
       this.refreshConnections();
       this.viewport = defaultViewport();
-      this.selectedNodeId = this.nodes[0]?.nodeId || "";
+      this.setSelection(this.nodes[0]?.nodeId ? [this.nodes[0].nodeId] : []);
     },
     loadTemplateData(template: WorkflowTemplateData) {
       this.commitHistory();
@@ -194,10 +195,30 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
 
       this.nodes.push(node);
       this.refreshConnections();
-      this.selectedNodeId = node.nodeId;
+      this.setSelection([node.nodeId]);
     },
     selectNode(nodeId: string) {
-      this.selectedNodeId = nodeId;
+      this.setSelection(nodeId ? [nodeId] : []);
+    },
+    setSelection(nodeIds: string[]) {
+      const validIds = new Set(this.nodes.map((node) => node.nodeId));
+      this.selectedNodeIds = [...new Set(nodeIds)].filter((nodeId) => validIds.has(nodeId));
+      this.selectedNodeId = this.selectedNodeIds[this.selectedNodeIds.length - 1] || "";
+    },
+    toggleNodeSelection(nodeId: string) {
+      if (!this.nodes.some((node) => node.nodeId === nodeId)) {
+        return;
+      }
+
+      if (this.selectedNodeIds.includes(nodeId)) {
+        this.setSelection(this.selectedNodeIds.filter((id) => id !== nodeId));
+      } else {
+        this.setSelection([...this.selectedNodeIds, nodeId]);
+      }
+    },
+    clearSelection() {
+      this.selectedNodeId = "";
+      this.selectedNodeIds = [];
     },
     updateNode(nodeId: string, patch: Partial<AgentNodeData>) {
       const node = this.nodes.find((item) => item.nodeId === nodeId);
@@ -226,7 +247,18 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.commitHistory();
       this.nodes = this.nodes.filter((node) => node.nodeId !== nodeId);
       this.refreshConnections();
-      this.selectedNodeId = this.nodes[0]?.nodeId || "";
+      this.setSelection(this.selectedNodeIds.filter((id) => id !== nodeId));
+    },
+    deleteSelectedNodes() {
+      if (!this.selectedNodeIds.length) {
+        return;
+      }
+
+      this.commitHistory();
+      const selectedIds = new Set(this.selectedNodeIds);
+      this.nodes = this.nodes.filter((node) => !selectedIds.has(node.nodeId));
+      this.refreshConnections();
+      this.clearSelection();
     },
     moveNodeOrder(nodeId: string, direction: -1 | 1) {
       const index = this.nodes.findIndex((node) => node.nodeId === nodeId);
@@ -253,7 +285,27 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       }));
       this.refreshConnections();
       this.viewport = defaultViewport();
-      this.selectedNodeId = this.nodes[0]?.nodeId || "";
+      this.setSelection(this.nodes[0]?.nodeId ? [this.nodes[0].nodeId] : []);
+    },
+    autoLayoutSelectedNodes() {
+      const selectedNodes = this.nodes.filter((node) => this.selectedNodeIds.includes(node.nodeId));
+
+      if (selectedNodes.length < 2) {
+        return;
+      }
+
+      this.commitHistory();
+      const minX = Math.min(...selectedNodes.map((node) => node.position.x));
+      const minY = Math.min(...selectedNodes.map((node) => node.position.y));
+
+      selectedNodes.forEach((node, index) => {
+        node.position = {
+          x: minX + (index % LAYOUT_COLUMNS) * LAYOUT_COLUMN_GAP,
+          y: minY + Math.floor(index / LAYOUT_COLUMNS) * LAYOUT_ROW_GAP,
+        };
+      });
+
+      this.refreshConnections();
     },
     setViewport(viewport: Partial<WorkflowViewport>) {
       this.viewport = {

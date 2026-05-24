@@ -11,13 +11,18 @@ const props = defineProps<{
 const isCodeAgent = computed(
   () => props.event.agent === "code_agent" || props.event.platformRunId?.startsWith("code_agent"),
 );
+const isBlocked = computed(() => {
+  const text = `${props.event.eventText} ${props.event.message || ""} ${props.event.detailJson || ""}`.toLowerCase();
+
+  return text.includes("blocked") || text.includes("forbidden") || text.includes("denied") || text.includes("阻断") || text.includes("违规");
+});
 
 function eventTagType(eventType: string) {
   if (eventType === "AGENT_FINISHED" || eventType === "RUNNER_FINISHED" || eventType === "TEST_FINISHED" || eventType === "REPORT_GENERATED" || eventType === "WORKFLOW_FINISHED") {
     return "success";
   }
 
-  if (eventType === "AGENT_FAILED" || eventType === "ERROR_OCCURRED") {
+  if (isBlocked.value || eventType === "AGENT_FAILED" || eventType === "ERROR_OCCURRED") {
     return "danger";
   }
 
@@ -66,10 +71,11 @@ function agentTagType(agent?: string) {
 </script>
 
 <template>
-  <article class="replay-event-card" :class="{ active, 'code-agent': isCodeAgent }">
+  <article class="replay-event-card" :class="{ active, 'code-agent': isCodeAgent, blocked: isBlocked }">
     <div class="event-card-head">
       <div class="event-tags">
         <el-tag v-if="isCodeAgent" type="warning" effect="dark" size="small">文件操作节点</el-tag>
+        <el-tag v-if="isBlocked" type="danger" effect="dark" size="small">安全阻断</el-tag>
         <el-tag :type="agentTagType(props.event.agent)" effect="plain" size="small">
           {{ agentLabel(props.event.agent) }}
         </el-tag>
@@ -114,6 +120,17 @@ function agentTagType(agent?: string) {
 .replay-event-card.code-agent.active {
   border-color: #f59e0b;
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+}
+
+.replay-event-card.blocked {
+  border-color: #ef4444;
+  border-left-color: #dc2626;
+  background: #fff1f2;
+}
+
+.replay-event-card.blocked.active {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
 }
 
 .event-card-head,

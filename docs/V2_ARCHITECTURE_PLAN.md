@@ -68,6 +68,7 @@ Vue3 + TypeScript
 - [x] C++ Runner Sandbox 最小版本。
 - [x] Docker Compose v2-only 总集成。
 - [x] Figma-first UI 设计源规范。
+- [x] v2 Demo Polish：Workflow Editor 小地图/多选、Replay 筛选、Dashboard CodeAgent 操作卡片。
 
 ## v2-only 收敛结果
 
@@ -86,7 +87,7 @@ Vue3 + TypeScript
 ## 推荐下一步
 
 1. 继续稳定 v2-only 演示版和验收脚本。
-2. 优化 Workflow Editor 小地图、多选和手动连线。
-3. 增强 Replay 事件筛选和对比。
+2. 继续优化 Workflow Editor 手动连线、小地图细节和键盘快捷键提示。
+3. 增强 Replay 事件对比和导出。
 4. 继续同步 Figma 设计源与 Vue 实现。
 5. 暂缓用户/权限/团队协作等复杂平台功能。

@@ -34,3 +34,9 @@ export type ReplayControlState = {
   playing: boolean;
   speedMs: number;
 };
+
+export type ReplayFilterState = {
+  agent: string;
+  status: string;
+  keyword: string;
+};

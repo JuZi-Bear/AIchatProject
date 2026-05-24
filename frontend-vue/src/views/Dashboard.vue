@@ -188,6 +188,23 @@ function agentTagType(agent?: string) {
   return types[agent || ""] || "info";
 }
 
+function isBlockedCodeAgentEvent(event?: RunEvent) {
+  if (!event) {
+    return false;
+  }
+
+  const text = `${event.eventText} ${event.message || ""} ${event.detailJson || ""}`.toLowerCase();
+  return text.includes("blocked") || text.includes("forbidden") || text.includes("denied") || text.includes("阻断") || text.includes("违规");
+}
+
+function latestCodeAgentEvent(platformRunId: string) {
+  return recentEvents.value.find((event) => event.platformRunId === platformRunId);
+}
+
+function codeAgentRunBlocked(record: PlatformRunRecord) {
+  return !record.success || isBlockedCodeAgentEvent(latestCodeAgentEvent(record.platformRunId));
+}
+
 async function loadSection<T>(
   key: keyof typeof loading,
   request: () => Promise<T>,
@@ -422,16 +439,30 @@ onMounted(() => {
       <div v-else class="code-agent-grid">
         <div class="code-agent-column">
           <div class="code-agent-column-title">最近运行</div>
-          <article v-for="record in recentCodeAgentRuns" :key="record.platformRunId" class="code-agent-run-item">
+          <article
+            v-for="record in recentCodeAgentRuns"
+            :key="record.platformRunId"
+            class="code-agent-run-item"
+            :class="{ blocked: codeAgentRunBlocked(record) }"
+          >
             <div>
               <div class="platform-run-id">{{ record.platformRunId }}</div>
               <div class="platform-run-subtitle">{{ record.requirement || "CodeAgent 文件操作" }}</div>
+              <div class="code-agent-time">
+                最近事件：{{ latestCodeAgentEvent(record.platformRunId)?.createdAt || record.createdAt || "未记录" }}
+              </div>
             </div>
             <div class="platform-run-tags">
               <el-tag :type="record.success ? 'success' : 'danger'" effect="plain" size="small">
                 {{ record.success ? "成功" : "失败" }}
               </el-tag>
+              <el-tag :type="codeAgentRunBlocked(record) ? 'danger' : 'success'" effect="plain" size="small">
+                {{ codeAgentRunBlocked(record) ? "阻断/异常" : "允许操作" }}
+              </el-tag>
               <el-tag type="warning" effect="plain" size="small">{{ record.runnerMode || "code_agent" }}</el-tag>
+              <router-link :to="{ path: '/history', query: { run_id: record.platformRunId } }">
+                <el-button size="small" text>详情</el-button>
+              </router-link>
               <router-link :to="`/replay/${record.platformRunId}`">
                 <el-button size="small" type="warning" plain>回放</el-button>
               </router-link>
@@ -441,13 +472,24 @@ onMounted(() => {
 
         <div class="code-agent-column">
           <div class="code-agent-column-title">最近事件</div>
-          <article v-for="event in recentCodeAgentEvents" :key="event.id || `${event.platformRunId}-${event.createdAt}`" class="code-agent-event-item">
+          <article
+            v-for="event in recentCodeAgentEvents"
+            :key="event.id || `${event.platformRunId}-${event.createdAt}`"
+            class="code-agent-event-item"
+            :class="{ blocked: isBlockedCodeAgentEvent(event) }"
+          >
             <div class="platform-run-id">{{ event.eventText || event.eventType }}</div>
             <div class="platform-run-subtitle">{{ event.message || event.platformRunId }}</div>
+            <div class="code-agent-time">{{ event.createdAt || "未记录时间" }}</div>
             <div class="platform-run-tags">
-              <el-tag :type="event.status === 'FAILED' ? 'danger' : event.status === 'SUCCESS' ? 'success' : 'warning'" effect="plain" size="small">
+              <el-tag
+                :type="event.status === 'FAILED' || isBlockedCodeAgentEvent(event) ? 'danger' : event.status === 'SUCCESS' ? 'success' : 'warning'"
+                effect="plain"
+                size="small"
+              >
                 {{ event.status || "UNKNOWN" }}
               </el-tag>
+              <el-tag v-if="isBlockedCodeAgentEvent(event)" type="danger" effect="plain" size="small">安全阻断</el-tag>
               <router-link :to="`/replay/${event.platformRunId}`">
                 <el-button size="small" text>查看回放</el-button>
               </router-link>
@@ -455,6 +497,16 @@ onMounted(() => {
           </article>
         </div>
       </div>
+    </el-card>
+    <el-card v-else shadow="never" class="platform-record-card code-agent-card">
+      <template #header>最近 CodeAgent 操作</template>
+      <el-alert
+        title="当前为 Python Direct 模式，不支持 Java 平台事件卡片"
+        description="切换到 Java Gateway 后可展示 CodeAgent 最近运行、阻断状态、RunEvent 和 Replay 入口。"
+        type="info"
+        show-icon
+        :closable="false"
+      />
     </el-card>
 
     <el-card v-if="isJavaMode" shadow="never" class="platform-record-card" v-loading="loading.events">
@@ -710,6 +762,22 @@ onMounted(() => {
   border: 1px solid #fde68a;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.code-agent-run-item.blocked,
+.code-agent-event-item.blocked {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.code-agent-time {
+  margin-top: 4px;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.blocked .code-agent-time {
+  color: #b91c1c;
 }
 
 .platform-event-main {

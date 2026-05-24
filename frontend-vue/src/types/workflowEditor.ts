@@ -9,6 +9,13 @@ export type WorkflowViewport = {
   scale: number;
 };
 
+export type WorkflowSelectionBox = {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+};
+
 export type AgentNodeData = {
   nodeId: string;
   agentKey: string;
@@ -46,6 +53,7 @@ export type WorkflowEditorState = {
   connections: ConnectionData[];
   viewport: WorkflowViewport;
   selectedNodeId: string;
+  selectedNodeIds: string[];
   undoStack: WorkflowTemplateData[];
   redoStack: WorkflowTemplateData[];
   savedTemplates: WorkflowTemplateData[];

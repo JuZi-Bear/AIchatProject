@@ -11,7 +11,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  select: [nodeId: string];
+  select: [nodeId: string, event: MouseEvent];
   delete: [nodeId: string];
   startDrag: [nodeId: string, event: PointerEvent];
   moveUp: [nodeId: string];
@@ -25,7 +25,7 @@ const emit = defineEmits<{
     :class="{ selected, disabled: !node.enabled, branch: node.stage === 'branch' || node.agentKey.startsWith('branch_') }"
     :style="{ left: `${node.position.x}px`, top: `${node.position.y}px` }"
     @pointerdown.stop="emit('startDrag', node.nodeId, $event)"
-    @click.stop="emit('select', node.nodeId)"
+    @click.stop="emit('select', node.nodeId, $event)"
   >
     <div class="node-header">
       <div class="node-order"><span>{{ index + 1 }}</span></div>

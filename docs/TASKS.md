@@ -56,10 +56,11 @@
 
 ## 后续可选优化
 
-- [ ] Workflow Editor 小地图。
-- [ ] Workflow Editor 多选和框选。
+- [x] Workflow Editor 小地图。
+- [x] Workflow Editor 多选和框选。
 - [ ] Workflow Editor 手动连线编辑。
-- [ ] Replay 事件筛选和搜索。
+- [x] Replay 事件筛选和搜索。
+- [x] Dashboard 最近 CodeAgent 操作卡片增强。
 - [ ] 更强 CodeAgent diff 可视化。
 - [ ] C++ Runner 资源限制增强。
 

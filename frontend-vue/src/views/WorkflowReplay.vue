@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Refresh } from "@element-plus/icons-vue";
+import { ArrowLeft, Refresh, Search } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -8,7 +8,7 @@ import { getWorkflowReplay } from "@/api/replay";
 import ReplayControlPanel from "@/components/ReplayControlPanel.vue";
 import ReplayEventCard from "@/components/ReplayEventCard.vue";
 import WorkflowReplayTimeline from "@/components/WorkflowReplayTimeline.vue";
-import type { WorkflowReplayData } from "@/types/replay";
+import type { ReplayFilterState, WorkflowReplayData } from "@/types/replay";
 
 const route = useRoute();
 const router = useRouter();
@@ -19,10 +19,62 @@ const errorDetail = ref("");
 const currentIndex = ref(0);
 const playing = ref(false);
 const speedMs = ref(800);
+const filters = ref<ReplayFilterState>({
+  agent: "all",
+  status: "all",
+  keyword: "",
+});
 let playTimer: ReturnType<typeof window.setInterval> | null = null;
 
-const events = computed(() => replay.value?.events || []);
+const allEvents = computed(() => replay.value?.events || []);
+const events = computed(() => {
+  const keyword = filters.value.keyword.trim().toLowerCase();
+
+  return allEvents.value.filter((event) => {
+    if (filters.value.agent !== "all") {
+      const agent = event.agent || (event.platformRunId?.startsWith("code_agent") ? "code_agent" : "");
+
+      if (agent !== filters.value.agent) {
+        return false;
+      }
+    }
+
+    if (filters.value.status !== "all" && event.status !== filters.value.status) {
+      return false;
+    }
+
+    if (!keyword) {
+      return true;
+    }
+
+    return `${event.eventText} ${event.message || ""} ${event.detailJson || ""}`.toLowerCase().includes(keyword);
+  });
+});
 const currentEvent = computed(() => events.value[currentIndex.value] || null);
+const codeAgentEventCount = computed(
+  () => allEvents.value.filter((event) => event.agent === "code_agent" || event.platformRunId?.startsWith("code_agent")).length,
+);
+const failedEventCount = computed(
+  () => allEvents.value.filter((event) => event.status === "FAILED" || event.eventType.includes("FAILED") || event.eventType === "ERROR_OCCURRED").length,
+);
+const agentOptions = [
+  { label: "全部 Agent", value: "all" },
+  { label: "CodeAgent", value: "code_agent" },
+  { label: "Product", value: "product" },
+  { label: "Coder", value: "coder" },
+  { label: "Tester", value: "tester" },
+  { label: "Runner", value: "runner" },
+  { label: "Sentry", value: "sentry" },
+  { label: "Quality", value: "quality" },
+  { label: "Report", value: "report" },
+  { label: "Workflow", value: "workflow" },
+];
+const statusOptions = [
+  { label: "全部状态", value: "all" },
+  { label: "SUCCESS", value: "SUCCESS" },
+  { label: "FAILED", value: "FAILED" },
+  { label: "RUNNING", value: "RUNNING" },
+];
 const durationText = computed(() => {
   const durationMs = replay.value?.durationMs || 0;
   if (!durationMs) {
@@ -91,6 +143,22 @@ function resetReplay() {
   currentIndex.value = 0;
 }
 
+function resetFilters() {
+  filters.value = {
+    agent: "all",
+    status: "all",
+    keyword: "",
+  };
+  resetReplay();
+}
+
+function showCodeAgentOnly() {
+  filters.value.agent = "code_agent";
+  filters.value.status = "all";
+  filters.value.keyword = "";
+  resetReplay();
+}
+
 function playReplay() {
   if (!events.value.length || currentIndex.value >= events.value.length - 1) {
     return;
@@ -113,7 +181,7 @@ async function loadReplay() {
 
   try {
     replay.value = await getWorkflowReplay(platformRunId.value);
-    currentIndex.value = replay.value.events.length ? 0 : -1;
+    currentIndex.value = events.value.length ? 0 : -1;
   } catch (error) {
     replay.value = null;
     errorDetail.value = error instanceof Error ? error.message : "加载工作流回放失败";
@@ -128,6 +196,11 @@ watch(speedMs, () => {
     playReplay();
   }
 });
+
+watch(filters, () => {
+  pauseReplay();
+  currentIndex.value = events.value.length ? 0 : -1;
+}, { deep: true });
 
 onMounted(loadReplay);
 
@@ -178,7 +251,7 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <span>事件数量</span>
-            <strong>{{ replay.events.length }}</strong>
+            <strong>{{ events.length }} / {{ allEvents.length }}</strong>
           </div>
           <div>
             <span>持续时间</span>
@@ -186,6 +259,30 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="requirement-block">{{ replay.requirement || "无需求摘要" }}</div>
+      </el-card>
+
+      <el-card shadow="never" class="replay-filter-card">
+        <div class="filter-row">
+          <div class="filter-title">
+            <strong>事件筛选</strong>
+            <span>CodeAgent {{ codeAgentEventCount }} · 异常 {{ failedEventCount }}</span>
+          </div>
+          <el-select v-model="filters.agent" class="filter-select">
+            <el-option v-for="option in agentOptions" :key="option.value" :label="option.label" :value="option.value" />
+          </el-select>
+          <el-select v-model="filters.status" class="filter-select">
+            <el-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
+          </el-select>
+          <el-input
+            v-model="filters.keyword"
+            class="filter-keyword"
+            :prefix-icon="Search"
+            clearable
+            placeholder="搜索 eventText / message / detailJson"
+          />
+          <el-button type="warning" plain @click="showCodeAgentOnly">只看 CodeAgent</el-button>
+          <el-button text @click="resetFilters">重置</el-button>
+        </div>
       </el-card>
 
       <ReplayControlPanel
@@ -204,7 +301,7 @@ onBeforeUnmount(() => {
       <el-row :gutter="16" align="top">
         <el-col :lg="15" :md="24">
           <section class="panel replay-main-panel" v-loading="loading">
-            <div class="panel-title">事件回放时间线</div>
+            <div class="panel-title">事件回放时间线（{{ events.length }} 条）</div>
             <WorkflowReplayTimeline :events="events" :current-index="currentIndex" />
           </section>
         </el-col>
@@ -275,6 +372,37 @@ onBeforeUnmount(() => {
   line-height: 1.55;
 }
 
+.replay-filter-card :deep(.el-card__body) {
+  padding: 12px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: auto 150px 140px minmax(220px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-title {
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+}
+
+.filter-title strong {
+  color: #0f172a;
+}
+
+.filter-title span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.filter-select,
+.filter-keyword {
+  width: 100%;
+}
+
 .replay-main-panel,
 .current-event-panel {
   min-height: 520px;
@@ -283,6 +411,16 @@ onBeforeUnmount(() => {
 @media (max-width: 1280px) {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .filter-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

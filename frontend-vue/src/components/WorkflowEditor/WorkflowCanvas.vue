@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Minus, Plus, Refresh } from "@element-plus/icons-vue";
+import { Delete, Minus, Plus, Refresh } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import AgentNode from "./AgentNode.vue";
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
 
 import type { AgentMeta } from "@/types/agent";
+import type { WorkflowSelectionBox } from "@/types/workflowEditor";
 
 const props = defineProps<{
   agents: AgentMeta[];
@@ -14,16 +15,25 @@ const props = defineProps<{
 const WORLD_WIDTH = 6000;
 const WORLD_HEIGHT = 4200;
 const GRID_SIZE = 24;
+const NODE_WIDTH = 256;
+const NODE_HEIGHT = 154;
+const MINIMAP_WIDTH = 210;
+const MINIMAP_HEIGHT = 148;
 
 const store = useWorkflowEditorStore();
 const canvasRef = ref<HTMLElement | null>(null);
+const minimapRef = ref<HTMLElement | null>(null);
 const isSpacePressed = ref(false);
 const isPanning = ref(false);
 const ignoreNextClick = ref(false);
+const selectionBox = ref<WorkflowSelectionBox | null>(null);
+const canvasSize = ref({ width: 0, height: 0 });
+const minimapDragging = ref(false);
 const draggingNode = ref<{
   nodeId: string;
-  offsetX: number;
-  offsetY: number;
+  startX: number;
+  startY: number;
+  nodeOrigins: Record<string, { x: number; y: number }>;
 } | null>(null);
 const panning = ref<{
   startX: number;
@@ -34,6 +44,7 @@ const panning = ref<{
 
 const canvasNodes = computed(() => store.orderedNodes);
 const zoomPercent = computed(() => `${Math.round(store.viewport.scale * 100)}%`);
+const selectedCount = computed(() => store.selectedNodeIds.length);
 const canvasStyle = computed(() => ({
   "--grid-size": `${GRID_SIZE * store.viewport.scale}px`,
   "--grid-x": `${store.viewport.x}px`,
@@ -44,6 +55,52 @@ const worldStyle = computed(() => ({
   height: `${WORLD_HEIGHT}px`,
   transform: `translate(${store.viewport.x}px, ${store.viewport.y}px) scale(${store.viewport.scale})`,
 }));
+const selectionBoxStyle = computed(() => {
+  if (!selectionBox.value) {
+    return {};
+  }
+
+  const left = Math.min(selectionBox.value.startX, selectionBox.value.currentX);
+  const top = Math.min(selectionBox.value.startY, selectionBox.value.currentY);
+  const width = Math.abs(selectionBox.value.currentX - selectionBox.value.startX);
+  const height = Math.abs(selectionBox.value.currentY - selectionBox.value.startY);
+
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  };
+});
+const minimapScale = computed(() => Math.min(MINIMAP_WIDTH / WORLD_WIDTH, MINIMAP_HEIGHT / WORLD_HEIGHT));
+const minimapNodes = computed(() =>
+  store.nodes.map((node) => ({
+    ...node,
+    selected: store.selectedNodeIds.includes(node.nodeId),
+    style: {
+      left: `${node.position.x * minimapScale.value}px`,
+      top: `${node.position.y * minimapScale.value}px`,
+      width: `${NODE_WIDTH * minimapScale.value}px`,
+      height: `${NODE_HEIGHT * minimapScale.value}px`,
+    },
+  })),
+);
+const minimapViewportStyle = computed(() => {
+  const scale = minimapScale.value;
+  const worldX = Math.max(0, -store.viewport.x / store.viewport.scale);
+  const worldY = Math.max(0, -store.viewport.y / store.viewport.scale);
+  const width = Math.min(WORLD_WIDTH, canvasSize.value.width / store.viewport.scale);
+  const height = Math.min(WORLD_HEIGHT, canvasSize.value.height / store.viewport.scale);
+
+  return {
+    left: `${worldX * scale}px`,
+    top: `${worldY * scale}px`,
+    width: `${width * scale}px`,
+    height: `${height * scale}px`,
+  };
+});
+
+let resizeObserver: ResizeObserver | null = null;
 
 function screenToWorld(event: Pick<PointerEvent | DragEvent | WheelEvent, "clientX" | "clientY">) {
   const rect = canvasRef.value?.getBoundingClientRect();
@@ -139,6 +196,27 @@ function autoLayout() {
   store.autoLayoutNodes();
 }
 
+function autoLayoutSelected() {
+  store.autoLayoutSelectedNodes();
+}
+
+function deleteSelected() {
+  store.deleteSelectedNodes();
+}
+
+function updateCanvasSize() {
+  const rect = canvasRef.value?.getBoundingClientRect();
+
+  if (!rect) {
+    return;
+  }
+
+  canvasSize.value = {
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 function startViewportPan(event: PointerEvent) {
   event.preventDefault();
   isPanning.value = true;
@@ -181,6 +259,11 @@ function stopViewportPan() {
 function handleCanvasPointerDown(event: PointerEvent) {
   if (event.button === 1 || (event.button === 0 && isSpacePressed.value)) {
     startViewportPan(event);
+    return;
+  }
+
+  if (event.button === 0) {
+    startSelectionBox(event);
   }
 }
 
@@ -190,7 +273,82 @@ function handleCanvasClick() {
     return;
   }
 
-  store.selectNode("");
+  store.clearSelection();
+}
+
+function startSelectionBox(event: PointerEvent) {
+  const point = canvasPoint(event);
+
+  event.preventDefault();
+  selectionBox.value = {
+    startX: point.x,
+    startY: point.y,
+    currentX: point.x,
+    currentY: point.y,
+  };
+  window.addEventListener("pointermove", moveSelectionBox);
+  window.addEventListener("pointerup", stopSelectionBox);
+}
+
+function moveSelectionBox(event: PointerEvent) {
+  if (!selectionBox.value) {
+    return;
+  }
+
+  const point = canvasPoint(event);
+  selectionBox.value.currentX = point.x;
+  selectionBox.value.currentY = point.y;
+}
+
+function stopSelectionBox(event: PointerEvent) {
+  if (!selectionBox.value) {
+    return;
+  }
+
+  const start = selectionBox.value;
+  const endPoint = canvasPoint(event);
+  const movement = Math.abs(endPoint.x - start.startX) + Math.abs(endPoint.y - start.startY);
+
+  if (movement > 6) {
+    ignoreNextClick.value = true;
+    const minScreenX = Math.min(start.startX, endPoint.x);
+    const maxScreenX = Math.max(start.startX, endPoint.x);
+    const minScreenY = Math.min(start.startY, endPoint.y);
+    const maxScreenY = Math.max(start.startY, endPoint.y);
+    const rect = canvasRef.value?.getBoundingClientRect();
+
+    if (rect) {
+      const worldTopLeft = {
+        x: (minScreenX - store.viewport.x) / store.viewport.scale,
+        y: (minScreenY - store.viewport.y) / store.viewport.scale,
+      };
+      const worldBottomRight = {
+        x: (maxScreenX - store.viewport.x) / store.viewport.scale,
+        y: (maxScreenY - store.viewport.y) / store.viewport.scale,
+      };
+      const selectedIds = store.nodes
+        .filter((node) => {
+          const nodeRight = node.position.x + NODE_WIDTH;
+          const nodeBottom = node.position.y + NODE_HEIGHT;
+
+          return (
+            node.position.x <= worldBottomRight.x &&
+            nodeRight >= worldTopLeft.x &&
+            node.position.y <= worldBottomRight.y &&
+            nodeBottom >= worldTopLeft.y
+          );
+        })
+        .map((node) => node.nodeId);
+
+      store.setSelection(selectedIds);
+    }
+  } else {
+    store.clearSelection();
+  }
+
+  selectionBox.value = null;
+  window.removeEventListener("pointermove", moveSelectionBox);
+  window.removeEventListener("pointerup", stopSelectionBox);
 }
 
 function handleDrop(event: DragEvent) {
@@ -220,6 +378,10 @@ function startDrag(nodeId: string, event: PointerEvent) {
     return;
   }
 
+  if (event.ctrlKey || event.metaKey) {
+    return;
+  }
+
   const node = store.nodes.find((item) => item.nodeId === nodeId);
 
   if (!node) {
@@ -228,12 +390,22 @@ function startDrag(nodeId: string, event: PointerEvent) {
 
   const worldPoint = screenToWorld(event);
   event.preventDefault();
-  store.selectNode(nodeId);
+  if (!store.selectedNodeIds.includes(nodeId)) {
+    store.selectNode(nodeId);
+  }
   store.commitHistory();
+  const movingIds = store.selectedNodeIds.includes(nodeId) ? store.selectedNodeIds : [nodeId];
+  const nodeOrigins = Object.fromEntries(
+    store.nodes
+      .filter((item) => movingIds.includes(item.nodeId))
+      .map((item) => [item.nodeId, { ...item.position }]),
+  );
+
   draggingNode.value = {
     nodeId,
-    offsetX: worldPoint.x - node.position.x,
-    offsetY: worldPoint.y - node.position.y,
+    startX: worldPoint.x,
+    startY: worldPoint.y,
+    nodeOrigins,
   };
   window.addEventListener("pointermove", moveDrag);
   window.addEventListener("pointerup", stopDrag);
@@ -245,10 +417,70 @@ function moveDrag(event: PointerEvent) {
   }
 
   const worldPoint = screenToWorld(event);
-  store.moveNodePosition(draggingNode.value.nodeId, {
-    x: worldPoint.x - draggingNode.value.offsetX,
-    y: worldPoint.y - draggingNode.value.offsetY,
+  const deltaX = worldPoint.x - draggingNode.value.startX;
+  const deltaY = worldPoint.y - draggingNode.value.startY;
+
+  Object.entries(draggingNode.value.nodeOrigins).forEach(([nodeId, origin]) => {
+    store.moveNodePosition(nodeId, {
+      x: origin.x + deltaX,
+      y: origin.y + deltaY,
+    });
   });
+}
+
+function handleNodeSelect(nodeId: string, event: MouseEvent) {
+  if (event.ctrlKey || event.metaKey) {
+    store.toggleNodeSelection(nodeId);
+    return;
+  }
+
+  store.selectNode(nodeId);
+}
+
+function minimapPoint(event: Pick<PointerEvent, "clientX" | "clientY">) {
+  const rect = minimapRef.value?.getBoundingClientRect();
+
+  if (!rect) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: Math.max(0, Math.min(MINIMAP_WIDTH, event.clientX - rect.left)),
+    y: Math.max(0, Math.min(MINIMAP_HEIGHT, event.clientY - rect.top)),
+  };
+}
+
+function focusMinimapPoint(event: PointerEvent) {
+  const point = minimapPoint(event);
+  const worldX = point.x / minimapScale.value;
+  const worldY = point.y / minimapScale.value;
+
+  store.setViewport({
+    x: canvasSize.value.width / 2 - worldX * store.viewport.scale,
+    y: canvasSize.value.height / 2 - worldY * store.viewport.scale,
+  });
+}
+
+function startMinimapDrag(event: PointerEvent) {
+  event.preventDefault();
+  minimapDragging.value = true;
+  focusMinimapPoint(event);
+  window.addEventListener("pointermove", moveMinimapDrag);
+  window.addEventListener("pointerup", stopMinimapDrag);
+}
+
+function moveMinimapDrag(event: PointerEvent) {
+  if (!minimapDragging.value) {
+    return;
+  }
+
+  focusMinimapPoint(event);
+}
+
+function stopMinimapDrag() {
+  minimapDragging.value = false;
+  window.removeEventListener("pointermove", moveMinimapDrag);
+  window.removeEventListener("pointerup", stopMinimapDrag);
 }
 
 function stopDrag() {
@@ -268,7 +500,7 @@ function handleKeydown(event: KeyboardEvent) {
   }
 
   if (event.key === "Escape") {
-    store.selectNode("");
+    store.clearSelection();
   }
 }
 
@@ -279,6 +511,11 @@ function handleKeyup(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  updateCanvasSize();
+  if (canvasRef.value) {
+    resizeObserver = new ResizeObserver(updateCanvasSize);
+    resizeObserver.observe(canvasRef.value);
+  }
   window.addEventListener("keydown", handleKeydown);
   window.addEventListener("keyup", handleKeyup);
 });
@@ -286,6 +523,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopDrag();
   stopViewportPan();
+  stopMinimapDrag();
+  resizeObserver?.disconnect();
   window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("keyup", handleKeyup);
 });
@@ -333,13 +572,45 @@ onBeforeUnmount(() => {
         :node="node"
         :index="index"
         :total="canvasNodes.length"
-        :selected="store.selectedNodeId === node.nodeId"
-        @select="store.selectNode"
+        :selected="store.selectedNodeIds.includes(node.nodeId)"
+        @select="handleNodeSelect"
         @delete="store.deleteNode"
         @start-drag="startDrag"
         @move-up="store.moveNodeOrder($event, -1)"
         @move-down="store.moveNodeOrder($event, 1)"
       />
+    </div>
+
+    <div v-if="selectionBox" class="selection-box" :style="selectionBoxStyle" />
+
+    <div
+      v-if="store.nodes.length"
+      ref="minimapRef"
+      class="canvas-minimap"
+      @click.stop
+      @pointerdown.stop="startMinimapDrag"
+    >
+      <div class="minimap-title">
+        <span>Minimap</span>
+        <strong>{{ store.nodes.length }} nodes</strong>
+      </div>
+      <div class="minimap-stage">
+        <span
+          v-for="node in minimapNodes"
+          :key="node.nodeId"
+          class="minimap-node"
+          :class="{ selected: node.selected, branch: node.stage === 'branch' || node.agentKey.startsWith('branch_') }"
+          :style="node.style"
+        />
+        <span class="minimap-viewport" :style="minimapViewportStyle" />
+      </div>
+    </div>
+
+    <div v-if="selectedCount > 1" class="selection-toolbar" @click.stop @pointerdown.stop>
+      <strong>{{ selectedCount }} 个节点已选中</strong>
+      <el-button size="small" :icon="Refresh" @click="autoLayoutSelected">整理选中</el-button>
+      <el-button size="small" :icon="Delete" type="danger" plain @click="deleteSelected">删除选中</el-button>
+      <el-button size="small" text @click="store.clearSelection">取消</el-button>
     </div>
 
     <div class="canvas-controls" @click.stop @pointerdown.stop>
@@ -417,6 +688,110 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+.selection-box {
+  position: absolute;
+  z-index: 9;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+
+.canvas-minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 74px;
+  z-index: 8;
+  width: 234px;
+  padding: 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.16);
+  cursor: crosshair;
+  backdrop-filter: blur(12px);
+}
+
+.minimap-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.minimap-title strong {
+  color: #1d4ed8;
+  text-transform: none;
+}
+
+.minimap-stage {
+  position: relative;
+  width: 210px;
+  height: 148px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background:
+    linear-gradient(#eff6ff 1px, transparent 1px),
+    linear-gradient(90deg, #eff6ff 1px, transparent 1px),
+    #f8fafc;
+  background-size: 12px 12px;
+}
+
+.minimap-node {
+  position: absolute;
+  border: 1px solid #93c5fd;
+  border-radius: 3px;
+  background: #bfdbfe;
+}
+
+.minimap-node.branch {
+  border-color: #f59e0b;
+  background: #fde68a;
+}
+
+.minimap-node.selected {
+  border-color: #2563eb;
+  background: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.24);
+}
+
+.minimap-viewport {
+  position: absolute;
+  border: 2px solid #1d4ed8;
+  border-radius: 4px;
+  background: rgba(29, 78, 216, 0.08);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.78);
+}
+
+.selection-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 38px rgba(30, 64, 175, 0.16);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.selection-toolbar strong {
+  color: #1e40af;
+  font-size: 12px;
 }
 
 .canvas-controls {
