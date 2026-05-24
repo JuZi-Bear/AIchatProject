@@ -312,6 +312,7 @@ async function createTask() {
       <el-button :icon="Plus" @click="store.newBlankWorkflow">新建空白</el-button>
       <el-button :disabled="!store.canUndo" @click="store.undo">撤销</el-button>
       <el-button :disabled="!store.canRedo" @click="store.redo">重做</el-button>
+      <el-button :disabled="!store.nodes.length" @click="store.autoLayoutNodes">自动整理</el-button>
       <el-select v-model="templateSelection" placeholder="加载 Workflow 模板" class="template-select">
         <el-option v-for="option in templateOptions" :key="option.value" :label="option.label" :value="option.value" />
       </el-select>

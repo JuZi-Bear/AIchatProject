@@ -1,10 +1,28 @@
 import { defineStore } from "pinia";
 
 import type { AgentMeta } from "@/types/agent";
-import type { AgentNodeData, ConnectionData, WorkflowEditorState, WorkflowTemplateData } from "@/types/workflowEditor";
+import type {
+  AgentNodeData,
+  ConnectionData,
+  WorkflowEditorState,
+  WorkflowTemplateData,
+  WorkflowViewport,
+} from "@/types/workflowEditor";
 import type { WorkflowTemplate } from "@/types/workflow";
 
 const STORAGE_KEY = "ai-agent-pipeline.workflow-editor.templates";
+const DEFAULT_VIEWPORT: WorkflowViewport = {
+  x: 40,
+  y: 40,
+  scale: 1,
+};
+const MIN_SCALE = 0.4;
+const MAX_SCALE = 1.8;
+const LAYOUT_START_X = 56;
+const LAYOUT_START_Y = 56;
+const LAYOUT_COLUMN_GAP = 276;
+const LAYOUT_ROW_GAP = 168;
+const LAYOUT_COLUMNS = 4;
 
 const agentLabels: Record<string, string> = {
   product: "Product Agent",
@@ -12,6 +30,9 @@ const agentLabels: Record<string, string> = {
   tester: "Tester Agent",
   runner: "Runner",
   code_agent: "CodeAgent",
+  branch_if: "If",
+  branch_and: "And",
+  branch_or: "Or",
   sentry: "Sentry Agent",
   plugins: "Plugin Executor",
   quality: "Quality Evaluator",
@@ -54,6 +75,21 @@ function normalizeTemplateKey(value: string) {
     .replace(/^_+|_+$/g, "") || `custom_${Date.now()}`;
 }
 
+function compactPosition(index: number) {
+  return {
+    x: LAYOUT_START_X + (index % LAYOUT_COLUMNS) * LAYOUT_COLUMN_GAP,
+    y: LAYOUT_START_Y + Math.floor(index / LAYOUT_COLUMNS) * LAYOUT_ROW_GAP,
+  };
+}
+
+function clampScale(scale: number) {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+}
+
+function defaultViewport(): WorkflowViewport {
+  return { ...DEFAULT_VIEWPORT };
+}
+
 export const useWorkflowEditorStore = defineStore("workflow-editor", {
   state: (): WorkflowEditorState => ({
     workflowTemplateKey: "custom_workflow",
@@ -61,6 +97,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
     workflowDescription: "通过 Vue Workflow Editor 生成的工作流模板。",
     nodes: [],
     connections: [],
+    viewport: defaultViewport(),
     selectedNodeId: "",
     undoStack: [],
     redoStack: [],
@@ -101,6 +138,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.workflowDescription = template.description;
       this.nodes = template.nodes.map((node) => ({ ...node, position: { ...node.position } }));
       this.connections = template.connections.map((connection) => ({ ...connection }));
+      this.viewport = defaultViewport();
       this.selectedNodeId = this.nodes[0]?.nodeId || "";
     },
     refreshConnections() {
@@ -113,6 +151,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.workflowDescription = "通过 Vue Workflow Editor 生成的工作流模板。";
       this.nodes = [];
       this.connections = [];
+      this.viewport = defaultViewport();
       this.selectedNodeId = "";
     },
     loadTemplate(template: WorkflowTemplate) {
@@ -124,10 +163,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
         nodeId: `${template.key}_${agentKey}_${index + 1}`,
         agentKey,
         name: agentLabels[agentKey] || agentKey,
-        position: {
-          x: 80 + (index % 3) * 260,
-          y: 80 + Math.floor(index / 3) * 150,
-        },
+        position: compactPosition(index),
         input_fields: index === 0 ? ["requirement"] : [`${template.agent_sequence[index - 1]}_result`],
         output_fields: [`${agentKey}_result`],
         stage: template.stage_sequence[index] || "未分类",
@@ -135,6 +171,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
         description: `${template.name} 的 ${agentLabels[agentKey] || agentKey} 节点`,
       }));
       this.refreshConnections();
+      this.viewport = defaultViewport();
       this.selectedNodeId = this.nodes[0]?.nodeId || "";
     },
     loadTemplateData(template: WorkflowTemplateData) {
@@ -203,6 +240,57 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       const [node] = this.nodes.splice(index, 1);
       this.nodes.splice(nextIndex, 0, node);
       this.refreshConnections();
+    },
+    autoLayoutNodes() {
+      if (!this.nodes.length) {
+        return;
+      }
+
+      this.commitHistory();
+      this.nodes = this.nodes.map((node, index) => ({
+        ...node,
+        position: compactPosition(index),
+      }));
+      this.refreshConnections();
+      this.viewport = defaultViewport();
+      this.selectedNodeId = this.nodes[0]?.nodeId || "";
+    },
+    setViewport(viewport: Partial<WorkflowViewport>) {
+      this.viewport = {
+        x: viewport.x ?? this.viewport.x,
+        y: viewport.y ?? this.viewport.y,
+        scale: clampScale(viewport.scale ?? this.viewport.scale),
+      };
+    },
+    panViewport(deltaX: number, deltaY: number) {
+      this.viewport = {
+        ...this.viewport,
+        x: this.viewport.x + deltaX,
+        y: this.viewport.y + deltaY,
+      };
+    },
+    resetViewport() {
+      this.viewport = defaultViewport();
+    },
+    zoomViewport(nextScale: number, anchor?: { x: number; y: number }) {
+      const scale = clampScale(nextScale);
+
+      if (!anchor) {
+        this.viewport = {
+          ...this.viewport,
+          scale,
+        };
+        return;
+      }
+
+      const worldX = (anchor.x - this.viewport.x) / this.viewport.scale;
+      const worldY = (anchor.y - this.viewport.y) / this.viewport.scale;
+
+      this.viewport = {
+        x: anchor.x - worldX * scale,
+        y: anchor.y - worldY * scale,
+        scale,
+      };
     },
     undo() {
       const previous = this.undoStack.pop();

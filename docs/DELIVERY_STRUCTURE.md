@@ -120,8 +120,8 @@ AIchatProject/
 
 ## Docker 与依赖
 
-- `Dockerfile`：基于 `python:3.11-slim` 构建 Python 镜像，可由 Compose command 启动 Streamlit 或 FastAPI。
-- `docker-compose.yml`：一键启动 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`、`streamlit-web` 多服务，并挂载 `reports/`、`runs/`、`output/`。
+- `Dockerfile`：基于 `python:3.11-slim` 构建 Python 镜像，当前 v2-only Compose 使用 command 启动 FastAPI。
+- `docker-compose.yml`：一键启动 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue` 多服务，并挂载 `reports/`、`runs/`、`output/`。
 - `.dockerignore`：避免打包虚拟环境、缓存、Git 信息和敏感 `.env`。
 - `requirements.txt`：Python 依赖清单。
 - `README.md`：项目总入口说明。

@@ -1,0 +1,67 @@
+{
+  "name": "AI Multi-Agent Pipeline UI Tokens",
+  "version": "1.0.0",
+  "source": "frontend-vue/src/styles/global.css",
+  "mode": "light",
+  "colors": {
+    "background": "#F4F7FB",
+    "surface": "#FFFFFF",
+    "surfaceSubtle": "#FBFDFF",
+    "textPrimary": "#1F2937",
+    "textStrong": "#0F172A",
+    "textSecondary": "#64748B",
+    "border": "#E2E8F0",
+    "sidebar": "#172033",
+    "sidebarHover": "#22304A",
+    "sidebarBorder": "#27344C",
+    "brandMark": "#2DD4BF",
+    "primary": "#2563EB",
+    "primarySoft": "#DBEAFE",
+    "success": "#34A853",
+    "successSoft": "#E6F4EA",
+    "warning": "#FBBC04",
+    "warningSoft": "#FEF7E0",
+    "danger": "#EA4335",
+    "dangerSoft": "#FCE8E6",
+    "purple": "#A142F4",
+    "purpleSoft": "#F3E8FD"
+  },
+  "typography": {
+    "fontFamily": "Inter, Segoe UI, PingFang SC, Microsoft YaHei, Arial, sans-serif",
+    "baseSize": 14,
+    "pageTitle": 24,
+    "topbarTitle": 18,
+    "panelTitle": 16,
+    "metricValue": 22,
+    "code": "Cascadia Code, Consolas, monospace"
+  },
+  "spacing": {
+    "pagePadding": 22,
+    "panelPadding": 18,
+    "panelGap": 16,
+    "gridGap": 12,
+    "controlGap": 10
+  },
+  "radius": {
+    "brand": 8,
+    "panel": 8,
+    "card": 8,
+    "pill": 999
+  },
+  "layout": {
+    "desktopMinWidth": 1180,
+    "sidebarWidth": 248,
+    "topbarHeight": 72,
+    "screenFrameWidth": 1440,
+    "screenFrameHeight": 900
+  },
+  "status": {
+    "waiting": "#94A3B8",
+    "running": "#2563EB",
+    "done": "#34A853",
+    "failed": "#EA4335",
+    "repairing": "#FBBC04",
+    "skipped": "#CBD5E1",
+    "codeAgent": "#EA4335"
+  }
+}

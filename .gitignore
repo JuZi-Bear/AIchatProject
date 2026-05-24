@@ -19,6 +19,7 @@ frontend-vue/dist/
 backend-java/target/
 runner-cpp/build/
 output/
+outputs/
 reports/
 runs/
 !runs/.gitkeep

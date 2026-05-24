@@ -226,7 +226,7 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - v2.0 第十三步已让 Vue 接入 Java + MySQL 数据视图：`VITE_API_MODE=java` 时，History 优先读取 `/api/platform/runs`，Settings 同步 `/api/settings`，Models 和 Plugins 读取 Java/MySQL 配置；`VITE_API_MODE=python` 时保持 Python Direct 与 localStorage 逻辑。
 - v2.0 第十四步已增强 Java + MySQL 任务记录详情和报告索引管理：`RunRecordEntity` 保存运行摘要、UI ViewModel、插件结果摘要、错误摘要、模型信息和审批字段；新增 `ReportIndexEntity`、`/api/platform/reports`、`/api/platform/stats`，Vue Reports 和 Dashboard 已接入平台报告索引与统计视图。
 - v2.0 第十五步已新增 C++ Runner Sandbox 最小可运行版本：`runner-cpp/` 支持任务 JSON、危险关键词扫描、调用 Python 执行目标文件和 JSON 结果输出；Python `code_runner` 通过 `runner_mode=cpp` 可选接入，未编译 runner 时自动回退 Python Runner。
-- v2.0 第十六步已完成多服务 Docker Compose 总集成：`mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`、`streamlit-web` 可通过 `docker compose up --build` 一起启动，C++ Runner 作为挂载目录和本地可选增强模块保留。
+- v2-only 分支已将 Docker Compose 收敛为平台主链路：`mysql`、`ai-agent-api`、`backend-java`、`frontend-vue` 可通过 `docker compose up --build` 一起启动；`streamlit-web` 服务已从 Compose 移除，但 `webui.py` / `graph_demo.py` 文件暂时保留为 legacy 本地入口。
 - 技术框架扩展落地第二步已新增 Java 平台任务事件记录：`RunEventEntity` 保存任务创建、状态变化、Python 请求/响应、成功失败、报告索引和异常事件，Vue History 展示事件时间线，Dashboard 展示最近平台事件，为后续 SSE/WebSocket 实时日志、运行回放和平台审计打基础。
 - 技术框架扩展落地第三步已新增 SSE 实时事件推送雏形：`RunEventSseService` 管理任务订阅者，`GET /api/platform/runs/{platformRunId}/events/stream` 通过 `text/event-stream` 推送 Java 平台事件，Vue RunConsole 和 RunHistory 可订阅实时事件流。
 - 技术框架扩展落地第四步已新增 Python Agent Engine 细粒度事件上报：Python 工作流输出 `workflow_events`，Java 平台层保存为 `RunEventEntity` 并通过已有 SSE 机制推送，Vue 可展示 Product/Coder/Tester/Runner/Sentry/Quality/Report 等 Agent 事件。
@@ -262,7 +262,7 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
 - 已提供前端侧模型和插件配置管理；当前配置通过 localStorage 保存，后续可升级为 Java 后端统一配置管理。
 - 已提供比赛演示模式，面向答辩现场突出多 Agent 协作、自愈修复、质量评分和报告生成。
 - 已支持 `npm run build` 生产构建，并通过 Nginx 支持 Vue Router history 路由回退。
-- 已通过 Docker Compose 将 `frontend-vue`、`backend-java` 和 `ai-agent-api` 作为 v2 预览服务联调，同时保留 `streamlit-web` 的 Streamlit v1 服务。
+- 已通过 Docker Compose 将 `frontend-vue`、`backend-java`、`mysql` 和 `ai-agent-api` 作为 v2 平台主链路联调；v2-only 分支不再通过 Compose 启动 Streamlit。
 - 已通过 `.env.development` / `.env.production` 支持 `VITE_API_MODE=python|java`：`python` 模式直连 FastAPI，`java` 模式通过 Spring Boot API Gateway 代理；页面组件不直接处理 API 路径差异。
 - 已在 Dashboard、History、Models、Plugins 页面展示当前数据模式和数据来源；Java Gateway 模式下展示 MySQL 平台运行记录和持久化配置视图。
 - Reports 页面在 Java Gateway 模式下优先展示 MySQL 报告索引，并在详情中显示 platformRunId、pythonRunId、需求摘要、成功状态、质量评分和 Markdown 正文。
@@ -306,12 +306,11 @@ v2.0 第二阶段已新增 Vue3 + TypeScript 前端骨架：
   - `frontend-vue`
   - `backend-java`
   - `ai-agent-api`
-  - `streamlit-web`
   - `mysql`
   - `runner-cpp` 挂载目录
 - 统一环境变量、网络、端口和数据卷。
 - 当前 C++ Runner 采用方案 A，不单独作为服务启动；后续可升级为 `cpp-runner` 独立服务或构建阶段。
-- 保留 v1.0 单容器启动作为比赛演示备用方案。
+- `webui.py`、`graph_demo.py` 暂时作为 legacy 本地入口保留，不再进入 v2-only Compose。
 
 ## 兼容原则
 

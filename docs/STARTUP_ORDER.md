@@ -89,12 +89,11 @@ OFFLINE_MODE=true
 docker compose up --build
 ```
 
-3. 访问 Vue / Java / FastAPI / Streamlit。
+3. 访问 Vue / Java / FastAPI / MySQL。
 
 - Vue 前端：`http://localhost:5174`
 - Java 平台服务：`http://localhost:8088/api/health`
 - FastAPI Docs：`http://localhost:8001/docs`
-- Streamlit v1：`http://localhost:8501`
 - MySQL：`localhost:3306`
 
 ## 常见顺序问题

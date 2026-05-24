@@ -52,7 +52,7 @@
 
 ## 命名一致性检查
 
-- 当前 Docker Compose 服务名统一为：`mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`、`streamlit-web`。
+- 当前 v2-only Docker Compose 服务名统一为：`mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`。`streamlit-web` 已从 Compose 移除，v1 文件暂时作为本地 legacy 入口保留。
 - 历史文档中的旧服务名 `ai-agent-pipeline` 已修正为当前多服务口径；`DOCKER_COMPOSE_GUIDE.md` 中只作为旧容器残留示例提及。
 - Vue API 模式命名统一为 `Python Direct` 和 `Java Gateway`。
 - 目录分类统一使用：`v1-demo`、`v2-platform`、`shared-core`、`experimental`、`generated-output`、`documentation`。
@@ -82,10 +82,10 @@
 
 ## Docker 文件检查
 
-- 根 `Dockerfile` 同时支持 Streamlit 和 FastAPI，通过 Compose command 区分启动命令。
+- 根 `Dockerfile` 仍可支持 FastAPI 和 legacy Streamlit 命令，但当前 v2-only Compose 只用它启动 FastAPI。
 - `frontend-vue/Dockerfile` 使用 Node 构建、Nginx 运行，支持生产构建参数。
 - `backend-java/Dockerfile` 使用 Maven + Java 17 构建运行。
-- `docker-compose.yml` 已包含 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`、`streamlit-web`。
+- `docker-compose.yml` 已收敛为 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue`。
 - C++ Runner 当前按方案 A 作为挂载目录，不作为独立 Compose 服务。
 
 ## 前后端接口一致性检查
@@ -107,7 +107,7 @@
 - 文档体系中仍有重复说明，尤其是启动、Docker、风险和目录结构说明。
 - `webui.py` 文件较大，后续如果继续优化，应只做展示层小步拆分，不应重写。
 - C++ Runner 当前不是完整安全沙箱，不能默认启用为生产 Runner。
-- Docker Compose 启动依赖端口 `3306`、`8001`、`8088`、`5174`、`8501`，比赛现场需要提前检查端口。
+- v2-only Docker Compose 启动依赖端口 `3306`、`8001`、`8088`、`5174`，比赛现场需要提前检查端口。`8501` 仅在本地单独启动 legacy Streamlit 时使用。
 
 ## 建议清理项
 

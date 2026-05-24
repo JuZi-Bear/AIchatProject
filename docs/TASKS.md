@@ -69,6 +69,21 @@
 - [x] 更新 TECH_STACK 技术栈扩展边界
 - [x] 更新 CODEX_PROJECT_CONTEXT 框架扩展原则
 
+## v2-only 运行逻辑收敛阶段
+
+- [x] 新建 `codex/v2-only-remove-v1` 工作分支
+- [x] 梳理 Vue -> Java -> Python -> MySQL/SSE/Replay 主运行链路
+- [x] 梳理 CodeAgent 文件操作、审计日志和事件回放链路
+- [x] 梳理 Workflow 模板保存、版本、删除和实例化链路
+- [x] 标记 v2-only 必须保留模块
+- [x] 标记 v1 去除候选和用户确认点
+- [ ] 用户确认 v1 文件是删除还是归档到 legacy
+- [x] 从 Docker Compose 移除 `streamlit-web` 服务
+- [ ] 移除或归档 Streamlit / CLI v1 入口文件
+- [x] 收敛 Docker Compose 为 v2-only 口径
+- [ ] 收敛 README 全文为 v2-only 口径
+- [ ] 执行 v2-only 最终验收
+
 ## v2.0 第一阶段 API 升级
 
 - [ ] v2.0 Python Agent Engine API
@@ -552,7 +567,7 @@
 - [x] 默认启动 Web UI
 - [x] Web UI 绑定 0.0.0.0:8501
 - [x] 支持通过 .env 传入 DeepSeek 配置
-- [x] docker-compose.yml 保留 Streamlit v1 服务，当前服务名为 streamlit-web
+- [x] v2-only 分支 docker-compose.yml 已移除 Streamlit v1 服务，当前 Compose 只保留 v2 平台链路
 - [x] docker-compose.yml 挂载 reports/ 和 output/
 - [x] 新增 .dockerignore 避免打包本地敏感文件
 - [x] README 增加 Docker 启动方式
@@ -917,3 +932,17 @@
 - [x] 新增 `docs/V2_DEMO_RELEASE_NOTES.md`
 - [x] 更新 `docs/V2_ARCHITECTURE_PLAN.md`
 - [x] 更新 README 和 DOCUMENT_INDEX 文档入口
+
+## Figma-first 前端 UI 设计源
+
+- [x] 新增 `figma/README.md`
+- [x] 新增 `figma/design_tokens.json`
+- [x] 新增 `figma/frontend_ui_map.json`
+- [x] 新增 `figma/component_inventory.json`
+- [x] 新增 `figma/create_figma_ui_source.js`
+- [x] 更新 `figma/design_link.md`
+- [x] 新增 `docs/FIGMA_UI_WORKFLOW.md`
+- [x] 更新 `docs/CODEX_PROJECT_CONTEXT.md`
+- [x] README 增加 Figma UI 设计源说明
+- [x] 用户提供 Figma design 文件 URL
+- [x] 使用 Figma `use_figma` 将设计源同步到用户个人 Figma 文件

@@ -3,6 +3,12 @@ export type NodePosition = {
   y: number;
 };
 
+export type WorkflowViewport = {
+  x: number;
+  y: number;
+  scale: number;
+};
+
 export type AgentNodeData = {
   nodeId: string;
   agentKey: string;
@@ -38,6 +44,7 @@ export type WorkflowEditorState = {
   workflowDescription: string;
   nodes: AgentNodeData[];
   connections: ConnectionData[];
+  viewport: WorkflowViewport;
   selectedNodeId: string;
   undoStack: WorkflowTemplateData[];
   redoStack: WorkflowTemplateData[];

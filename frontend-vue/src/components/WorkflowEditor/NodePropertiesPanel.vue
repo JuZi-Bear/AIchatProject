@@ -4,6 +4,15 @@ import { computed, reactive, watch } from "vue";
 
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
 
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean;
+  }>(),
+  {
+    embedded: false,
+  },
+);
+
 const store = useWorkflowEditorStore();
 const selectedNode = computed(() => store.selectedNode);
 const form = reactive({
@@ -57,8 +66,8 @@ function saveNode() {
 </script>
 
 <template>
-  <el-card shadow="never" class="properties-card">
-    <template #header>
+  <el-card shadow="never" class="properties-card" :class="{ embedded: props.embedded }">
+    <template v-if="!props.embedded" #header>
       <div class="panel-head">
         <span>节点属性</span>
         <el-tag v-if="selectedNode" type="primary" effect="plain">{{ selectedNode.agentKey }}</el-tag>
@@ -72,7 +81,7 @@ function saveNode() {
       </el-form-item>
 
       <el-form-item label="执行阶段">
-        <el-input v-model="form.stage" placeholder="analysis / generation / testing / report" />
+        <el-input v-model="form.stage" placeholder="analysis / generation / testing / branch / report" />
       </el-form-item>
 
       <el-form-item label="是否启用">
@@ -80,15 +89,15 @@ function saveNode() {
       </el-form-item>
 
       <el-form-item label="输入字段">
-        <el-input v-model="form.inputFieldsText" type="textarea" :rows="4" placeholder="每行一个字段，或用逗号分隔" />
+        <el-input v-model="form.inputFieldsText" type="textarea" :rows="3" placeholder="每行一个字段，或用逗号分隔" />
       </el-form-item>
 
       <el-form-item label="输出字段">
-        <el-input v-model="form.outputFieldsText" type="textarea" :rows="4" placeholder="每行一个字段，或用逗号分隔" />
+        <el-input v-model="form.outputFieldsText" type="textarea" :rows="3" placeholder="每行一个字段，或用逗号分隔" />
       </el-form-item>
 
       <el-form-item label="节点说明">
-        <el-input v-model="form.description" type="textarea" :rows="5" />
+        <el-input v-model="form.description" type="textarea" :rows="4" />
       </el-form-item>
 
       <el-button type="primary" class="full-width" @click="saveNode">保存修改</el-button>
@@ -99,6 +108,14 @@ function saveNode() {
 <style scoped>
 .properties-card {
   border-radius: 8px;
+}
+
+.properties-card.embedded {
+  border-radius: 10px;
+}
+
+.properties-card.embedded :deep(.el-card__body) {
+  padding: 14px;
 }
 
 .panel-head {

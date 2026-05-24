@@ -26,6 +26,7 @@ v1.0 比赛交付版已经落地的技术栈如下：
 - Pinia：Vue 前端状态管理。
 - Axios：Vue 前端 API 调用封装。
 - Element Plus：Vue 前端 UI 组件库。
+- Figma：v2 前端 UI 的可编辑设计源，用于维护页面 Frame、组件状态、设计 token 和后续 UI 修改入口。
 - Rich：CLI 彩色输出。
 - pytest：自动测试。
 - coverage：测试覆盖率统计。
@@ -66,6 +67,7 @@ v1.0 比赛交付版已经落地的技术栈如下：
 - `Reports`：支持 Markdown 报告列表、报告名搜索、run_id 解析、内容查看和复制报告内容。
 - `Models`：支持模型列表、provider/启用状态筛选、模型搜索、API Key 提示和前端默认模型选择。
 - `Plugins`：支持插件卡片、启用/关闭开关、插件说明和本地启用状态管理。
+- `figma/`：Figma-first 设计源目录，包含 `design_tokens.json`、`frontend_ui_map.json`、`component_inventory.json` 和 `create_figma_ui_source.js`，用于把 Vue 页面映射为个人可编辑的 Figma 项目。
 
 ## v2.0 API 调用模式
 
@@ -122,7 +124,6 @@ v1.0 比赛交付版已经落地的技术栈如下：
 - `ai-agent-api`：Python FastAPI Agent Engine 容器，负责 Agent 工作流 API。
 - `backend-java`：Spring Boot 平台服务容器，负责 Java Gateway、MySQL 数据视图和平台接口。
 - `frontend-vue`：Vue3 生产构建容器，使用 Nginx 托管静态文件，默认通过 Java Gateway 调用。
-- `streamlit-web`：Streamlit v1 演示版容器，保留比赛现场稳定入口。
 - `runner-cpp`：当前不是独立服务，而是挂载到 Python 容器的可选增强目录；后续可升级为独立 Runner 服务或构建阶段。
 
 ## 后续扩展技术栈
@@ -135,7 +136,7 @@ v2.0 平台化升级继续预留的技术栈如下：
 
 ## 技术作用边界
 
-- Streamlit：仅作为 v1.0 比赛演示前端，优势是启动快、部署简单、适合现场演示。
+- Streamlit：仅作为 v1.0 legacy 本地演示前端，文件暂时保留，但当前 v2-only Docker Compose 不再启动 Streamlit 服务。
 - Vue3 + TypeScript：v2.0 正式前端方向，当前已支持 Dashboard 总览、比赛演示模式、工作流可视化、工作流回放、细粒度 Agent 事件时间线、历史记录、结果详情、模型默认选择、插件状态管理、报告查看、API 调用模式切换和 Java/MySQL 数据视图。
 - Vue Canvas + Pinia：Workflow Editor 当前使用 HTML5 Drag/Drop、Pointer Events、SVG 连线和 Pinia Store 管理节点、连接、选中状态、undo/redo、本地模板保存、Java/MySQL 模板保存和 API 实例化。
 - Python Agent Engine：长期保留，负责 LangGraph、多 Agent、模型调用、测试修复、质量评分、报告生成、`workflow_events` 生成、Agent 注册中心和 Prompt 模板管理，并通过 FastAPI 暴露 Agent Engine 接口。

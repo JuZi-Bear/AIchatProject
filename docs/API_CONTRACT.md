@@ -26,7 +26,6 @@ Docker Compose 模式下服务访问地址：
 Vue 前端: http://localhost:5174
 Java 平台服务: http://localhost:8088/api/health
 FastAPI Docs: http://localhost:8001/docs
-Streamlit v1: http://localhost:8501
 MySQL: localhost:3306
 ```
 

@@ -11,7 +11,7 @@
 - Java Spring Boot 平台服务层：通过 `backend-java/` 提供 Java Gateway、平台运行记录、配置和报告索引能力。
 - MySQL 数据持久化：保存 Java 平台层运行记录、报告索引、模型配置、插件配置和前端设置。
 - C++ Runner Sandbox：通过 `runner-cpp/` 提供可选安全执行器雏形。
-- Docker Compose 多服务部署：通过 `docker-compose.yml` 编排 Vue、Java、MySQL、FastAPI 和 Streamlit。
+- Docker Compose 多服务部署：当前 v2-only 分支通过 `docker-compose.yml` 编排 Vue、Java、MySQL 和 FastAPI；Streamlit 文件仍保留为本地 legacy 入口。
 
 ## 当前架构优势
 

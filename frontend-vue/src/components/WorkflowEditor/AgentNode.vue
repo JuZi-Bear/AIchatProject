@@ -22,18 +22,22 @@ const emit = defineEmits<{
 <template>
   <article
     class="agent-node"
-    :class="{ selected, disabled: !node.enabled }"
+    :class="{ selected, disabled: !node.enabled, branch: node.stage === 'branch' || node.agentKey.startsWith('branch_') }"
     :style="{ left: `${node.position.x}px`, top: `${node.position.y}px` }"
     @pointerdown.stop="emit('startDrag', node.nodeId, $event)"
     @click.stop="emit('select', node.nodeId)"
   >
     <div class="node-header">
-      <div class="node-order">{{ index + 1 }}</div>
+      <div class="node-order"><span>{{ index + 1 }}</span></div>
       <div class="node-title">
         <strong>{{ node.name }}</strong>
         <span>{{ node.agentKey }}</span>
       </div>
-      <el-tag :type="node.enabled ? 'success' : 'info'" effect="plain" size="small">
+      <el-tag
+        :type="node.stage === 'branch' || node.agentKey.startsWith('branch_') ? 'warning' : node.enabled ? 'success' : 'info'"
+        effect="plain"
+        size="small"
+      >
         {{ node.enabled ? "启用" : "禁用" }}
       </el-tag>
     </div>
@@ -91,6 +95,24 @@ const emit = defineEmits<{
   box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.16), 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
+.agent-node.branch {
+  border-color: #f59e0b;
+  background:
+    linear-gradient(135deg, rgba(251, 191, 36, 0.12), transparent 42%),
+    #ffffff;
+}
+
+.agent-node.branch .node-order {
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  transform: rotate(45deg);
+}
+
+.agent-node.branch .node-order span {
+  transform: rotate(-45deg);
+}
+
 .agent-node.disabled {
   background: #f8fafc;
   opacity: 0.72;
@@ -116,6 +138,10 @@ const emit = defineEmits<{
   background: #dbeafe;
   color: #1e40af;
   font-weight: 800;
+}
+
+.node-order span {
+  display: block;
 }
 
 .node-title {

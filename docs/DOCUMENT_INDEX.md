@@ -9,6 +9,7 @@
 | `DUAL_TRACK_ARCHITECTURE.md` | 主文档 | 双轨并行策略、边界和收敛方向 |
 | `PROJECT_DIRECTORY_GUIDE.md` | 主文档 | 项目目录树和目录归属 |
 | `V2_ARCHITECTURE_PLAN.md` | 主文档 | v2.0 平台化升级路线和阶段进展 |
+| `V2_ONLY_RUNTIME_SIMPLIFICATION.md` | 主文档 | v2-only 分支运行逻辑收敛、保留链路和 v1 去除候选 |
 | `FRAMEWORK_EXTENSION_PLAN.md` | 主文档 | 技术框架扩展总规划 |
 | `FRAMEWORK_EXTENSION_BOUNDARY.md` | 主文档 | 框架扩展边界 |
 | `FRAMEWORK_EXTENSION_ARCHITECTURE.md` | 主文档 | 未来框架扩展示意图 |
@@ -79,6 +80,7 @@
 | `CPP_RUNNER_SANDBOX.md` | 主文档 | C++ Runner Sandbox 说明 |
 | `PLUGIN_GUIDE.md` | 主文档 | 插件开发指南 |
 | `UI_SPEC.md` | 主文档 | UI 设计规格 |
+| `FIGMA_UI_WORKFLOW.md` | 主文档 | Figma-first 前端 UI 设计源和 Vue 同步流程 |
 
 ## 规划与路线图
 

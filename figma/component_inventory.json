@@ -1,0 +1,72 @@
+{
+  "name": "AI Multi-Agent Pipeline Component Inventory",
+  "version": "1.0.0",
+  "components": [
+    {
+      "name": "AppShell",
+      "vueSource": "frontend-vue/src/App.vue",
+      "figmaComponent": "Shell/AppShell",
+      "variants": ["Python Direct", "Java Gateway", "API Disconnected"]
+    },
+    {
+      "name": "SidebarNav",
+      "vueSource": "frontend-vue/src/App.vue",
+      "figmaComponent": "Navigation/SidebarNav",
+      "variants": ["Default", "Active", "Hover"]
+    },
+    {
+      "name": "SummaryCards",
+      "vueSource": "frontend-vue/src/components/SummaryCards.vue",
+      "figmaComponent": "Data/SummaryCards",
+      "variants": ["Success", "Failed", "Warning"]
+    },
+    {
+      "name": "WorkflowTimeline",
+      "vueSource": "frontend-vue/src/components/WorkflowTimeline.vue",
+      "figmaComponent": "Workflow/Timeline",
+      "variants": ["waiting", "running", "done", "failed", "repairing", "skipped"]
+    },
+    {
+      "name": "CodeAgentPanel",
+      "vueSource": "frontend-vue/src/components/WorkflowEditor/CodeAgentPanel.vue",
+      "figmaComponent": "CodeAgent/Panel",
+      "variants": ["Read File", "Write File", "List Files", "Blocked Path", "Audit Preview", "Diff Preview"]
+    },
+    {
+      "name": "WorkflowCanvas",
+      "vueSource": "frontend-vue/src/components/WorkflowEditor/WorkflowCanvas.vue",
+      "figmaComponent": "WorkflowEditor/Canvas",
+      "variants": ["Infinite Canvas", "Pan Zoom", "Empty", "CodeAgent Flow", "Template Loaded"]
+    },
+    {
+      "name": "WorkflowEditorFloatingPalette",
+      "vueSource": "frontend-vue/src/views/WorkflowEditor.vue",
+      "figmaComponent": "WorkflowEditor/FloatingPalette",
+      "variants": ["Expanded", "Collapsed", "Agent", "CodeAgent", "Branch"]
+    },
+    {
+      "name": "WorkflowEditorInspector",
+      "vueSource": "frontend-vue/src/views/WorkflowEditor.vue",
+      "figmaComponent": "WorkflowEditor/InspectorOverlay",
+      "variants": ["Hidden", "Agent Selected", "CodeAgent Selected"]
+    },
+    {
+      "name": "AgentNode",
+      "vueSource": "frontend-vue/src/components/WorkflowEditor/AgentNode.vue",
+      "figmaComponent": "WorkflowEditor/AgentNode",
+      "variants": ["Product", "Coder", "Tester", "Sentry", "CodeAgent", "Report", "Disabled", "Selected"]
+    },
+    {
+      "name": "ReplayEventCard",
+      "vueSource": "frontend-vue/src/components/ReplayEventCard.vue",
+      "figmaComponent": "Replay/EventCard",
+      "variants": ["Agent Started", "Agent Finished", "Agent Failed", "CodeAgent Blocked", "Report Generated"]
+    },
+    {
+      "name": "ReportPreview",
+      "vueSource": "frontend-vue/src/components/ReportPreview.vue",
+      "figmaComponent": "Reports/Preview",
+      "variants": ["Collapsed", "Expanded", "Empty"]
+    }
+  ]
+}

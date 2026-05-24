@@ -12,7 +12,7 @@
 | P3 | `docs/PROMPTS.md` 为空文档 | docs | 提示词归档 | 由用户确认：保留为提示词归档入口，或标记为待归档空文档 | 是 |
 | P3 | `tests/test_generated_code.py` 可能是生成测试文件 | shared-core | 测试文件、Git 跟踪策略 | 由用户确认是否继续跟踪；如不跟踪，只做 Git 层移出，不删除本地文件 | 是 |
 | P3 | C++ Runner 当前不是完整安全沙箱 | experimental | Runner 安全能力说明 | 保持默认 Python Runner，继续在文档中标注 C++ Runner 为实验能力 | 否 |
-| P3 | Docker Compose 依赖本地端口 `3306`、`8001`、`8088`、`5174`、`8501` | docker | 本地/现场启动 | 在 `TEST_RESULT_LOG.md` 中记录端口占用情况；必要时后续补充端口排查脚本 | 否 |
+| P3 | v2-only Docker Compose 依赖本地端口 `3306`、`8001`、`8088`、`5174` | docker | 本地/现场启动 | 在 `TEST_RESULT_LOG.md` 中记录端口占用情况；必要时后续补充端口排查脚本。`8501` 只属于本地 legacy Streamlit | 否 |
 
 ## 暂无测试失败项
 

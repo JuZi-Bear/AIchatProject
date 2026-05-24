@@ -1,0 +1,73 @@
+{
+  "name": "frontend-vue to Figma UI Map",
+  "version": "1.0.0",
+  "figmaFileUrl": "https://www.figma.com/design/6Zz9nZmWhUCRM5XK53vjv9/Untitled?node-id=0-1",
+  "apiMode": "python/java compatible",
+  "screens": [
+    {
+      "route": "/",
+      "vueFile": "frontend-vue/src/views/Dashboard.vue",
+      "figmaFrame": "Dashboard / Platform Overview",
+      "purpose": "平台总览、运行统计、最近运行、模型状态、插件状态、最近 CodeAgent 操作"
+    },
+    {
+      "route": "/runs/new",
+      "vueFile": "frontend-vue/src/views/RunConsole.vue",
+      "figmaFrame": "RunConsole / Execute Workflow",
+      "purpose": "需求输入、模型和插件选择、演示模式、CodeAgentPanel、实时事件"
+    },
+    {
+      "route": "/workflows/editor",
+      "vueFile": "frontend-vue/src/views/WorkflowEditor.vue",
+      "figmaFrame": "Workflow Editor / Drag CodeAgent",
+      "purpose": "Figma 风无限画布、左侧浮动 Agent Palette、右侧节点属性浮层、模板保存和任务生成"
+    },
+    {
+      "route": "/history",
+      "vueFile": "frontend-vue/src/views/RunHistory.vue",
+      "figmaFrame": "RunHistory / Detail and Events",
+      "purpose": "历史列表、详情复用组件、事件时间线、回放入口"
+    },
+    {
+      "route": "/replay/:platformRunId",
+      "vueFile": "frontend-vue/src/views/WorkflowReplay.vue",
+      "figmaFrame": "Replay / Workflow Playback",
+      "purpose": "事件回放、逐步播放、CodeAgent 节点高亮"
+    },
+    {
+      "route": "/reports",
+      "vueFile": "frontend-vue/src/views/Reports.vue",
+      "figmaFrame": "Reports / Markdown Center",
+      "purpose": "报告列表、Markdown 内容、复制报告"
+    },
+    {
+      "route": "/agents",
+      "vueFile": "frontend-vue/src/views/Agents.vue",
+      "figmaFrame": "Agents / Registry",
+      "purpose": "Agent 注册中心、阶段筛选、输入输出字段"
+    },
+    {
+      "route": "/workflows/templates",
+      "vueFile": "frontend-vue/src/views/WorkflowTemplates.vue",
+      "figmaFrame": "Workflow Templates / Versioned Templates",
+      "purpose": "模板中心、版本管理、详情预览、删除模板"
+    },
+    {
+      "route": "/models",
+      "vueFile": "frontend-vue/src/views/Models.vue",
+      "figmaFrame": "Models / Provider Config",
+      "purpose": "模型列表、默认模型、API Key 提示、数据来源标识"
+    },
+    {
+      "route": "/plugins",
+      "vueFile": "frontend-vue/src/views/Plugins.vue",
+      "figmaFrame": "Plugins / Plugin Config",
+      "purpose": "插件卡片、启用开关、前端配置保存"
+    }
+  ],
+  "sharedShell": {
+    "vueFile": "frontend-vue/src/App.vue",
+    "figmaFrame": "App Shell / Sidebar + Topbar",
+    "notes": "所有页面默认继承左侧导航、顶部栏、主内容区。"
+  }
+}

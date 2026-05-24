@@ -6,7 +6,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-aichat_platform}
     ports:
-      - "3306:3306"
+      - "${MYSQL_HOST_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -67,32 +67,6 @@ services:
     depends_on:
       backend-java:
         condition: service_started
-      ai-agent-api:
-        condition: service_started
-    restart: unless-stopped
-
-  streamlit-web:
-    build: .
-    command: python -m streamlit run webui.py --server.address=0.0.0.0 --server.port=8501
-    env_file:
-      - .env
-    environment:
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      QWEN_API_KEY: ${QWEN_API_KEY:-}
-      GLM_API_KEY: ${GLM_API_KEY:-}
-      DEFAULT_MODEL_PROVIDER: ${DEFAULT_MODEL_PROVIDER:-deepseek}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
-      OFFLINE_MODE: ${OFFLINE_MODE:-false}
-    ports:
-      - "8501:8501"
-    volumes:
-      - ./reports:/app/reports
-      - ./runs:/app/runs
-      - ./output:/app/output
-      - ./config:/app/config
-      - ./runner-cpp:/app/runner-cpp
-    depends_on:
       ai-agent-api:
         condition: service_started
     restart: unless-stopped

@@ -706,7 +706,6 @@ Vue 前端: http://localhost:5174
 FastAPI Docs: http://localhost:8001/docs
 Java Gateway: http://localhost:8088/api/health
 MySQL: localhost:3306
-Streamlit v1: http://localhost:8501
 ```
 
 ### 6.3 停止容器
@@ -719,11 +718,11 @@ docker compose down
 
 - 镜像基于 `python:3.11-slim`。
 - 依赖来自 `requirements.txt`。
-- 根目录 `Dockerfile` 默认启动 Streamlit Web UI，也可以通过 Compose command 覆盖为 FastAPI API 服务。
+- 根目录 `Dockerfile` 当前由 Compose command 启动 FastAPI；legacy Streamlit 仍可本地单独启动，但不再作为 v2-only Compose 服务。
 - `frontend-vue/Dockerfile` 使用 `node:20-alpine` 构建 Vue，并使用 `nginx:alpine` 运行生产静态资源。
 - `.env` 会通过 `docker-compose.yml` 传入容器。
 - Compose 会读取 `DEEPSEEK_API_KEY`、`QWEN_API_KEY`、`GLM_API_KEY` 和 `DEFAULT_MODEL_PROVIDER`。
-- Compose 服务包括 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue` 和 `streamlit-web`。
+- Compose 服务包括 `mysql`、`ai-agent-api`、`backend-java` 和 `frontend-vue`。
 - `mysql_data` volume 会保存 Java 平台层数据库数据。
 - `reports/`、`runs/`、`output/`、`config/` 会挂载到 Python 容器中，方便保留报告、历史、生成产物和配置。
 - `runner-cpp/` 会挂载到 Python 容器中，作为可选 C++ Runner Sandbox 增强模块。

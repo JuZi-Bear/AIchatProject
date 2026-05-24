@@ -2,27 +2,44 @@
 import {
   Connection,
   DataAnalysis,
+  Expand,
   Files,
+  Fold,
   House,
   List,
   Operation,
   Share,
   SetUp,
 } from "@element-plus/icons-vue";
+import { computed, ref } from "vue";
+
+const sidebarCollapsed = ref(localStorage.getItem("ai-agent-pipeline.sidebar-collapsed") === "true");
+const sidebarWidth = computed(() => (sidebarCollapsed.value ? "72px" : "248px"));
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  localStorage.setItem("ai-agent-pipeline.sidebar-collapsed", String(sidebarCollapsed.value));
+}
 </script>
 
 <template>
   <el-container class="app-shell">
-    <el-aside class="sidebar" width="248px">
+    <el-aside class="sidebar" :class="{ collapsed: sidebarCollapsed }" :width="sidebarWidth">
       <div class="brand">
         <div class="brand-mark">AI</div>
-        <div>
+        <div class="brand-copy">
           <div class="brand-title">Agent Pipeline</div>
           <div class="brand-subtitle">Vue3 Console</div>
         </div>
       </div>
 
-      <el-menu router class="nav-menu" :default-active="$route.path">
+      <el-menu
+        router
+        class="nav-menu"
+        :collapse="sidebarCollapsed"
+        :collapse-transition="false"
+        :default-active="$route.path"
+      >
         <el-menu-item index="/">
           <el-icon><House /></el-icon>
           <span>Dashboard</span>
@@ -64,9 +81,19 @@ import {
 
     <el-container>
       <el-header class="topbar">
-        <div>
-          <div class="topbar-title">Python Agent Engine Control Plane</div>
-          <div class="topbar-subtitle">FastAPI + Vue3 + TypeScript preview</div>
+        <div class="topbar-left">
+          <el-tooltip :content="sidebarCollapsed ? '显示侧边栏' : '隐藏侧边栏'" placement="bottom">
+            <el-button
+              class="sidebar-toggle"
+              :icon="sidebarCollapsed ? Expand : Fold"
+              circle
+              @click="toggleSidebar"
+            />
+          </el-tooltip>
+          <div>
+            <div class="topbar-title">Python Agent Engine Control Plane</div>
+            <div class="topbar-subtitle">FastAPI + Vue3 + TypeScript preview</div>
+          </div>
         </div>
         <el-tag type="success" effect="plain">
           <el-icon><DataAnalysis /></el-icon>

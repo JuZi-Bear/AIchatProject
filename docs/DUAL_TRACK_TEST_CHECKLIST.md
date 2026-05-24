@@ -96,7 +96,7 @@ cmake --build build --config Release
 - FastAPI Docs 可访问：`http://localhost:8001/docs`。
 - Java Health 可访问：`http://localhost:8088/api/health`。
 - Vue Dashboard 可访问：开发模式通常为 `http://localhost:5173`，Docker 模式为 `http://localhost:5174`。
-- Docker 模式下 Streamlit 可访问：`http://localhost:8501`。
+- v2-only Docker 模式不再启动 Streamlit；如需验证 v1 legacy，请本地单独运行 `python -m streamlit run webui.py`。
 - Java Gateway 模式下 Dashboard 能显示平台统计或清晰的连接失败提示。
 - Reports / Runs / Models / Plugins 页面不白屏。
 - C++ Runner 不存在时能自动回退 Python Runner。
