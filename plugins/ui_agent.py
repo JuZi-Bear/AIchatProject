@@ -58,5 +58,5 @@ class UIAgent(BasePluginAgent):
 
 ### 可选优化
 
-如果后续要做成完整 Web 应用，可以优先使用 Streamlit 实现，保持页面结构简单，方便现场讲解。
+如果后续要做成完整 Web 应用，可以优先输出简洁的 Vue 页面结构或 HTML 原型，保持页面结构清晰，方便现场讲解。
 """

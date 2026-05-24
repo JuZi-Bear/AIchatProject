@@ -1,15 +1,21 @@
-# 系统架构
+# v2-only Architecture
 
-> 历史文档：本文是早期 v1.0 架构简图。当前双轨架构主文档请优先阅读 `docs/DUAL_TRACK_ARCHITECTURE.md`，目录结构请阅读 `docs/PROJECT_DIRECTORY_GUIDE.md`。
+当前项目主链路：
 
-用户需求
-↓
-Product Agent
-↓
-Coder Agent
-↓
-Tester Agent
-↓
-Sentry Agent
-↓
-自动修复
+```text
+Vue3 + TypeScript
+  -> Java Spring Boot Gateway
+  -> FastAPI Python Agent Engine
+  -> LangGraph / Agents / CodeAgent
+  -> MySQL / reports / runs / output
+```
+
+## 职责
+
+- Vue：Dashboard、RunConsole、Workflow Editor、Replay。
+- Java：平台 API、配置、RunEvent、SSE、MySQL 持久化。
+- Python：Agent Engine、工作流、模型、插件、报告。
+- MySQL：平台记录、事件、模板和报告索引。
+- Docker Compose：统一启动 v2 服务。
+
+详细说明见 `docs/V2_ARCHITECTURE_PLAN.md` 与 `docs/FRAMEWORK_EXTENSION_ARCHITECTURE.md`。

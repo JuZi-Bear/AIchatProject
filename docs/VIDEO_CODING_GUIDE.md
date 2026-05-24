@@ -1,48 +1,50 @@
-# Video Coding 录制指南
+# v2-only Video Coding 录制指南
 
-本文用于准备比赛 video coding 或项目讲解录屏。目标是让评委看到项目从稳定演示到平台化升级的完整工程思路。
+本文用于准备比赛 video coding 或项目讲解录屏。当前版本只展示 v2 平台主链路。
 
 ## 推荐录制顺序
 
-1. 项目总览：打开 `README.md` 和 `docs/DUAL_TRACK_ARCHITECTURE.md`。
-2. v1 Streamlit 演示：启动 `webui.py`，展示自然语言需求到报告生成。
-3. FastAPI：打开 `api_server.py` 和 `/docs`，展示 Python Agent Engine API 化。
-4. Vue Dashboard：打开 `frontend-vue/`，展示平台总览、运行统计、模型和插件状态。
-5. Java Gateway：打开 `backend-java/`，展示代理接口、平台记录和 settings。
-6. MySQL：展示 Java 持久化运行记录、报告索引和配置表的设计说明。
-7. C++ Runner：打开 `runner-cpp/` 和 `docs/CPP_RUNNER_SANDBOX.md`，说明安全执行器雏形。
-8. Docker Compose：打开 `docker-compose.yml` 和 `docs/DOCKER_COMPOSE_GUIDE.md`，展示多服务部署。
+1. 项目总览：打开 `README.md`、`docs/V2_ARCHITECTURE_PLAN.md`。
+2. Docker Compose：展示 `mysql`、`ai-agent-api`、`backend-java`、`frontend-vue` 四个服务。
+3. Vue Dashboard：展示运行统计、最近事件、模型、插件和报告入口。
+4. Workflow Editor：展示 Figma 风无限画布、拖入节点、分支节点和 CodeAgent。
+5. RunConsole：执行 CodeAgent 演示，展示 SSE 实时事件。
+6. Audit / Diff：展示审计日志、阻断路径和文件前后对比。
+7. Replay：回放完整事件流。
+8. Java + MySQL：展示平台记录、事件、模板和报告索引。
+9. FastAPI：展示 Python Agent Engine 的 `/docs` 和 Agent/Workflow API。
+10. 总结：展示成果、风险兜底和下一步规划。
 
-## 每部分建议讲解内容
+## 每部分讲解重点
 
 | 部分 | 讲解重点 |
 | --- | --- |
-| 项目总览 | 多 Agent 自主开发流水线，双轨并行策略 |
-| Streamlit v1 | 稳定演示、快速兜底、比赛现场可靠 |
-| FastAPI | Python Agent Engine API 化，为 Vue/Java/C++ 接入做准备 |
-| Vue Dashboard | 平台化总览、历史、报告、模型和插件配置 |
-| Java Gateway | 平台服务层、任务记录、配置管理、MySQL 持久化 |
-| MySQL | 数据从临时文件走向平台记录和统计 |
-| C++ Runner | 安全执行增强点，不破坏 Python Runner |
-| Docker Compose | 一次启动多服务，展示工程化部署能力 |
+| 项目总览 | AI 多 Agent 工作流平台，v2-only 平台演示链路 |
+| Docker Compose | 一次启动 Vue、Java、FastAPI、MySQL |
+| Vue Dashboard | 平台总览、最近事件、报告和快捷入口 |
+| Workflow Editor | 可视化编排、节点属性浮层、分支节点 |
+| CodeAgent | 受控文件操作、白名单、阻断路径、审计日志 |
+| SSE / RunEvent | Java 平台事件记录与实时推送 |
+| Replay | 根据 MySQL 事件记录回放执行过程 |
+| Java + MySQL | 平台记录、配置、模板、报告索引持久化 |
+| FastAPI | Python Agent Engine API 化，屏蔽 LangGraph 内部结构 |
 
 ## 建议打开的文件
 
 - 总览：`README.md`、`docs/DOCUMENT_INDEX.md`
-- 双轨：`docs/DUAL_TRACK_ARCHITECTURE.md`
-- v1：`webui.py`、`graph_demo.py`
-- API：`api_server.py`、`services/run_service.py`
-- Vue：`frontend-vue/src/views/Dashboard.vue`、`frontend-vue/src/api/client.ts`
-- Java：`backend-java/src/main/java/com/aichat/platform/`
+- 架构：`docs/V2_ARCHITECTURE_PLAN.md`、`docs/FRAMEWORK_EXTENSION_ARCHITECTURE.md`
+- Vue：`frontend-vue/src/views/WorkflowEditor.vue`
+- Java：`backend-java/src/main/java/com/aichat/platform/service/RunEventService.java`
+- Python：`api_server.py`、`services/run_service.py`
+- CodeAgent：`utils/code_agent_tools.py`、`docs/CODE_AGENT_NODE_GUIDE.md`
 - Docker：`docker-compose.yml`
-- C++ Runner：`runner-cpp/src/SandboxRunner.cpp`、`utils/cpp_runner_adapter.py`
 
 ## 适合现场修改的文件
 
 - `docs/` 下的讲解文档。
 - `frontend-vue/src/views/` 中轻量展示文案。
 - `frontend-vue/src/components/` 中非核心展示组件。
-- `config/settings.yaml` 中演示参数，例如 `runner_mode`，修改前说明风险。
+- `config/settings.yaml` 中演示参数，例如 `runner_mode`。
 
 ## 不建议现场修改的文件
 
@@ -57,59 +59,16 @@
 
 ## 推荐演示命令
 
-v1 Streamlit：
-
 ```powershell
-python -m streamlit run webui.py
+docker compose up -d --build
+.\scripts\smoke_codeagent.ps1 -ApiMode java -CheckBlockedPath
+.\scripts\smoke_workflow_template.ps1
+.\scripts\final_v2_acceptance.ps1
 ```
-
-FastAPI：
-
-```powershell
-python -m uvicorn api_server:app --reload --host 127.0.0.1 --port 8001
-```
-
-Vue 开发模式：
-
-```powershell
-cd frontend-vue
-npm run dev
-```
-
-Java 本地模式：
-
-```powershell
-cd backend-java
-mvn spring-boot:run
-```
-
-Docker Compose：
-
-```powershell
-docker compose up --build
-```
-
-C++ Runner 编译：
-
-```powershell
-cd runner-cpp
-cmake -S . -B build
-cmake --build build --config Release
-```
-
-## 推荐展示流程
-
-1. Streamlit v1：展示稳定闭环。
-2. FastAPI：展示 `/health`、`/runs`、`/reports`。
-3. Vue Dashboard：展示平台首页、最近运行、模型和插件状态。
-4. Java Gateway：展示 `/api/health` 和平台记录接口。
-5. MySQL：讲解运行记录和报告索引持久化。
-6. C++ Runner：展示危险关键词扫描和 fallback 设计。
-7. Docker Compose：展示多服务服务名和端口。
 
 ## 录制注意事项
 
-- 比赛现场优先用 v1 Streamlit 作为稳定入口。
-- v2 平台功能用于展示工程能力，不要承诺完全替代 v1。
-- 如果 API Key 不可用，使用 offline/demo 模式讲清楚兜底策略。
-- 如果 Docker 端口冲突，切回本地启动模式。
+- 先确认 Docker 服务和本地端口正常。
+- API Key 不稳定时启用 offline/demo 模式。
+- 现场重点展示“拖拽 -> 执行 -> SSE -> 审计 -> Replay”的闭环。
+- 不在录制中改核心工作流，避免现场引入不可控风险。

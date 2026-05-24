@@ -4,7 +4,7 @@
 
 ## 发布定位
 
-`v2-demo-rc1` 是 v2.0 平台化演示候选版本。它不替代 v1.0 Streamlit 稳定演示轨，而是用于展示 Vue + Java + MySQL + FastAPI + CodeAgent + Workflow Replay 的平台化升级能力。
+`v2-demo-rc1` 是 v2.0 平台化演示候选版本，用于展示 Vue + Java + MySQL + FastAPI + CodeAgent + Workflow Replay 的平台化能力。当前主分支已收敛为 v2-only。
 
 ## 当前可演示能力
 
@@ -79,11 +79,7 @@ cd D:\AIchatProject
 
 ## 现场兜底
 
-如果 v2 链路不可用，切回 v1.0 Streamlit：
-
-```powershell
-python -m streamlit run webui.py
-```
+如果 v2 链路不可用，优先重新启动本地联调脚本或 Docker Compose。
 
 如果 Vue 页面不可访问：
 
@@ -110,4 +106,4 @@ python -m streamlit run webui.py
 - 不现场改 Java JPA 实体字段。
 - 不现场改 Vue 路由或构建配置。
 - 不现场把 Workflow 模板接入真实 LangGraph 动态编排。
-- 不现场删除 Streamlit v1 演示轨。
+- 不现场修改核心 LangGraph 主流程。

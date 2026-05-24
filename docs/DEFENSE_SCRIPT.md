@@ -1,56 +1,47 @@
-# 比赛答辩讲稿
+# v2-only 比赛答辩讲稿
 
 ## 项目一句话介绍
 
-AI Multi-Agent Pipeline 是一个基于多智能体协作的自主开发流水线，可以从自然语言需求出发，自动完成需求拆解、代码生成、测试验证、错误分析、自动修复、质量评分和报告生成。
+这是一个 AI 多 Agent 工作流平台，可以从自然语言需求出发，完成 Agent 协作、受控文件操作、实时事件推送、审计记录和工作流回放。
 
 ## 项目解决的问题
 
-传统 AI 代码生成往往只停留在“生成一段代码”，缺少测试验证、错误分析、自动修复和结果沉淀。本项目把一次性生成升级为闭环流水线，让 AI 不只写代码，还能检查、修复、评分并输出报告。
+传统 AI 代码生成演示通常只能展示“输入和输出”，很难解释中间发生了什么。本项目把执行过程事件化、持久化和可视化，让评委能看到每一步 Agent 如何参与、CodeAgent 如何受控修改文件、失败和阻断如何被记录。
 
 ## 为什么使用多 Agent
 
-软件开发本身就是多角色协作。我们把任务拆成 Product Agent、Coder Agent、Tester Agent、Sentry Agent 和插件 Agent，让每个 Agent 承担清晰职责，减少单模型一次性完成所有工作的混乱。
+不同 Agent 负责不同职责：Product 负责需求拆解，Coder 负责代码，Tester 负责测试，Sentry 负责错误分析，Quality 负责评分，Report 负责总结。职责拆分后，流程更容易观察、调试和扩展。
 
 ## 为什么使用 LangGraph
 
-LangGraph 适合表达有状态、多节点、可回路的工作流。本项目需要“生成代码 -> 运行测试 -> 出错分析 -> 自动修复 -> 再测试”的闭环，因此图结构比简单链式调用更清晰，也更方便扩展节点。
+LangGraph 适合表达有状态、多节点、可重试的 Agent 工作流。它让工作流从一次性函数调用变成可管理的执行图，为后续模板、回放和可视化编排打基础。
 
-## 为什么保留 Streamlit
+## 为什么使用 Vue + Java + MySQL
 
-Streamlit 是 v1.0 比赛演示轨的稳定入口。它启动快、依赖少、可以直观展示工作流和报告。即使 v2 平台服务出现端口、Docker 或数据库问题，Streamlit 仍可作为现场兜底。
+Vue 负责可视化工作台和编辑器，Java 负责平台 API、事件记录、SSE 推送和配置管理，MySQL 负责持久化任务、事件、模板和报告索引。Python 专注 Agent Engine，平台能力不直接侵入 LangGraph 核心。
 
-## 为什么新增 Vue + Java
+## 为什么设计 CodeAgent
 
-Vue3 + TypeScript 用于构建更正式的平台前端，适合 Dashboard、历史记录、报告查看、模型和插件配置。Java Spring Boot 作为平台服务层，负责 API Gateway、任务记录、配置管理和后续权限、团队协作等平台能力。
-
-## 为什么使用 MySQL
-
-Python 文件系统适合快速演示，但平台化需要可查询、可统计、可管理的数据。MySQL 用来保存 Java 平台层的运行记录、报告索引、配置和统计基础数据，为后续多用户和团队协作打基础。
-
-## 为什么设计 C++ Runner
-
-代码执行是 AI 编程系统里的高风险环节。当前 Python Runner 能完成演示，但安全隔离有限。C++ Runner Sandbox 是后续增强执行安全性的技术预研，用于危险关键词扫描、可控执行和未来进程隔离。
+CodeAgent 是简化版代码执行模块，只做受控的 `read_file`、`write_file`、`list_files`。它有路径白名单、阻断路径、读取长度限制和 JSONL 审计日志，适合展示“可以真实改文件，但有安全边界”。
 
 ## 自动修复流程怎么工作
 
-系统先根据需求生成代码和测试，然后 Runner 执行验证。如果失败，Sentry Agent 会分析错误摘要，Coder Agent 根据错误信息进行修复，再次运行测试。这个过程受最大重试次数控制，最终形成质量评分和报告。
+运行失败后，Runner 和 Tester 的输出会进入 Sentry 分析，再由 Coder 根据错误摘要修复。修复过程会写入 workflow events，Java 保存为 RunEvent，Vue 可以实时展示并回放。
 
 ## 技术栈分工
 
-- Python + LangGraph：Agent 核心工作流。
-- Streamlit：v1 稳定演示。
-- FastAPI：Python Agent Engine API 化。
-- Vue3 + TypeScript：v2 平台前端。
-- Java Spring Boot：平台服务层和 API Gateway。
-- MySQL：平台数据持久化。
-- Docker Compose：多服务部署。
-- C++ Runner：安全执行器增强方向。
+- Vue3 + TypeScript：Dashboard、RunConsole、Workflow Editor、Replay。
+- Java Spring Boot：Gateway、RunEvent、SSE、MySQL 持久化。
+- Python FastAPI：Agent Engine API。
+- LangGraph：多 Agent 工作流。
+- MySQL：任务、事件、模板、报告索引。
+- C++ Runner：可选安全执行器雏形。
+- Docker Compose：v2 多服务部署。
 
-## 双轨架构优势
+## 当前演示闭环
 
-双轨让项目同时具备比赛稳定性和工程扩展性。v1 负责稳定演示，v2 负责平台化演进。这样既不会因为重构破坏现场演示，也能展示项目从原型到平台的升级路线。
+拖拽工作流节点 -> 执行 CodeAgent -> 文件生成或阻断 -> JSONL 审计 -> Java RunEvent -> SSE 实时展示 -> Replay 回放。
 
 ## 后续发展方向
 
-后续可以继续增强 Java 平台层，引入用户系统、权限控制、任务队列和团队协作；增强 C++ Runner 的隔离能力；让 Vue 前端覆盖完整演示体验；最终逐步把 v2 平台作为主入口，v1 Streamlit 保留为轻量演示模式。
+后续可以增强 Agent 注册中心、模板版本管理、任务队列、权限、团队协作和更强的沙箱执行。但当前版本优先保证单人比赛演示闭环稳定。

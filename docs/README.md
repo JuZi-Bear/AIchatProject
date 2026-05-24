@@ -7,7 +7,7 @@
 ## 核心文件
 
 - `DOCUMENT_INDEX.md`：文档总导航。
-- `DUAL_TRACK_ARCHITECTURE.md`：双轨并行架构说明。
+- `V2_ARCHITECTURE_PLAN.md`：v2-only 架构说明。
 - `PROJECT_DIRECTORY_GUIDE.md`：项目目录指南。
 - `API_CONTRACT.md`：API 契约。
 - `DOCKER_COMPOSE_GUIDE.md`：多服务 Docker Compose 指南。
@@ -19,7 +19,7 @@
 - `REDUNDANCY_REVIEW.md`：文档冗余评审。
 - `MAINTENANCE_GUIDE.md`：维护指南。
 - `SAFE_CHANGE_CHECKLIST.md`：安全变更检查清单。
-- `DUAL_TRACK_TEST_CHECKLIST.md`：双轨启动测试清单。
+- `FINAL_CHECKLIST.md`：v2-only 启动和验收清单。
 - `STARTUP_ORDER.md`：推荐启动顺序。
 - `TEST_RESULT_LOG.md`：测试结果记录。
 - `FRAMEWORK_EXTENSION_PLAN.md`：技术框架扩展总规划。
@@ -31,7 +31,7 @@
 
 ## 不能随便修改
 
-- 不要删除历史文档；过时内容先在 `DOCUMENT_INDEX.md` 标记。
+- 不要让历史说明重新成为当前启动入口；过时内容先在 `DOCUMENT_INDEX.md` 标记或合并。
 - 不要让 README 和多个 docs 同时维护冲突的启动命令。
 - 不要在文档中写真实 API Key。
 - 不要把未完成能力描述成已完全生产可用。

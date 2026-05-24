@@ -1,6 +1,6 @@
 # CodeAgent 节点集成说明
 
-本文记录简化版 CodeAgent 节点在当前双轨架构中的调用链路。CodeAgent 不是完整 Codex，只执行用户指定路径的 `read_file`、`write_file`、`list_files` 三类受控文件操作。
+本文记录简化版 CodeAgent 节点在当前 v2-only 架构中的调用链路。CodeAgent 不是完整 Codex，只执行用户指定路径的 `read_file`、`write_file`、`list_files` 三类受控文件操作。
 
 ## 单人演示闭环
 

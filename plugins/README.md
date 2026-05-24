@@ -2,7 +2,7 @@
 
 ## 目录作用
 
-`plugins/` 是共享插件系统目录，服务于 v1.0 Streamlit 演示和 v2.0 平台化展示。当前包含文档、安全、重构和 UI 等插件 Agent。
+`plugins/` 是共享插件系统目录，服务于当前 v2 Python Agent Engine。当前包含文档、安全、重构和 UI 等插件 Agent。
 
 ## 核心文件
 

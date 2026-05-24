@@ -1,117 +1,21 @@
-# 答辩问答准备
+# v2-only Defense Q&A
 
-## 1. 你们项目解决的核心问题是什么？
+## 为什么拆成 Vue、Java、Python、MySQL？
 
-答：项目把“AI 生成代码”升级为“AI 自动开发流水线”。系统不仅生成代码，还会拆解需求、生成测试、运行代码、分析错误、自动修复、执行插件、评分并生成报告。
+Python 适合承载 Agent Engine 和 LangGraph，Java 适合平台记录、配置、SSE 和后续企业服务，Vue 适合可视化工作台，MySQL 负责持久化。分层后，AI 工作流和平台能力不会互相绑死。
 
-## 2. 为什么使用多 Agent？
+## 为什么要做 RunEvent 和 Replay？
 
-答：单个模型一次完成所有任务容易不稳定，也难解释。多 Agent 把任务拆成需求分析、代码生成、测试、错误分析、质量评分等角色，每个 Agent 职责明确，流程更可控。
+AI 工作流如果只展示最终输出，很难说明中间过程。RunEvent 把关键节点事件保存下来，Replay 让评委看到任务从创建、执行、文件操作、安全阻断到报告生成的完整轨迹。
 
-## 3. 为什么使用 LangGraph？
+## CodeAgent 如何保证安全？
 
-答：LangGraph 适合表达状态机和条件分支。我们的流程包含人工审批、运行成功/失败判断、最多修复 N 次、插件执行和报告生成，用 LangGraph 比普通脚本更清晰。
+它不是完整自动编码助手，只支持受控的 `read_file`、`write_file`、`list_files`。路径白名单、阻断路径、读取长度限制和 JSONL 审计日志共同构成安全边界。
 
-## 4. 和普通代码生成工具有什么区别？
+## 为什么保留 Python Direct？
 
-答：普通工具通常只生成代码。本项目会自动运行代码、生成 pytest 测试、根据失败日志修复、记录历史、生成报告，并能通过 Web UI 展示完整过程。
+Python Direct 是开发调试模式，可以快速定位 FastAPI Agent Engine 问题。比赛演示默认使用 Java Gateway。
 
-## 5. 如何保证生成代码正确？
+## 为什么不马上做用户和权限？
 
-答：最终成功不只看代码能不能启动，还要求 Runner 成功且 pytest 测试通过。Tester Agent 会根据需求生成正常输入、边界情况和异常输入测试，coverage 也会参与质量评分。
-
-## 6. 如何处理代码运行安全问题？
-
-答：第一，Runner 执行前会拦截 `os.remove`、`shutil.rmtree`、`subprocess`、`eval`、`exec`。第二，执行前有人工审批节点。第三，Security Agent 会在插件阶段再做安全检查。v2.0 还新增了 C++ Runner Sandbox 最小版本，后续可以把执行隔离、资源限制和审计放到独立 Runner 层。
-
-## 7. 自动修复的依据是什么？
-
-答：自动修复依据包括用户需求、当前代码、Runner stderr、pytest stdout、pytest stderr、测试代码和 Sentry Agent 分析结果。Coder Agent 根据这些信息修复业务代码。
-
-## 8. 为什么限制最大修复次数？
-
-答：为了避免无限循环。默认最多修复 3 次，如果仍失败就停止并输出最终错误和报告，方便人工接管。
-
-## 9. Tester Agent 是静态检查还是运行测试？
-
-答：现在 Tester Agent 会生成 pytest 测试代码并运行测试。早期静态检查能力保留兼容，但 LangGraph 主流程使用 pytest + coverage。
-
-## 10. 如果 pytest 测试本身生成错了怎么办？
-
-答：Sentry Agent 会同时分析测试代码和测试日志，判断是业务代码问题、测试用例问题、边界条件问题还是环境问题。当前策略要求 Coder Agent 优先修复业务代码，不通过修改测试规避失败。
-
-## 11. 插件系统有什么作用？
-
-答：插件系统让主流程之外的 AI 能力可配置扩展。比如 Doc Agent 生成文档，Security Agent 做安全检查，Refactor Agent 给出重构建议，UI Agent 生成界面建议。未来可扩展部署、数据库、架构等 Agent。
-
-## 12. 为什么支持多模型？
-
-答：比赛和真实场景中不同模型效果不同。支持 DeepSeek、Qwen、GLM 可以展示国产大模型生态，也可以横向比较同一需求下不同模型的成功率、修复次数、覆盖率和质量评分。
-
-## 13. 如果 API 失败怎么办？
-
-答：系统支持离线模式。设置 `OFFLINE_MODE=true` 或模型调用失败时，会使用 `offline_demo.py` 中的预置响应，保证比赛现场可以继续演示。
-
-## 14. 为什么要用 Docker？
-
-答：Docker 可以固定 Python 版本和依赖，减少新设备部署时的环境差异。项目提供 Dockerfile 和 docker-compose.yml，一条命令即可启动 Web UI。
-
-## 15. Human-in-the-loop 的价值是什么？
-
-答：AI 生成代码存在不确定性，人工审批可以在运行前给用户最后控制权。未勾选审批时系统不会执行代码，提升安全性和可控性。
-
-## 16. 质量评分怎么计算？
-
-答：总分 100 分。pytest 通过 30 分，程序运行成功 20 分，覆盖率最高 20 分，安全检查通过 15 分，自动修复次数最高 15 分。
-
-## 17. Web UI 为什么适合比赛演示？
-
-答：Web UI 可以直观看到 Agent 工作流、修复次数、pytest 结果、质量评分、插件结果和报告。演示模式会隐藏冗长日志，只展示评委最容易理解的关键信息。
-
-## 18. 运行历史有什么用？
-
-答：每次运行都会保存 `runs/{run_id}.json`，包含完整 state。这样可以回看需求、代码、测试、错误、修复过程、插件结果和报告路径，便于复盘和答辩。
-
-## 19. 报告生成有什么价值？
-
-答：报告把本次运行的需求、模型、Agent 输出、测试结果、覆盖率、质量评分、插件结果和错误摘要固化下来，可以作为比赛提交材料和赛后复盘依据。
-
-## 20. 项目创新点是什么？
-
-答：核心创新是把国产大模型、多 Agent、LangGraph 状态机、pytest 测试驱动修复、插件化 AI 模块、多模型对比、质量评分、人工审批和 Web UI 演示整合成一个完整闭环。
-
-## 21. 项目目前的边界是什么？
-
-答：当前主要面向单文件 Python 示例，适合比赛演示和原型验证。复杂多文件项目、真实生产沙箱和完整部署流水线还需要进一步扩展。
-
-## 22. 项目后续如何扩展？
-
-答：可以增加 Architect Agent、Database Agent、Deploy Agent 和 Frontend Agent，支持多文件工程、真实沙箱、数据库连接、Figma 到前端代码和自动部署。
-
-## 23. 为什么报告里要记录模型信息？
-
-答：记录模型服务商、模型名和 base_url 后，可以追踪每次结果来自哪个模型，方便复盘和多模型效果比较。
-
-## 24. 如何证明系统不是简单 prompt 拼接？
-
-答：系统有明确状态流转、pytest 执行、coverage 统计、代码运行、错误反馈、自动修复、插件执行、质量评分和历史报告。它是一个可执行的工程流程，而不是单次提示词输出。
-
-## 25. 为什么 v1.0 仍保留 Streamlit，而 v2.0 才引入 Vue / Java / C++？
-
-答：v1.0 的目标是比赛稳定演示。Streamlit 启动快、部署简单、现场风险低；Python 也最适合直接承载 LangGraph 和模型调用。v2.0 已逐步新增 Vue、Java 和 C++ 雏形，但它们通过 API 和配置可选接入，不破坏 v1.0 演示链路。
-
-## 26. 后续如何升级为多语言平台？
-
-答：升级路线是先用 FastAPI 包装 Python Agent Engine，再用 Vue3 + TypeScript 替换 Streamlit 前端，随后引入 Java Spring Boot 做平台服务层，最后使用 C++ Runner Sandbox 增强代码运行隔离。各层通过 `docs/API_CONTRACT.md` 中的接口契约连接。
-
-## 27. C++ Runner Sandbox 现在完成到什么程度？
-
-答：当前是最小可运行版本，位于 `runner-cpp/`。它可以读取任务 JSON、检查代码文件、扫描危险关键词、调用 Python 执行目标文件并输出 JSON 结果。默认仍使用 Python Runner，只有 `runner_mode=cpp` 时才尝试调用 C++ Runner；如果未编译，会自动回退并显示 warning。
-
-## 28. 当前架构是否支持前后端分离？
-
-答：支持。我们已经抽离了 `services/run_service.py` 作为 Application Service 层，并统一输出 `state`、`run_summary` 和 `ui_view_model`。未来只需要把 run_service 包装成 HTTP API，Vue 或 Java 就可以复用同样的数据结构。
-
-## 29. ui_view_model 和 run_service 的作用是什么？
-
-答：`run_service` 负责统一创建运行、读取历史、查询模型、插件和报告，是未来 API 层的服务边界。`ui_view_model` 负责把复杂 state 转成稳定的前端展示结构，避免 Web UI 或未来 Vue 前端直接解析 LangGraph 原始状态。
+当前重点是单人比赛演示闭环。用户、权限、团队协作会显著增加复杂度，应在 v2 主链路稳定后再做。

@@ -1,6 +1,6 @@
 # C++ Runner Sandbox
 
-v2.0 第十五步新增 `runner-cpp/`，作为 C++ 安全执行器的最小可运行版本。它不会替换现有 Python Runner，默认配置仍然是 `runner_mode: python`，因此 v1.0 Streamlit、FastAPI、Java、Vue 和 Docker 现有链路保持兼容。
+`runner-cpp/` 是 C++ 安全执行器的最小可运行版本。它不会替换现有 Python Runner，默认配置仍然是 `runner_mode: python`，因此 FastAPI、Java、Vue 和 Docker v2 链路保持兼容。
 
 ## 为什么引入 C++ Runner
 

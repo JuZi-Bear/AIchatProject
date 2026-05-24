@@ -63,7 +63,7 @@ API 模式映射：
 | `python` | Python Direct | `VITE_PYTHON_API_BASE_URL` | `/health` | `/models`、`/plugins`、`/agents`、`/api/workflows/templates`、`/api/workflows/instantiate`、`/runs`、`/reports` |
 | `java` | Java Gateway | `VITE_JAVA_API_BASE_URL` | `/agent/health` | `/models`、`/plugins`、`/agents`、`/workflows/templates`、`/workflows/instantiate`、`/platform/workflows/templates`、`/runs`、`/reports`、`/settings`、`/platform/runs`、`/platform/events/recent` |
 
-v1.0 / v2.0 过渡期推荐 Python Direct，平台化扩展推荐 Java Gateway。
+v2-only 演示版默认推荐 Java Gateway；Python Direct 保留为开发调试模式。
 
 ## GET /health
 

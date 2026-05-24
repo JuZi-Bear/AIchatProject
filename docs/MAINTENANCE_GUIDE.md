@@ -1,107 +1,65 @@
-# 维护指南
+# v2-only 维护指南
 
-本文说明后续如何安全维护双轨并行项目。
+本文说明后续如何安全维护当前 v2 平台演示版。
 
-## 如何判断文件属于 v1.0 还是 v2.0
+## 如何判断模块归属
 
-- v1.0 比赛演示轨：`webui.py`、`graph_demo.py`、`start_demo.bat`、Streamlit 相关展示和 Python Direct 运行链路。
-- v2.0 平台化升级轨：`frontend-vue/`、`backend-java/`、`api_server.py`、`schemas/`、`services/`、`docker-compose.yml`。
-- shared-core：`core/`、`plugins/`、`utils/`、`config/`、顶层 Agent/模型/报告相关 Python 文件。
-- experimental：`runner-cpp/`、`figma/`。
-- generated-output：`reports/`、`runs/`、`output/`。
-- documentation：`docs/`、根 `README.md`。
+- Vue 前端：`frontend-vue/`
+- Java 平台服务：`backend-java/`
+- Python Agent Engine：`api_server.py`、`services/`、`core/`、`agents.py`
+- 共享配置：`config/`
+- 可选执行器：`runner-cpp/`
+- 部署：`docker-compose.yml`、`Dockerfile`
+- 文档：`docs/`
+- 生成产物：`reports/`、`runs/`、`output/`
 
-不确定时，先查 `docs/PROJECT_DIRECTORY_GUIDE.md` 和 `docs/DUAL_TRACK_ARCHITECTURE.md`。
+## 安全修改 Python Agent Engine
 
-## 如何安全修改 Python Agent Engine
+- 优先改 `services/`、`utils/` 或新增模块。
+- 谨慎修改 `core/workflow.py`、`core/state.py`、`agents.py`。
+- 不随意改变 `run_summary`、`ui_view_model`、`workflow_events` 字段。
+- 修改后至少验证 Python `/health`、Java `/api/agent/health` 和一次 smoke。
 
-- 先确认是否影响 v1 Streamlit 和 v2 FastAPI。
-- 不直接改写 LangGraph 主流程，优先小步补充工具函数或服务适配。
-- 保持 `run_summary` 和 `ui_view_model` 向后兼容。
-- Runner 相关修改必须保留 Python Runner fallback。
-- 修改后更新 `docs/API_CONTRACT.md`、`docs/TECH_STACK.md` 或相关模块 README。
+## 安全修改 Vue 前端
 
-建议测试：
+- 优先保持 API 类型定义与接口契约一致。
+- Workflow Editor 修改后必须验证拖拽、缩放、属性浮层、保存模板和生成任务。
+- RunConsole 修改后必须验证 CodeAgent、SSE、审计日志和 Replay 入口。
+- 修改后执行 `cd frontend-vue && npm run build`。
 
-```powershell
-python -m compileall .
-python graph_demo.py
-python -m uvicorn api_server:app --host 127.0.0.1 --port 8001
-```
+## 安全修改 Java 后端
 
-## 如何安全修改 Vue 前端
+- 保持代理接口兼容。
+- 新增平台接口优先使用 `ApiResponse`。
+- 数据库变更依赖 JPA `ddl-auto=update`，上线前应记录字段说明。
+- 修改后执行 `cd backend-java && mvn -DskipTests package`。
 
-- API 路径差异只放在 `frontend-vue/src/api/`。
-- 页面组件只消费类型化 API 和 ViewModel，不直接拼后端路径。
-- 保持 Python Direct 和 Java Gateway 两种模式。
-- 修改展示字段时兼容缺失字段和旧历史记录。
+## 安全修改 C++ Runner
 
-建议测试：
+- 默认不替代 Python Runner。
+- 保持 `runner_mode: python` 为默认值。
+- 如果启用 C++ Runner，需要验证 fallback 和安全扫描结果。
+
+## 修改后必须测试
 
 ```powershell
 cd frontend-vue
-npm install
 npm run build
-npm run dev
+
+cd ..\backend-java
+mvn -DskipTests package
+
+cd ..
+docker compose up -d --build
+.\scripts\smoke_codeagent.ps1 -ApiMode java -CheckBlockedPath
+.\scripts\smoke_workflow_template.ps1
+.\scripts\final_v2_acceptance.ps1
 ```
 
-## 如何安全修改 Java 后端
+## 修改后必须更新
 
-- Java 层是平台服务层和 API Gateway，不替代 Python Agent Engine。
-- 原有代理接口保持原样，新平台接口使用 `ApiResponse`。
-- 修改 MySQL 相关逻辑前确认是否需要 migration 或兼容旧数据。
-- 不在 Java 中写死 Python API 地址、数据库密码或 API Key。
-
-建议测试：
-
-```powershell
-cd backend-java
-mvn clean package
-mvn spring-boot:run
-```
-
-## 如何安全修改 C++ Runner
-
-- 默认 `runner_mode` 保持 `python`。
-- C++ Runner 不可用时必须回退 Python Runner。
-- 不绕过危险关键词扫描。
-- 不把当前最小版本描述为完整沙箱。
-
-建议测试：
-
-```powershell
-cd runner-cpp
-cmake -S . -B build
-cmake --build build --config Release
-```
-
-然后通过 `utils/cpp_runner_adapter.py` 或 Python Runner 集成路径验证 fallback。
-
-## 修改后必须测试哪些命令
-
-基础检查：
-
-```powershell
-git diff --check
-docker compose config --services
-```
-
-按修改范围追加：
-
-- Python：`python -m compileall .`
-- FastAPI：`python -m uvicorn api_server:app --host 127.0.0.1 --port 8001`
-- Streamlit：`python -m streamlit run webui.py`
-- Vue：`cd frontend-vue; npm run build`
-- Java：`cd backend-java; mvn clean package`
-- Docker：`docker compose up --build`
-
-## 修改后必须更新哪些文档
-
-- 架构边界变化：`docs/DUAL_TRACK_ARCHITECTURE.md`
-- 目录变化：`docs/PROJECT_DIRECTORY_GUIDE.md`
-- API 变化：`docs/API_CONTRACT.md`
-- Docker 变化：`docs/DOCKER_COMPOSE_GUIDE.md`
-- 技术栈变化：`docs/TECH_STACK.md`
-- 风险和兜底变化：`docs/RISK_AND_STABILITY.md`
-- Codex 协作规则变化：`docs/CODEX_PROJECT_CONTEXT.md`、`docs/MODULE_BOUNDARY.md`
-- 用户入口变化：根 `README.md`
+- `README.md`
+- `docs/API_CONTRACT.md`
+- `docs/V2_ARCHITECTURE_PLAN.md`
+- `docs/TASKS.md`
+- 相关功能文档或演示脚本

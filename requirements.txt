@@ -1,8 +1,6 @@
 openai
 langchain
 langgraph
-rich
-streamlit
 fastapi
 uvicorn
 python-dotenv

@@ -2,7 +2,7 @@
 
 ## 目录作用
 
-`frontend-vue/` 是 v2.0 平台化升级轨的 Vue3 + TypeScript 前端项目，用于逐步替代 Streamlit 的平台展示能力。它支持 Dashboard、运行控制台、历史记录、报告、模型配置、插件配置和演示模式。
+`frontend-vue/` 是 v2-only 平台的 Vue3 + TypeScript 前端项目。它支持 Dashboard、运行控制台、历史记录、报告、模型配置、插件配置、Agent 注册中心、Workflow 模板、Workflow Editor 和 Replay。
 
 ## 核心文件
 

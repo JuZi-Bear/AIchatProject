@@ -11,6 +11,6 @@ RUN python -m pip install --upgrade pip \
 
 COPY . .
 
-EXPOSE 8501 8001
+EXPOSE 8001
 
-CMD ["python", "-m", "streamlit", "run", "webui.py", "--server.address=0.0.0.0", "--server.port=8501"]
+CMD ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8001"]

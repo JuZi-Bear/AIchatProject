@@ -1,6 +1,6 @@
 # 测试问题归档与分级
 
-本文基于 `docs/DUAL_TRACK_TEST_CHECKLIST.md`、`docs/TEST_RESULT_LOG.md`、`docs/CODE_HEALTH_REVIEW.md` 进行问题归档和优先级判断。本阶段只整理问题，不直接删除代码，不大改 UI/API/数据库/LangGraph/Agent/插件/Docker Compose 服务结构。
+本文基于 `docs/FINAL_CHECKLIST.md`、`docs/TEST_RESULT_LOG.md`、`docs/CODE_HEALTH_REVIEW.md` 进行问题归档和优先级判断。本阶段只整理问题，不直接删除核心代码，不大改 UI/API/数据库/LangGraph/Agent/插件/Docker Compose 服务结构。
 
 ## 问题分级标准
 
@@ -48,7 +48,7 @@
 | 优先级 | 问题 | 来源 | 所属轨道 | 当前判断 |
 | --- | --- | --- | --- | --- |
 | P2 | 文档体系仍有重复说明，尤其是启动、Docker、风险和目录结构说明 | `CODE_HEALTH_REVIEW.md` | docs | 可做低风险文档合并和归档标记 |
-| P2 | `docs/ARCHITECTURE.md` 内容很短，与 `DUAL_TRACK_ARCHITECTURE.md` 重叠 | `CODE_HEALTH_REVIEW.md` | docs | 建议合并或标记为历史文档 |
+| P2 | 架构说明分散在多个文档 | `CODE_HEALTH_REVIEW.md` | docs | 建议以 `V2_ARCHITECTURE_PLAN.md` 为主文档，其余文档只做索引或补充 |
 | P2 | `docs/DELIVERY_STRUCTURE.md` 与 `PROJECT_DIRECTORY_GUIDE.md` 目录说明重叠 | `CODE_HEALTH_REVIEW.md` | docs | 建议保留交付历史口径，减少重复入口 |
 | P2 | `docs/RISK_AND_SOLUTION.md` 与 `RISK_AND_STABILITY.md` 风险说明重叠 | `CODE_HEALTH_REVIEW.md` | docs | 建议后续合并风险口径 |
 | P2 | `docs/USER_MANUAL.md` 与 `docs/OPERATION_GUIDE.md` 启动说明重复 | `CODE_HEALTH_REVIEW.md` | docs | 建议明确用户手册和维护手册边界 |

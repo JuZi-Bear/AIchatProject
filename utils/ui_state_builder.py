@@ -165,7 +165,7 @@ def build_workflow_status(state: dict) -> list[dict]:
 
 
 def build_workflow_status_map(state: dict) -> dict:
-    """Build the legacy label -> TitleCase status map used by the current Streamlit UI."""
+    """Build the legacy label -> TitleCase status map used by older UI adapters."""
     return {
         item["label"]: _status_to_title(item["status"])
         for item in build_workflow_status(state)
