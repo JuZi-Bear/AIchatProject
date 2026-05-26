@@ -71,6 +71,7 @@
 - CodeAgent 文件夹工作流模板选择。
 - Workflow Editor 自定义 Agent 节点和 Human Approval 节点。
 - Models 页面平台层 API Key 更新 / 清除入口。
+- Workflow Runtime Lite：Java 平台层读取 MySQL 模板并按节点顺序写入事件，CodeAgent 节点真实执行，其它 Agent 节点作为可回放模拟事件。
 
 后续建议：
 
@@ -79,7 +80,7 @@
 - 手动连线编辑。
 - Replay 过滤和搜索。
 - Figma Component Variants 同步。
-- 将自定义 Agent 从“模板节点”升级为可注册 Agent 前，需要先设计 Dynamic Workflow Runtime。
+- 将自定义 Agent 从“模板节点”升级为可注册 Agent 前，需要先从 Workflow Runtime Lite 演进到 Dynamic Workflow Runtime。
 
 ## 第三阶段：AI Agent Engine 增强
 
@@ -135,7 +136,7 @@
 ## 当前推荐路线
 
 1. 稳定 v2-only 演示版。
-2. 继续打磨 Workflow Editor 演示体验。
+2. 继续验证 Workflow Runtime Lite 的节点执行边界。
 3. 增强 Replay 和事件分析。
 4. 提升 CodeAgent diff / 审计展示。
-5. 再进入任务生命周期和配置中心深水区。
+5. 再进入 Dynamic Workflow Runtime、任务生命周期和配置中心深水区。

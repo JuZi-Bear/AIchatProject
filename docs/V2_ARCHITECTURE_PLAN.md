@@ -77,6 +77,7 @@ Vue3 + TypeScript
 - [x] Human Approval 平台层审批节点、事件和 Replay 确认入口。
 - [x] Workflow Editor 自定义 Agent 模板节点。
 - [x] Java Gateway 模型 API Key masked 状态和加密保存接口。
+- [x] Workflow Runtime Lite：Java 平台层按模板节点顺序执行演示链路，CodeAgent 节点真实执行，其它 Agent 节点记录可回放事件。
 
 ## v2-only 收敛结果
 
@@ -87,7 +88,8 @@ Vue3 + TypeScript
 
 ## 当前限制
 
-- Workflow Editor 当前编辑平台模板和可回放任务视图；手动连线和强化连接线用于前端编排表达和模板保存，不直接驱动动态 LangGraph 分支。
+- Workflow Runtime Lite 当前是 Java 平台层演示执行器；它让模板进入“可执行演示”闭环，但不等于动态 LangGraph Runtime。
+- Workflow Editor 当前编辑平台模板、Runtime Lite 演示链路和可回放任务视图；手动连线和强化连接线用于前端编排表达和模板保存，不直接驱动动态 LangGraph 分支。
 - Custom Agent 当前是模板可视化节点，不会自动注册到 Python Agent Registry。
 - Human Approval 第一阶段是 Java 平台层审批事件，不会中断真实 LangGraph 运行。
 - Java Gateway 可保存平台层模型密钥状态，但 Python Direct 仍通过 `.env` 配置模型 Key。
@@ -100,7 +102,7 @@ Vue3 + TypeScript
 ## 推荐下一步
 
 1. 继续稳定 v2-only 演示版和验收脚本。
-2. 预研动态 Workflow Runtime，让模板连接未来可以安全映射到后端执行拓扑。
+2. 继续验证 Workflow Runtime Lite，沉淀哪些节点适合从平台事件升级为真实执行。
 3. 增强 Replay 事件对比和导出。
 4. 继续同步 Figma 设计源与 Vue 实现。
 5. 暂缓用户/权限/团队协作等复杂平台功能。

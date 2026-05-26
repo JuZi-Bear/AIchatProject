@@ -1,6 +1,7 @@
 package com.aichat.platform.controller;
 
 import com.aichat.platform.dto.ApiResponse;
+import com.aichat.platform.service.PlatformWorkflowRuntimeService;
 import com.aichat.platform.service.WorkflowTemplateService;
 import java.util.List;
 import java.util.Map;
@@ -17,9 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlatformWorkflowController {
 
     private final WorkflowTemplateService workflowTemplateService;
+    private final PlatformWorkflowRuntimeService platformWorkflowRuntimeService;
 
-    public PlatformWorkflowController(WorkflowTemplateService workflowTemplateService) {
+    public PlatformWorkflowController(
+            WorkflowTemplateService workflowTemplateService,
+            PlatformWorkflowRuntimeService platformWorkflowRuntimeService
+    ) {
         this.workflowTemplateService = workflowTemplateService;
+        this.platformWorkflowRuntimeService = platformWorkflowRuntimeService;
     }
 
     @GetMapping("/templates")
@@ -45,6 +51,16 @@ public class PlatformWorkflowController {
             @RequestBody(required = false) Map<String, Object> request
     ) {
         return workflowTemplateService.instantiateTemplate(templateKey, request)
+                .map(ApiResponse::ok)
+                .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
+    }
+
+    @PostMapping("/templates/{templateKey}/execute")
+    public ApiResponse<Map<String, Object>> executeTemplate(
+            @PathVariable String templateKey,
+            @RequestBody(required = false) Map<String, Object> request
+    ) {
+        return platformWorkflowRuntimeService.executeTemplate(templateKey, request)
                 .map(ApiResponse::ok)
                 .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
     }

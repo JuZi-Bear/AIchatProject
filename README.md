@@ -168,10 +168,12 @@ figma/              Figma-first UI 设计源规范
 - Workflow Editor 新增 `Human Approval` 和 `Custom Agent` 节点；第一阶段用于模板、回放和人工确认事件，不动态改写 LangGraph。
 - Java 新增 `POST /api/platform/runs/{platformRunId}/approval`，用于批准或拒绝等待人工确认的任务。
 - Java 新增 `GET/POST/DELETE /api/platform/secrets/models`，用于平台层模型 API Key 状态管理和加密保存。
+- Java 新增 Workflow Runtime Lite：`POST /api/platform/workflows/templates/{templateKey}/execute` 可按 MySQL 模板节点顺序执行平台演示链路，CodeAgent 节点真实执行，其它 Agent 节点写入可回放事件。
 
 ## 当前限制
 
-- Workflow Editor 当前生成平台模板和可回放任务视图，前端可视化连线不直接改写 LangGraph 主流程。
+- Workflow Runtime Lite 是平台层演示执行器，不等于动态 LangGraph Runtime；Product / Coder / Tester 等节点第一版作为 `simulated` 事件，CodeAgent 节点为 `executed`，Human Approval 节点为 `waiting`。
+- Workflow Editor 当前生成平台模板、Runtime Lite 演示链路和可回放任务视图，前端可视化连线不直接改写 LangGraph 主流程。
 - 自定义 Agent 节点当前保存到模板 JSON，不会自动注册到 Python Agent Registry。
 - 前端 API Key 管理仅 Java Gateway 模式可用；Python Direct 模式仍建议使用 `.env`。
 - CodeAgent 是简化文件操作模块，不是完整 Codex。
@@ -183,6 +185,6 @@ figma/              Figma-first UI 设计源规范
 优先稳定 v2-only 演示版：
 
 1. 复跑最终验收脚本并记录结果。
-2. 继续微调 Workflow Editor 演示体验和 Figma 设计源同步。
-3. 将 Figma 设计源与 Vue 页面继续保持同步。
+2. 围绕 Workflow Runtime Lite 验证更多真实执行节点，例如报告导出、CodeAgent 文件夹计划应用。
+3. 继续微调 Workflow Editor 演示体验并保持 Figma 设计源同步。
 4. 暂缓用户系统、权限和动态 LangGraph 编排。

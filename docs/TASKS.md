@@ -79,12 +79,16 @@
 - [x] Java 平台人工确认 API。
 - [x] Java 平台模型 API Key 安全状态管理。
 - [x] Models 页面 API Key 更新 / 清除入口。
+- [x] Java Workflow Runtime Lite 模板执行接口。
+- [x] Workflow Editor 执行模板工作流入口。
+- [x] Workflow Templates 页面 MySQL 模板执行入口。
+- [x] Replay 展示 executed / simulated / waiting 执行模式。
 - [x] Replay 事件筛选和搜索。
 - [x] Dashboard 最近 CodeAgent 操作卡片增强。
 - [x] RunConsole 结构化需求构造器。
 - [x] RunConsole 运行结果高光区。
 - [x] RunConsole 结果详情紧凑化。
-- [ ] 动态 LangGraph 编排预研。
+- [ ] 从 Runtime Lite 预研动态 LangGraph 编排。
 - [ ] 更强 CodeAgent diff 可视化。
 - [ ] C++ Runner 资源限制增强。
 

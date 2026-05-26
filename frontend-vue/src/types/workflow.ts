@@ -28,3 +28,19 @@ export type InstantiateWorkflowResponse = {
   run_summary: Partial<RunSummary> & Record<string, unknown>;
   ui_view_model: UIViewModel & Record<string, unknown>;
 };
+
+export type WorkflowRuntimeNodeEvent = {
+  event_type?: string;
+  event_text?: string;
+  agent?: string;
+  status?: string;
+  message?: string;
+  detail?: Record<string, unknown> | unknown;
+  created_at?: string;
+} & Record<string, unknown>;
+
+export type WorkflowRuntimeExecutionResult = InstantiateWorkflowResponse & {
+  status?: string;
+  events?: WorkflowRuntimeNodeEvent[];
+  warnings?: string[];
+};

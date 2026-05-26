@@ -4,6 +4,8 @@ import type { ApiResponse } from "@/types/api";
 import type {
   InstantiateWorkflowRequest,
   InstantiateWorkflowResponse,
+  WorkflowRuntimeExecutionResult,
+  WorkflowRuntimeNodeEvent,
   WorkflowTemplate,
 } from "@/types/workflow";
 import type { AgentNodeData, ConnectionData, WorkflowTemplateData } from "@/types/workflowEditor";
@@ -17,6 +19,13 @@ type RawWorkflowTemplate = Partial<WorkflowTemplate> & {
 type RawInstantiateWorkflowResponse = Partial<InstantiateWorkflowResponse> & {
   platform_run_id?: string;
 };
+
+type RawWorkflowRuntimeExecutionResult = RawInstantiateWorkflowResponse &
+  Partial<WorkflowRuntimeExecutionResult> & {
+    events?: WorkflowRuntimeNodeEvent[];
+    warnings?: string[];
+    status?: string;
+  };
 
 type RawPlatformWorkflowTemplate = Partial<WorkflowTemplateData> & {
   id?: number;
@@ -74,6 +83,15 @@ function normalizeInstantiateResponse(response: RawInstantiateWorkflowResponse):
     workflow_events: response.workflow_events || [],
     run_summary: response.run_summary || {},
     ui_view_model: response.ui_view_model || {},
+  };
+}
+
+function normalizeRuntimeExecutionResponse(response: RawWorkflowRuntimeExecutionResult): WorkflowRuntimeExecutionResult {
+  return {
+    ...normalizeInstantiateResponse(response),
+    status: response.status || String(response.run_summary?.status || ""),
+    events: response.events || response.workflow_events || [],
+    warnings: response.warnings || [],
   };
 }
 
@@ -181,6 +199,23 @@ export function instantiatePlatformWorkflowTemplate(
       input_data: inputData,
     })
     .then((response) => normalizeInstantiateResponse(unwrapApiResponse<RawInstantiateWorkflowResponse>(response.data)));
+}
+
+export function executePlatformWorkflowTemplate(
+  templateKey: string,
+  inputData: Record<string, unknown>,
+): Promise<WorkflowRuntimeExecutionResult> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("Workflow Runtime Lite 仅 Java Gateway 模式支持"));
+  }
+
+  return apiClient
+    .post<ApiResponse<RawWorkflowRuntimeExecutionResult>>(platformWorkflowPath(`/templates/${templateKey}/execute`), {
+      input_data: inputData,
+    })
+    .then((response) =>
+      normalizeRuntimeExecutionResponse(unwrapApiResponse<RawWorkflowRuntimeExecutionResult>(response.data)),
+    );
 }
 
 export function deletePlatformWorkflowTemplate(templateKey: string): Promise<WorkflowTemplateData> {

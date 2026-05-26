@@ -17,6 +17,44 @@ const isBlocked = computed(() => {
   return text.includes("blocked") || text.includes("forbidden") || text.includes("denied") || text.includes("阻断") || text.includes("违规");
 });
 
+const executionMode = computed(() => {
+  if (!props.event.detailJson) {
+    return "";
+  }
+
+  try {
+    const detail = JSON.parse(props.event.detailJson) as {
+      executionMode?: string;
+      execution_mode?: string;
+      detail?: { executionMode?: string; execution_mode?: string };
+    };
+
+    return detail.executionMode || detail.execution_mode || detail.detail?.executionMode || detail.detail?.execution_mode || "";
+  } catch {
+    return "";
+  }
+});
+
+function executionModeLabel(mode: string) {
+  const labels: Record<string, string> = {
+    executed: "真实执行",
+    simulated: "平台模拟",
+    waiting: "等待确认",
+  };
+
+  return labels[mode] || mode;
+}
+
+function executionModeTagType(mode: string) {
+  const types: Record<string, string> = {
+    executed: "success",
+    simulated: "info",
+    waiting: "warning",
+  };
+
+  return types[mode] || "info";
+}
+
 function eventTagType(eventType: string) {
   if (eventType === "AGENT_FINISHED" || eventType === "RUNNER_FINISHED" || eventType === "TEST_FINISHED" || eventType === "REPORT_GENERATED" || eventType === "WORKFLOW_FINISHED") {
     return "success";
@@ -76,6 +114,9 @@ function agentTagType(agent?: string) {
       <div class="event-tags">
         <el-tag v-if="isCodeAgent" type="warning" effect="dark" size="small">文件操作节点</el-tag>
         <el-tag v-if="isBlocked" type="danger" effect="dark" size="small">安全阻断</el-tag>
+        <el-tag v-if="executionMode" :type="executionModeTagType(executionMode)" effect="plain" size="small">
+          {{ executionModeLabel(executionMode) }}
+        </el-tag>
         <el-tag :type="agentTagType(props.event.agent)" effect="plain" size="small">
           {{ agentLabel(props.event.agent) }}
         </el-tag>

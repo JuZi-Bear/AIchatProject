@@ -7,6 +7,7 @@ import { useRouter } from "vue-router";
 import { currentApiMode } from "@/api/client";
 import {
   deletePlatformWorkflowTemplate,
+  executePlatformWorkflowTemplate,
   instantiatePlatformWorkflowTemplate,
   instantiateWorkflow,
   savePlatformWorkflowTemplate,
@@ -37,6 +38,8 @@ const instantiating = ref(false);
 const savingPlatform = ref(false);
 const deletingPlatform = ref(false);
 const instantiatingPlatform = ref(false);
+const executingRuntime = ref(false);
+const executingSelectedPlatform = ref(false);
 const lastResult = ref<InstantiateWorkflowResponse | null>(null);
 const isJavaMode = currentApiMode === "java";
 
@@ -309,6 +312,34 @@ async function instantiateSelectedPlatformTemplate() {
   }
 }
 
+async function executeSelectedPlatformTemplate() {
+  const template = selectedTemplateInfo.value;
+
+  if (!template || template.source !== "platform") {
+    ElMessage.warning("只有 MySQL 模板支持 Runtime Lite 执行");
+    return;
+  }
+
+  executingSelectedPlatform.value = true;
+
+  try {
+    const result = await executePlatformWorkflowTemplate(template.key, {
+      requirement: `执行 Workflow Runtime Lite: ${template.name}`,
+      editor_mode: true,
+      runtime_mode: "workflow_runtime_lite",
+    });
+    lastResult.value = result;
+    emit("instantiated", result);
+    detailDialogVisible.value = false;
+    ElMessage.success("Workflow Runtime Lite 已执行，正在打开回放");
+    await router.push(`/replay/${result.platformRunId}`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "执行 Workflow Runtime Lite 失败");
+  } finally {
+    executingSelectedPlatform.value = false;
+  }
+}
+
 function openSaveDialog() {
   saveForm.key = store.workflowTemplateKey;
   saveForm.name = store.workflowName;
@@ -387,6 +418,46 @@ async function createTask() {
     instantiating.value = false;
   }
 }
+
+async function executeCurrentWorkflowRuntime() {
+  if (!isJavaMode) {
+    ElMessage.warning("执行模板工作流仅 Java Gateway 模式支持");
+    return;
+  }
+
+  if (!(await runWorkflowCheck(false))) {
+    return;
+  }
+
+  executingRuntime.value = true;
+  lastResult.value = null;
+
+  try {
+    const template = store.saveCurrentTemplate(
+      store.workflowTemplateKey || `runtime_${Date.now()}`,
+      store.workflowName || "Runtime Lite Workflow",
+      store.workflowDescription,
+    );
+    await savePlatformWorkflowTemplate(template);
+    emit("reloadTemplates");
+
+    const result = await executePlatformWorkflowTemplate(template.workflowTemplateKey, {
+      requirement:
+        instantiateForm.requirement.trim() ||
+        `执行 Workflow Runtime Lite: ${template.name || template.workflowTemplateKey}`,
+      editor_mode: true,
+      runtime_mode: "workflow_runtime_lite",
+    });
+    lastResult.value = result;
+    emit("instantiated", result);
+    ElMessage.success("Workflow Runtime Lite 已执行，正在打开回放");
+    await router.push(`/replay/${result.platformRunId}`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "执行 Workflow Runtime Lite 失败");
+  } finally {
+    executingRuntime.value = false;
+  }
+}
 </script>
 
 <template>
@@ -418,6 +489,14 @@ async function createTask() {
         <span class="group-label">主要动作</span>
         <div class="group-actions">
           <el-button :icon="Upload" type="primary" plain @click="openSaveDialog">保存模板</el-button>
+          <el-button
+            v-if="isJavaMode"
+            type="primary"
+            :loading="executingRuntime"
+            @click="executeCurrentWorkflowRuntime"
+          >
+            执行模板工作流
+          </el-button>
           <el-button type="success" class="create-task-button" @click="openInstantiateDialog">生成任务</el-button>
           <el-dropdown trigger="click">
             <el-button :icon="MoreFilled" circle plain />
@@ -539,6 +618,14 @@ async function createTask() {
         @click="instantiateSelectedPlatformTemplate"
       >
         生成可回放任务
+      </el-button>
+      <el-button
+        v-if="isJavaMode && selectedTemplateInfo?.source === 'platform'"
+        type="primary"
+        :loading="executingSelectedPlatform"
+        @click="executeSelectedPlatformTemplate"
+      >
+        执行模板工作流
       </el-button>
       <el-button
         v-if="isJavaMode && selectedTemplateInfo?.source === 'platform'"

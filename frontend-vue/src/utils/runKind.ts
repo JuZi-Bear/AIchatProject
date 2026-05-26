@@ -24,6 +24,14 @@ export function isWorkflowTemplateRun(run?: RunKindSource | null) {
   return runnerMode === "workflow_template" || modelProvider === "workflow_template" || runId.startsWith("workflow_template_");
 }
 
+export function isWorkflowRuntimeRun(run?: RunKindSource | null) {
+  const runnerMode = normalized(run?.runnerMode || run?.runner_mode);
+  const modelProvider = normalized(run?.modelProvider || run?.model_provider);
+  const runId = runIdOf(run);
+
+  return runnerMode === "workflow_runtime" || modelProvider === "workflow_runtime" || runId.startsWith("workflow_runtime_");
+}
+
 export function isCodeAgentRun(run?: RunKindSource | null) {
   const runnerMode = normalized(run?.runnerMode || run?.runner_mode);
   const modelProvider = normalized(run?.modelProvider || run?.model_provider);
@@ -33,6 +41,10 @@ export function isCodeAgentRun(run?: RunKindSource | null) {
 }
 
 export function runKindLabel(run?: RunKindSource | null) {
+  if (isWorkflowRuntimeRun(run)) {
+    return "Runtime 执行";
+  }
+
   if (isWorkflowTemplateRun(run)) {
     return "模板回放";
   }
@@ -45,6 +57,10 @@ export function runKindLabel(run?: RunKindSource | null) {
 }
 
 export function runKindTagType(run?: RunKindSource | null) {
+  if (isWorkflowRuntimeRun(run)) {
+    return "success";
+  }
+
   if (isWorkflowTemplateRun(run)) {
     return "primary";
   }
@@ -69,6 +85,10 @@ export function runnerDisplayLabel(runnerMode?: string) {
     return "Workflow Template Replay";
   }
 
+  if (runnerMode === "workflow_runtime") {
+    return "Workflow Runtime Lite";
+  }
+
   return "Python Runner";
 }
 
@@ -83,6 +103,10 @@ export function runnerTagType(runnerMode?: string) {
 
   if (runnerMode === "workflow_template") {
     return "primary";
+  }
+
+  if (runnerMode === "workflow_runtime") {
+    return "success";
   }
 
   return "info";

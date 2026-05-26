@@ -2,21 +2,33 @@
 import { Operation, Refresh, Search } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
-import { getApiModeLabel } from "@/api/client";
-import { getWorkflowTemplates, instantiateWorkflow } from "@/api/workflows";
+import { currentApiMode, getApiModeLabel } from "@/api/client";
+import {
+  executePlatformWorkflowTemplate,
+  getPlatformWorkflowTemplates,
+  getWorkflowTemplates,
+  instantiateWorkflow,
+} from "@/api/workflows";
 import type { InstantiateWorkflowResponse, WorkflowTemplate } from "@/types/workflow";
+import type { WorkflowTemplateData } from "@/types/workflowEditor";
 
 const apiModeLabel = getApiModeLabel();
+const router = useRouter();
 const templates = ref<WorkflowTemplate[]>([]);
+const platformTemplates = ref<WorkflowTemplateData[]>([]);
 const selectedTemplate = ref<WorkflowTemplate | null>(null);
+const selectedPlatformTemplate = ref<WorkflowTemplateData | null>(null);
 const keyword = ref("");
 const stageFilter = ref("all");
 const requirement = ref("");
 const loading = ref(false);
 const creating = ref(false);
+const executingRuntime = ref(false);
 const createResult = ref<InstantiateWorkflowResponse | null>(null);
 const createError = ref("");
+const isJavaMode = currentApiMode === "java";
 
 const stageOptions = computed(() => {
   const stages = new Set<string>();
@@ -52,11 +64,19 @@ async function loadTemplates() {
   loading.value = true;
 
   try {
-    templates.value = await getWorkflowTemplates();
+    const [apiTemplates, mysqlTemplates] = await Promise.all([
+      getWorkflowTemplates(),
+      isJavaMode ? getPlatformWorkflowTemplates() : Promise.resolve([]),
+    ]);
+    templates.value = apiTemplates;
+    platformTemplates.value = mysqlTemplates;
     selectedTemplate.value = selectedTemplate.value || templates.value[0] || null;
+    selectedPlatformTemplate.value = selectedPlatformTemplate.value || platformTemplates.value[0] || null;
   } catch (error) {
     templates.value = [];
+    platformTemplates.value = [];
     selectedTemplate.value = null;
+    selectedPlatformTemplate.value = null;
     ElMessage.error(error instanceof Error ? error.message : "加载 Workflow 模板失败");
   } finally {
     loading.value = false;
@@ -84,6 +104,33 @@ async function createTemplateTask() {
     ElMessage.error(createError.value);
   } finally {
     creating.value = false;
+  }
+}
+
+async function executePlatformTemplate(template = selectedPlatformTemplate.value) {
+  if (!template) {
+    ElMessage.warning("请先选择一个 Java MySQL Workflow 模板");
+    return;
+  }
+
+  executingRuntime.value = true;
+  createResult.value = null;
+  createError.value = "";
+
+  try {
+    const result = await executePlatformWorkflowTemplate(template.workflowTemplateKey, {
+      requirement: requirement.value.trim() || `执行 Workflow Runtime Lite: ${template.name}`,
+      template_name: template.name,
+      runtime_mode: "workflow_runtime_lite",
+    });
+    createResult.value = result;
+    ElMessage.success("Workflow Runtime Lite 已执行，正在打开回放");
+    await router.push(`/replay/${result.platformRunId}`);
+  } catch (error) {
+    createError.value = error instanceof Error ? error.message : "执行 Workflow Runtime Lite 失败";
+    ElMessage.error(createError.value);
+  } finally {
+    executingRuntime.value = false;
   }
 }
 
@@ -228,6 +275,49 @@ onMounted(loadTemplates);
         </aside>
       </div>
     </section>
+
+    <section v-if="isJavaMode" class="panel runtime-panel">
+      <div class="runtime-head">
+        <div>
+          <h2>Java MySQL 模板执行</h2>
+          <p>Workflow Runtime Lite 会按模板节点顺序写入事件，CodeAgent 节点真实执行，其它 Agent 节点作为平台事件模拟。</p>
+        </div>
+        <el-tag type="primary" effect="plain">Runtime Lite</el-tag>
+      </div>
+
+      <el-empty v-if="!loading && !platformTemplates.length" description="暂无 Java MySQL Workflow 模板" />
+      <div v-else class="platform-template-grid" v-loading="loading">
+        <article
+          v-for="template in platformTemplates"
+          :key="template.workflowTemplateKey"
+          class="platform-template-card"
+          :class="{ active: selectedPlatformTemplate?.workflowTemplateKey === template.workflowTemplateKey }"
+          @click="selectedPlatformTemplate = template"
+        >
+          <div class="template-head">
+            <div>
+              <div class="template-name">{{ template.name }}</div>
+              <div class="template-key">{{ template.workflowTemplateKey }} · v{{ template.version }}</div>
+            </div>
+            <el-tag type="success" effect="plain">{{ template.nodes.length }} nodes</el-tag>
+          </div>
+          <p>{{ template.description || "暂无描述" }}</p>
+          <div class="stage-line">
+            <span v-for="stage in [...new Set(template.nodes.map((node) => node.stage))]" :key="stage">
+              {{ stage }}
+            </span>
+          </div>
+          <el-button
+            type="primary"
+            :icon="Operation"
+            :loading="executingRuntime && selectedPlatformTemplate?.workflowTemplateKey === template.workflowTemplateKey"
+            @click.stop="executePlatformTemplate(template)"
+          >
+            执行
+          </el-button>
+        </article>
+      </div>
+    </section>
   </section>
 </template>
 
@@ -369,6 +459,57 @@ onMounted(loadTemplates);
   word-break: break-word;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 13px;
+  line-height: 1.55;
+}
+
+.runtime-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.runtime-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.runtime-head h2 {
+  margin: 0 0 6px;
+  color: #202124;
+  font-size: 20px;
+}
+
+.runtime-head p {
+  margin: 0;
+  color: #5f6368;
+  line-height: 1.6;
+}
+
+.platform-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.platform-template-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fbff;
+  cursor: pointer;
+}
+
+.platform-template-card.active {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+}
+
+.platform-template-card p {
+  margin: 0;
+  color: #334155;
   line-height: 1.55;
 }
 

@@ -1654,6 +1654,62 @@ Java Gateway 模式下用于提交 Human Approval 节点的人工确认结果。
 - `HUMAN_REJECTED`
 - `STATUS_CHANGED`
 
+## Platform Workflow Runtime Lite API
+
+### POST `/api/platform/workflows/templates/{templateKey}/execute`
+
+Java Gateway 模式下执行 MySQL 中保存的 Workflow 模板。该接口属于平台层演示执行器：它会读取模板节点与连线，按拓扑顺序记录 RunEvent 并通过 SSE 推送；`code_agent` 节点会调用现有 Python CodeAgent 执行文件操作，`human_approval` 节点会让任务进入 `WAITING_FOR_HUMAN`，其它 Agent 节点第一版作为 `simulated` 平台事件，不动态改写 LangGraph。
+
+请求：
+
+```json
+{
+  "input_data": {
+    "requirement": "执行 Workflow Runtime Lite: CodeAgent 文件夹演示",
+    "runtime_mode": "workflow_runtime_lite"
+  }
+}
+```
+
+响应：
+
+```json
+{
+  "success": true,
+  "message": "ok",
+  "data": {
+    "platformRunId": "workflow_runtime_1780000000000",
+    "run_id": "workflow_runtime_1780000000000",
+    "template_key": "codeagent_demo",
+    "status": "WAITING_FOR_HUMAN",
+    "events": [],
+    "workflow_events": [],
+    "warnings": [],
+    "run_summary": {
+      "runner_mode": "workflow_runtime",
+      "runtime_mode": "workflow_runtime_lite",
+      "require_human_approval": true
+    },
+    "ui_view_model": {
+      "workflow_steps": [],
+      "workflow_events": []
+    }
+  }
+}
+```
+
+执行模式标记：
+
+- `executed`：真实执行节点，目前主要是 CodeAgent。
+- `simulated`：平台事件节点，例如 Product / Coder / Tester 等 no-op 节点。
+- `waiting`：Human Approval 节点等待人工确认。
+
+边界：
+
+- 不修改 Python FastAPI `/runs`。
+- 不动态改写 LangGraph 执行拓扑。
+- 不改变 `run_summary`、`ui_view_model`、`workflow_events` 兼容结构。
+
 ## Platform Model Secret API
 
 ### GET `/api/platform/secrets/models`
