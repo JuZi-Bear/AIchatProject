@@ -269,8 +269,47 @@ public class RunRecordService {
         return savedRecord;
     }
 
+    public RunRecordEntity approveRun(String platformRunId, boolean approved, String comment) {
+        RunRecordEntity record = runRecordRepository.findByPlatformRunId(platformRunId)
+                .orElseThrow(() -> new IllegalArgumentException("platform run not found: " + platformRunId));
+        String oldStatus = firstNonBlank(record.getStatus(), "UNKNOWN");
+
+        if (!"WAITING_FOR_HUMAN".equals(oldStatus)) {
+            runEventService.addEvent(
+                    platformRunId,
+                    record.getPythonRunId(),
+                    RunEventType.ERROR_OCCURRED,
+                    oldStatus,
+                    "当前任务不处于等待人工确认状态",
+                    Map.of("currentStatus", oldStatus, "comment", firstNonBlank(comment))
+            );
+
+            return record;
+        }
+
+        String nextStatus = approved ? "APPROVED" : "REJECTED";
+        record.setStatus(nextStatus);
+        record.setApproved(approved);
+        record.setSuccess(approved);
+        record.setRequireHumanApproval(false);
+        RunRecordEntity savedRecord = runRecordRepository.save(record);
+
+        runEventService.addStatusChangedEvent(platformRunId, oldStatus, nextStatus);
+        runEventService.addEvent(
+                platformRunId,
+                savedRecord.getPythonRunId(),
+                approved ? RunEventType.HUMAN_APPROVED : RunEventType.HUMAN_REJECTED,
+                nextStatus,
+                approved ? "用户已批准继续执行" : "用户已拒绝继续执行",
+                Map.of("approved", approved, "comment", firstNonBlank(comment))
+        );
+
+        return savedRecord;
+    }
+
     private boolean isTerminalStatus(String status) {
-        return "SUCCESS".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status);
+        return "SUCCESS".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)
+                || "APPROVED".equals(status) || "REJECTED".equals(status);
     }
 
     private String buildCodeAgentRequirement(String operation, String filePath) {
@@ -390,6 +429,9 @@ public class RunRecordService {
             case "RUNNING" -> "运行中";
             case "CREATED" -> "已创建";
             case "CANCELLED" -> "已取消";
+            case "WAITING_FOR_HUMAN" -> "等待人工确认";
+            case "APPROVED" -> "已批准";
+            case "REJECTED" -> "已拒绝";
             default -> status == null || status.isBlank() ? "未知" : status;
         };
     }

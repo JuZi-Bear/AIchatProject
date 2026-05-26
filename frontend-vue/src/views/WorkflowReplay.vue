@@ -5,6 +5,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { getWorkflowReplay } from "@/api/replay";
+import { currentApiMode } from "@/api/client";
+import { approvePlatformRun } from "@/api/runs";
 import ReplayControlPanel from "@/components/ReplayControlPanel.vue";
 import ReplayEventCard from "@/components/ReplayEventCard.vue";
 import WorkflowReplayTimeline from "@/components/WorkflowReplayTimeline.vue";
@@ -19,6 +21,8 @@ const errorDetail = ref("");
 const currentIndex = ref(0);
 const playing = ref(false);
 const speedMs = ref(800);
+const approvalComment = ref("");
+const approving = ref(false);
 const filters = ref<ReplayFilterState>({
   agent: "all",
   status: "all",
@@ -57,6 +61,7 @@ const codeAgentEventCount = computed(
 const failedEventCount = computed(
   () => allEvents.value.filter((event) => event.status === "FAILED" || event.eventType.includes("FAILED") || event.eventType === "ERROR_OCCURRED").length,
 );
+const waitingForHuman = computed(() => replay.value?.status === "WAITING_FOR_HUMAN");
 const agentOptions = [
   { label: "全部 Agent", value: "all" },
   { label: "CodeAgent", value: "code_agent" },
@@ -74,6 +79,9 @@ const statusOptions = [
   { label: "SUCCESS", value: "SUCCESS" },
   { label: "FAILED", value: "FAILED" },
   { label: "RUNNING", value: "RUNNING" },
+  { label: "WAITING_FOR_HUMAN", value: "WAITING_FOR_HUMAN" },
+  { label: "APPROVED", value: "APPROVED" },
+  { label: "REJECTED", value: "REJECTED" },
 ];
 const durationText = computed(() => {
   const durationMs = replay.value?.durationMs || 0;
@@ -103,6 +111,18 @@ function statusTagType(status?: string) {
 
   if (status === "CANCELLED") {
     return "warning";
+  }
+
+  if (status === "WAITING_FOR_HUMAN") {
+    return "warning";
+  }
+
+  if (status === "APPROVED") {
+    return "success";
+  }
+
+  if (status === "REJECTED") {
+    return "danger";
   }
 
   return "info";
@@ -188,6 +208,25 @@ async function loadReplay() {
     ElMessage.error(errorDetail.value);
   } finally {
     loading.value = false;
+  }
+}
+
+async function submitApproval(approved: boolean) {
+  if (currentApiMode !== "java" || !platformRunId.value) {
+    ElMessage.warning("人工确认仅 Java Gateway 模式支持");
+    return;
+  }
+
+  approving.value = true;
+
+  try {
+    await approvePlatformRun(platformRunId.value, approved, approvalComment.value);
+    ElMessage.success(approved ? "已批准继续执行" : "已拒绝继续执行");
+    await loadReplay();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "提交人工确认失败");
+  } finally {
+    approving.value = false;
   }
 }
 
@@ -285,6 +324,23 @@ onBeforeUnmount(() => {
         </div>
       </el-card>
 
+      <el-card v-if="waitingForHuman" shadow="never" class="approval-card">
+        <div class="approval-copy">
+          <strong>等待人工确认</strong>
+          <span>该任务包含 Human Approval 节点。确认结果会写入 RunEvent，并进入 SSE / Replay 事件链。</span>
+        </div>
+        <el-input
+          v-model="approvalComment"
+          type="textarea"
+          :rows="2"
+          placeholder="可选：输入确认说明或拒绝原因"
+        />
+        <div class="approval-actions">
+          <el-button type="success" :loading="approving" @click="submitApproval(true)">批准继续</el-button>
+          <el-button type="danger" plain :loading="approving" @click="submitApproval(false)">拒绝停止</el-button>
+        </div>
+      </el-card>
+
       <ReplayControlPanel
         :current-index="Math.max(currentIndex, 0)"
         :total="events.length"
@@ -374,6 +430,36 @@ onBeforeUnmount(() => {
 
 .replay-filter-card :deep(.el-card__body) {
   padding: 12px;
+}
+
+.approval-card :deep(.el-card__body) {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.approval-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.approval-copy strong {
+  color: #92400e;
+}
+
+.approval-copy span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.approval-actions :deep(.el-button) {
+  margin-left: 0;
 }
 
 .filter-row {

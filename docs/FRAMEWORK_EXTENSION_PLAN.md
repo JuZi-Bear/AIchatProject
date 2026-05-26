@@ -46,10 +46,12 @@
 - Replay API。
 - Settings / Model / Plugin config。
 - Workflow 模板保存、版本、删除和实例化。
+- Human Approval 平台层审批事件和批准 / 拒绝 API。
+- Java Gateway 模型 API Key 状态管理和加密保存接口。
 
 后续建议：
 
-- 任务状态机显式化。
+- 任务状态机显式化，尤其是 `WAITING_FOR_HUMAN -> APPROVED / REJECTED` 后的自动继续策略。
 - 事件查询筛选。
 - 平台审计日志增强。
 - 统一错误码。
@@ -63,9 +65,12 @@
 - Dashboard。
 - History / Reports / Agents。
 - Workflow Templates。
-- Figma 风 Workflow Editor。
+- Google Material 风 Workflow Editor：步骤引导、轻量 Agent Palette、阶段泳道 Canvas、Inspector Tabs。
 - CodeAgentPanel。
 - Replay。
+- CodeAgent 文件夹工作流模板选择。
+- Workflow Editor 自定义 Agent 节点和 Human Approval 节点。
+- Models 页面平台层 API Key 更新 / 清除入口。
 
 后续建议：
 
@@ -74,6 +79,7 @@
 - 手动连线编辑。
 - Replay 过滤和搜索。
 - Figma Component Variants 同步。
+- 将自定义 Agent 从“模板节点”升级为可注册 Agent 前，需要先设计 Dynamic Workflow Runtime。
 
 ## 第三阶段：AI Agent Engine 增强
 
@@ -129,7 +135,7 @@
 ## 当前推荐路线
 
 1. 稳定 v2-only 演示版。
-2. 完善 Workflow Editor 体验。
+2. 继续打磨 Workflow Editor 演示体验。
 3. 增强 Replay 和事件分析。
 4. 提升 CodeAgent diff / 审计展示。
 5. 再进入任务生命周期和配置中心深水区。

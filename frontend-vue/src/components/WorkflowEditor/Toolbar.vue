@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Delete, Download, FolderOpened, Plus, Refresh, Upload, View } from "@element-plus/icons-vue";
+import { Delete, Download, FolderOpened, MoreFilled, Plus, Refresh, Upload, View } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -12,7 +12,7 @@ import {
   savePlatformWorkflowTemplate,
 } from "@/api/workflows";
 import type { InstantiateWorkflowResponse, WorkflowTemplate } from "@/types/workflow";
-import type { WorkflowTemplateData } from "@/types/workflowEditor";
+import type { WorkflowTemplateData, WorkflowValidationIssue } from "@/types/workflowEditor";
 
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
 
@@ -137,6 +137,29 @@ const selectedTemplateInfo = computed(() => {
   };
 });
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function confirmNewBlankWorkflow() {
+  try {
+    await ElMessageBox.confirm("确认清空当前画布并新建空白 Workflow？", "新建空白", {
+      confirmButtonText: "确认清空",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+    store.newBlankWorkflow();
+    ElMessage.success("已新建空白 Workflow");
+  } catch {
+    // User cancelled.
+  }
+}
+
 function loadSelectedTemplate() {
   if (!templateSelection.value) {
     ElMessage.warning("请选择要加载的 Workflow 模板");
@@ -150,21 +173,24 @@ function loadSelectedTemplate() {
 
     if (template) {
       store.loadTemplate(template);
-      ElMessage.success("已加载 API Workflow 模板");
+      store.autoLayoutNodes();
+      ElMessage.success("已加载并整理 API Workflow 模板");
     }
   } else if (source === "platform") {
     const template = props.platformTemplates.find((item) => item.workflowTemplateKey === key);
 
     if (template) {
       store.loadTemplateData(template);
-      ElMessage.success("已加载 MySQL Workflow 模板");
+      store.autoLayoutNodes();
+      ElMessage.success("已加载并整理 MySQL Workflow 模板");
     }
   } else {
     const template = store.savedTemplates.find((item) => item.workflowTemplateKey === key);
 
     if (template) {
       store.loadTemplateData(template);
-      ElMessage.success("已加载本地 Workflow 模板");
+      store.autoLayoutNodes();
+      ElMessage.success("已加载并整理本地 Workflow 模板");
     }
   }
 }
@@ -176,6 +202,53 @@ function showTemplateDetails() {
   }
 
   detailDialogVisible.value = true;
+}
+
+function issueHtml(issues: WorkflowValidationIssue[]) {
+  const errors = issues.filter((issue) => issue.severity === "error");
+  const warnings = issues.filter((issue) => issue.severity === "warning");
+  const list = (items: WorkflowValidationIssue[]) =>
+    items.map((issue) => `<li><strong>${escapeHtml(issue.title)}</strong>：${escapeHtml(issue.message)}</li>`).join("");
+
+  return `
+    <div class="workflow-check-result">
+      ${errors.length ? `<p><b>阻断问题 ${errors.length} 个</b></p><ul>${list(errors)}</ul>` : ""}
+      ${warnings.length ? `<p><b>提醒 ${warnings.length} 个</b></p><ul>${list(warnings)}</ul>` : ""}
+    </div>
+  `;
+}
+
+async function runWorkflowCheck(showSuccess = true) {
+  const issues = store.validateWorkflow();
+  const errors = issues.filter((issue) => issue.severity === "error");
+
+  if (issues.length) {
+    await ElMessageBox.alert(issueHtml(issues), errors.length ? "流程检查未通过" : "流程检查提醒", {
+      confirmButtonText: "知道了",
+      type: errors.length ? "error" : "warning",
+      dangerouslyUseHTMLString: true,
+    });
+  } else if (showSuccess) {
+    ElMessage.success("流程检查通过，可以保存模板或生成任务");
+  }
+
+  return errors.length === 0;
+}
+
+function previewExecutionOrder() {
+  if (!store.nodes.length) {
+    ElMessage.warning("当前画布暂无节点");
+    return;
+  }
+
+  const rows = store.orderedNodes
+    .map((node, index) => `<li><b>${index + 1}. ${escapeHtml(node.name)}</b><br/><span>${escapeHtml(node.stage)} · ${escapeHtml(node.agentKey)}</span></li>`)
+    .join("");
+
+  ElMessageBox.alert(`<ol class="execution-preview">${rows}</ol>`, "预览执行顺序", {
+    confirmButtonText: "关闭",
+    dangerouslyUseHTMLString: true,
+  });
 }
 
 async function deleteSelectedPlatformTemplate() {
@@ -280,7 +353,17 @@ function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
+async function openInstantiateDialog() {
+  if (await runWorkflowCheck(false)) {
+    instantiateDialogVisible.value = true;
+  }
+}
+
 async function createTask() {
+  if (!(await runWorkflowCheck(false))) {
+    return;
+  }
+
   instantiating.value = true;
   lastResult.value = null;
 
@@ -308,31 +391,56 @@ async function createTask() {
 
 <template>
   <el-card shadow="never" class="toolbar-card">
-    <div class="toolbar-row">
-      <el-button :icon="Plus" @click="store.newBlankWorkflow">新建空白</el-button>
-      <el-button :disabled="!store.canUndo" @click="store.undo">撤销</el-button>
-      <el-button :disabled="!store.canRedo" @click="store.redo">重做</el-button>
-      <el-button :disabled="!store.nodes.length" @click="store.autoLayoutNodes">自动整理</el-button>
-      <el-select v-model="templateSelection" placeholder="加载 Workflow 模板" class="template-select">
-        <el-option v-for="option in templateOptions" :key="option.value" :label="option.label" :value="option.value" />
-      </el-select>
-      <el-button :icon="FolderOpened" :loading="props.loadingTemplates" @click="loadSelectedTemplate">加载模板</el-button>
-      <el-button :icon="View" :disabled="!selectedTemplateInfo" @click="showTemplateDetails">模板详情</el-button>
-      <el-button
-        v-if="isJavaMode"
-        :icon="Delete"
-        type="danger"
-        plain
-        :loading="deletingPlatform"
-        :disabled="selectedTemplateInfo?.source !== 'platform'"
-        @click="deleteSelectedPlatformTemplate"
-      >
-        删除 MySQL
-      </el-button>
-      <el-button :icon="Refresh" :loading="props.loadingTemplates" @click="emit('reloadTemplates')">刷新模板</el-button>
-      <el-button :icon="Upload" type="primary" plain @click="openSaveDialog">保存模板</el-button>
-      <el-button :icon="Download" plain @click="exportJson">导出 JSON</el-button>
-      <el-button type="success" @click="instantiateDialogVisible = true">生成任务</el-button>
+    <div class="toolbar-grid">
+      <section class="toolbar-group">
+        <span class="group-label">工作流操作</span>
+        <div class="group-actions">
+          <el-button :icon="Plus" plain @click="confirmNewBlankWorkflow">新建空白</el-button>
+          <el-select v-model="templateSelection" placeholder="加载 Workflow 模板" class="template-select">
+            <el-option v-for="option in templateOptions" :key="option.value" :label="option.label" :value="option.value" />
+          </el-select>
+          <el-button :icon="FolderOpened" :loading="props.loadingTemplates" plain @click="loadSelectedTemplate">
+            加载模板
+          </el-button>
+          <el-button :disabled="!store.nodes.length" plain @click="store.autoLayoutNodes">自动整理</el-button>
+        </div>
+      </section>
+
+      <section class="toolbar-group">
+        <span class="group-label">预览与校验</span>
+        <div class="group-actions">
+          <el-button :icon="View" plain @click="runWorkflowCheck()">检查流程</el-button>
+          <el-button plain @click="previewExecutionOrder">预览执行顺序</el-button>
+        </div>
+      </section>
+
+      <section class="toolbar-group primary-group">
+        <span class="group-label">主要动作</span>
+        <div class="group-actions">
+          <el-button :icon="Upload" type="primary" plain @click="openSaveDialog">保存模板</el-button>
+          <el-button type="success" class="create-task-button" @click="openInstantiateDialog">生成任务</el-button>
+          <el-dropdown trigger="click">
+            <el-button :icon="MoreFilled" circle plain />
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item :icon="View" :disabled="!selectedTemplateInfo" @click="showTemplateDetails">
+                  模板详情
+                </el-dropdown-item>
+                <el-dropdown-item :icon="Refresh" @click="emit('reloadTemplates')">刷新模板</el-dropdown-item>
+                <el-dropdown-item :icon="Download" @click="exportJson">导出 JSON</el-dropdown-item>
+                <el-dropdown-item
+                  v-if="isJavaMode"
+                  :icon="Delete"
+                  :disabled="selectedTemplateInfo?.source !== 'platform'"
+                  @click="deleteSelectedPlatformTemplate"
+                >
+                  删除 MySQL 模板
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </section>
     </div>
 
     <el-alert
@@ -470,18 +578,49 @@ async function createTask() {
 
 <style scoped>
 .toolbar-card {
-  border-radius: 8px;
+  border: 1px solid #dadce0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(60, 64, 67, 0.08);
 }
 
-.toolbar-row {
+.toolbar-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr) auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.toolbar-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.group-label {
+  color: #5f6368;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.group-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 
+.primary-group {
+  justify-self: end;
+}
+
 .template-select {
-  width: 260px;
+  width: min(280px, 100%);
+}
+
+.create-task-button {
+  min-width: 104px;
+  font-weight: 800;
 }
 
 .toolbar-result,
@@ -516,5 +655,32 @@ async function createTask() {
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
   line-height: 1.55;
+}
+
+:global(.workflow-check-result ul),
+:global(.execution-preview) {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+:global(.workflow-check-result li),
+:global(.execution-preview li) {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+:global(.execution-preview span) {
+  color: #5f6368;
+  font-size: 12px;
+}
+
+@media (max-width: 1180px) {
+  .toolbar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .primary-group {
+    justify-self: stretch;
+  }
 }
 </style>

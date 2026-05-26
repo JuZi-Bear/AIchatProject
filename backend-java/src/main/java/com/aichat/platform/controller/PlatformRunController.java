@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -46,6 +47,21 @@ public class PlatformRunController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "platform run not found: " + platformRunId));
 
         return ApiResponse.ok(runRecordService.cancelRun(platformRunId));
+    }
+
+    @PostMapping("/{platformRunId}/approval")
+    public ApiResponse<RunRecordEntity> approvePlatformRun(
+            @PathVariable String platformRunId,
+            @RequestBody(required = false) Map<String, Object> request
+    ) {
+        runRecordService.getRecord(platformRunId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "platform run not found: " + platformRunId));
+
+        Map<String, Object> safeRequest = request == null ? Map.of() : request;
+        boolean approved = Boolean.parseBoolean(String.valueOf(safeRequest.getOrDefault("approved", false)));
+        String comment = String.valueOf(safeRequest.getOrDefault("comment", ""));
+
+        return ApiResponse.ok(runRecordService.approveRun(platformRunId, approved, comment));
     }
 
     @GetMapping("/{platformRunId}/events")

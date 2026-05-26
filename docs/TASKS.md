@@ -58,9 +58,33 @@
 
 - [x] Workflow Editor 小地图。
 - [x] Workflow Editor 多选和框选。
-- [ ] Workflow Editor 手动连线编辑。
+- [x] Workflow Editor 手动连线编辑。
+- [x] Workflow Editor 连接线选中和删除。
+- [x] Workflow Editor 自动顺序连线按钮。
+- [x] Workflow Editor 小地图连接预览。
+- [x] Workflow Editor 连线视觉增强。
+- [x] Workflow Editor Bezier noodle 曲线连线。
+- [x] Workflow Editor 端点/箭头视觉分层。
+- [x] Workflow Editor Palette 避让路径。
+- [x] Workflow Editor Google Material 演示布局。
+- [x] Workflow Editor 顶部步骤引导和分组工具栏。
+- [x] Workflow Editor 轻量 Agent Palette 和 CodeAgent 高光。
+- [x] Workflow Editor 阶段泳道 Canvas。
+- [x] Workflow Editor Inspector Tabs 和流程检查。
+- [x] CodeAgent 文件夹工作流模板。
+- [x] Project Workspace 受控工作区管理。
+- [x] CodeAgent 文件夹模式接入默认 Workspace 与安全摘要。
+- [x] Workflow Editor Human Approval 节点。
+- [x] Workflow Editor 自定义 Agent 节点编辑。
+- [x] Java 平台人工确认 API。
+- [x] Java 平台模型 API Key 安全状态管理。
+- [x] Models 页面 API Key 更新 / 清除入口。
 - [x] Replay 事件筛选和搜索。
 - [x] Dashboard 最近 CodeAgent 操作卡片增强。
+- [x] RunConsole 结构化需求构造器。
+- [x] RunConsole 运行结果高光区。
+- [x] RunConsole 结果详情紧凑化。
+- [ ] 动态 LangGraph 编排预研。
 - [ ] 更强 CodeAgent diff 可视化。
 - [ ] C++ Runner 资源限制增强。
 

@@ -22,8 +22,11 @@ Vue3 + TypeScript
 - Agent 注册中心：Python 管理 Agent 元信息，Vue `/agents` 展示注册表。
 - Prompt 模板：主要 Agent Prompt 存放在 `prompts/`。
 - Workflow 模板：内置模板 + Java/MySQL 自定义模板保存、版本、删除和实例化。
-- Workflow Editor：Figma 风无限画布、左侧浮动 Palette、右侧属性浮层。
-- CodeAgent：受控执行 `read_file`、`write_file`、`list_files`，记录 JSONL 审计日志和 RunEvent。
+- Workflow Editor：Google Material 风演示编辑器，支持模板保存、手动连线、自定义 Agent 节点和 Human Approval 节点。
+- CodeAgent：受控执行单文件和文件夹工作区操作，支持模板填充、dry-run diff、备份、JSONL 审计日志和 RunEvent。
+- Project Workspace：Java Gateway + MySQL 保存受控工作区，CodeAgent 文件夹模式可选择默认工作区并展示安全摘要。
+- 平台人工确认：Java Gateway 可记录 `WAITING_FOR_HUMAN`、批准/拒绝事件，并在 Replay 中展示。
+- 模型密钥管理：Java Gateway 模式下 Models 页面可更新平台层 API Key 状态，GET 接口只返回 masked 信息，不返回明文。
 - C++ Runner Sandbox：可选安全执行增强，默认仍保留 Python Runner fallback。
 - Figma-first UI：`figma/` 保存设计 token、页面映射和组件清单。
 
@@ -158,9 +161,19 @@ figma/              Figma-first UI 设计源规范
 - `docs/FIGMA_UI_WORKFLOW.md`：Figma-first UI 工作流。
 - `docs/CODEX_PROJECT_CONTEXT.md`：Codex 协作上下文。
 
+## 最新扩展
+
+- CodeAgent 文件夹模式新增工作流模板选择，可一键填充工作区、include/exclude、输出文件、dry-run 和备份策略。
+- Workspace 页面新增受控工作区管理，可保存默认文件夹、读取限制、dry-run 和备份策略；Python CodeAgent 仍做最终白名单裁判。
+- Workflow Editor 新增 `Human Approval` 和 `Custom Agent` 节点；第一阶段用于模板、回放和人工确认事件，不动态改写 LangGraph。
+- Java 新增 `POST /api/platform/runs/{platformRunId}/approval`，用于批准或拒绝等待人工确认的任务。
+- Java 新增 `GET/POST/DELETE /api/platform/secrets/models`，用于平台层模型 API Key 状态管理和加密保存。
+
 ## 当前限制
 
-- Workflow Editor 当前生成平台模板和可回放任务视图，不直接改写 LangGraph 主流程。
+- Workflow Editor 当前生成平台模板和可回放任务视图，前端可视化连线不直接改写 LangGraph 主流程。
+- 自定义 Agent 节点当前保存到模板 JSON，不会自动注册到 Python Agent Registry。
+- 前端 API Key 管理仅 Java Gateway 模式可用；Python Direct 模式仍建议使用 `.env`。
 - CodeAgent 是简化文件操作模块，不是完整 Codex。
 - C++ Runner Sandbox 是可选增强，不默认替代 Python Runner。
 - 用户系统、权限系统、团队协作和任务队列暂未启用。
@@ -170,6 +183,6 @@ figma/              Figma-first UI 设计源规范
 优先稳定 v2-only 演示版：
 
 1. 复跑最终验收脚本并记录结果。
-2. 微调 Workflow Editor 交互体验。
+2. 继续微调 Workflow Editor 演示体验和 Figma 设计源同步。
 3. 将 Figma 设计源与 Vue 页面继续保持同步。
 4. 暂缓用户系统、权限和动态 LangGraph 编排。

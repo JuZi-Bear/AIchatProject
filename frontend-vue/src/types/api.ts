@@ -18,6 +18,7 @@ export type { RunEvent } from "./runEvent";
 export type { InstantiateWorkflowRequest, InstantiateWorkflowResponse, WorkflowTemplate } from "./workflow";
 export type { AgentNodeData, ConnectionData, WorkflowEditorState, WorkflowTemplateData } from "./workflowEditor";
 export type { CodeAgentOperation, CodeAgentOperationResult, CodeAgentRequest, CodeAgentResponse } from "./codeAgent";
+export type { WorkspaceConfig, WorkspaceLimitPolicy, WorkspaceSafetyStatus } from "./workspace";
 export type {
   DemoCase,
   DemoCaseKey,

@@ -15,10 +15,16 @@ public class ModelController {
 
     private final PythonAgentClient pythonAgentClient;
     private final ModelConfigRepository modelConfigRepository;
+    private final com.aichat.platform.service.ModelSecretService modelSecretService;
 
-    public ModelController(PythonAgentClient pythonAgentClient, ModelConfigRepository modelConfigRepository) {
+    public ModelController(
+            PythonAgentClient pythonAgentClient,
+            ModelConfigRepository modelConfigRepository,
+            com.aichat.platform.service.ModelSecretService modelSecretService
+    ) {
         this.pythonAgentClient = pythonAgentClient;
         this.modelConfigRepository = modelConfigRepository;
+        this.modelSecretService = modelSecretService;
     }
 
     @GetMapping
@@ -41,7 +47,8 @@ public class ModelController {
                 entity.getEnvKey(),
                 entity.isEnabled(),
                 null,
-                null,
+                modelSecretService.hasStoredSecret(entity)
+                        || (entity.getEnvKey() != null && System.getenv(entity.getEnvKey()) != null),
                 entity.isDefaultModel(),
                 entity.isDefaultModel()
         );

@@ -32,47 +32,112 @@ const runnerLabel = computed(() => runnerDisplayLabel(summary.value?.runner_mode
 <template>
   <el-empty v-if="!response" description="等待运行结果" />
   <div v-else class="result-overview">
-    <el-descriptions :column="2" border>
-      <el-descriptions-item label="run_id">{{ response.run_id || "未生成" }}</el-descriptions-item>
-      <el-descriptions-item label="用户需求">
-        <span class="inline-long">{{ requirementText }}</span>
-      </el-descriptions-item>
-      <el-descriptions-item label="是否成功">
+    <div class="overview-grid">
+      <div class="overview-item wide">
+        <span>run_id</span>
+        <strong>{{ response.run_id || "未生成" }}</strong>
+      </div>
+      <div class="overview-item">
+        <span>成功状态</span>
         <el-tag :type="summary?.success ? 'success' : 'danger'" effect="plain">
           {{ summary?.success ? "成功" : "失败" }}
         </el-tag>
-      </el-descriptions-item>
-      <el-descriptions-item label="修复次数">{{ summary?.retry_count ?? 0 }}</el-descriptions-item>
-      <el-descriptions-item label="测试是否通过">
+      </div>
+      <div class="overview-item">
+        <span>修复次数</span>
+        <strong>{{ summary?.retry_count ?? 0 }}</strong>
+      </div>
+      <div class="overview-item">
+        <span>测试状态</span>
         <el-tag :type="summary?.test_success ? 'success' : 'danger'" effect="plain">
           {{ summary?.test_success ? "通过" : "未通过" }}
         </el-tag>
-      </el-descriptions-item>
-      <el-descriptions-item label="覆盖率">{{ summary?.coverage_percent ?? 0 }}%</el-descriptions-item>
-      <el-descriptions-item label="质量评分">{{ summary?.quality_score ?? 0 }}</el-descriptions-item>
-      <el-descriptions-item label="Runner">
-        {{ runnerLabel }}
-      </el-descriptions-item>
-      <el-descriptions-item v-if="summary?.runner_warning" label="Runner Warning" :span="2">
-        <span class="inline-long">{{ summary.runner_warning }}</span>
-      </el-descriptions-item>
-      <el-descriptions-item label="报告路径">
-        <span class="inline-long">{{ summary?.report_path || "暂无报告" }}</span>
-      </el-descriptions-item>
-      <el-descriptions-item label="错误摘要" :span="2">
-        <span class="inline-long">{{ errorSummary }}</span>
-      </el-descriptions-item>
-    </el-descriptions>
+      </div>
+      <div class="overview-item">
+        <span>覆盖率</span>
+        <strong>{{ summary?.coverage_percent ?? 0 }}%</strong>
+      </div>
+      <div class="overview-item">
+        <span>质量评分</span>
+        <strong>{{ summary?.quality_score ?? 0 }}</strong>
+      </div>
+      <div class="overview-item">
+        <span>Runner</span>
+        <strong>{{ runnerLabel }}</strong>
+      </div>
+    </div>
+
+    <el-collapse class="overview-collapse">
+      <el-collapse-item title="用户需求" name="requirement">
+        <p class="inline-long">{{ requirementText }}</p>
+      </el-collapse-item>
+      <el-collapse-item title="报告路径" name="report">
+        <p class="inline-long">{{ summary?.report_path || "暂无报告" }}</p>
+      </el-collapse-item>
+      <el-collapse-item title="错误摘要 / Runner Warning" name="error">
+        <p v-if="summary?.runner_warning" class="inline-long warning-text">{{ summary.runner_warning }}</p>
+        <p class="inline-long">{{ errorSummary }}</p>
+      </el-collapse-item>
+    </el-collapse>
   </div>
 </template>
 
 <style scoped>
-.result-overview :deep(.el-descriptions__cell) {
-  vertical-align: top;
+.result-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overview-item {
+  display: grid;
+  gap: 6px;
+  min-height: 76px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.overview-item.wide {
+  grid-column: span 2;
+}
+
+.overview-item span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.overview-item strong {
+  overflow: hidden;
+  color: #0f172a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-collapse {
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .inline-long {
+  margin: 0;
   overflow-wrap: anywhere;
   line-height: 1.6;
+}
+
+.warning-text {
+  color: #b45309;
+}
+
+@media (max-width: 1280px) {
+  .overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

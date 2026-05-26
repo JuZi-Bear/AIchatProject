@@ -17,3 +17,15 @@ export type ModelConfig = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type ModelSecretStatus = {
+  provider: string;
+  name: string;
+  envKey: string;
+  configured: boolean;
+  stored: boolean;
+  envConfigured: boolean;
+  maskedKey: string;
+  updatedAt: string;
+  message: string;
+};

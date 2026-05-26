@@ -81,7 +81,9 @@ function normalizeNode(node: Partial<AgentNodeData>, index: number): AgentNodeDa
   return {
     nodeId: node.nodeId || `${node.agentKey || "agent"}_${index + 1}`,
     agentKey: node.agentKey || "",
+    nodeType: node.nodeType,
     name: node.name || node.agentKey || `Agent ${index + 1}`,
+    role: node.role,
     position: {
       x: Number(node.position?.x ?? 80 + (index % 3) * 260),
       y: Number(node.position?.y ?? 80 + Math.floor(index / 3) * 150),
@@ -91,6 +93,9 @@ function normalizeNode(node: Partial<AgentNodeData>, index: number): AgentNodeDa
     stage: node.stage || "custom",
     enabled: node.enabled ?? true,
     description: node.description || "",
+    codeAgentConfig: node.codeAgentConfig,
+    humanApprovalConfig: node.humanApprovalConfig,
+    customAgentMeta: node.customAgentMeta,
   };
 }
 

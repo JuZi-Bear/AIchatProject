@@ -60,6 +60,10 @@ function toggleSidebar() {
           <el-icon><Connection /></el-icon>
           <span>Models</span>
         </el-menu-item>
+        <el-menu-item index="/workspace">
+          <el-icon><Files /></el-icon>
+          <span>Workspace</span>
+        </el-menu-item>
         <el-menu-item index="/plugins">
           <el-icon><SetUp /></el-icon>
           <span>Plugins</span>

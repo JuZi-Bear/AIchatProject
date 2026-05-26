@@ -10,7 +10,9 @@ import DemoWorkflowStage from "@/components/DemoWorkflowStage.vue";
 import CodeAgentPanel from "@/components/WorkflowEditor/CodeAgentPanel.vue";
 import RepairHighlight from "@/components/RepairHighlight.vue";
 import ReportPreview from "@/components/ReportPreview.vue";
+import RequirementBuilder from "@/components/RunConsole/RequirementBuilder.vue";
 import ResultOverview from "@/components/ResultOverview.vue";
+import RunResultHighlight from "@/components/RunConsole/RunResultHighlight.vue";
 import SummaryCards from "@/components/SummaryCards.vue";
 import WorkflowTimeline from "@/components/WorkflowTimeline.vue";
 import { currentApiMode, getApiModeLabel } from "@/api/client";
@@ -64,6 +66,7 @@ const result = ref<RunResponse | null>(null);
 const errorDetail = ref("");
 const lastRequirement = ref("");
 const selectedDemoCaseKey = ref<DemoCaseKey>("auto_repair");
+const controlPanelMode = ref<"workflow" | "codeAgent">("workflow");
 const liveEvents = ref<RunEvent[]>([]);
 const liveEventError = ref("");
 const liveEventStreaming = ref(false);
@@ -282,6 +285,16 @@ function handleDemoCaseChange(caseKey: DemoCaseKey) {
   applyDemoCase(caseKey);
 }
 
+function handleRequirementTemplateApplied(payload: {
+  key: string;
+  useCodeAgent: boolean;
+  codeAgentOperation: string;
+}) {
+  if (payload.useCodeAgent || payload.key.startsWith("code_agent")) {
+    controlPanelMode.value = "codeAgent";
+  }
+}
+
 async function loadOptions() {
   loadingOptions.value = true;
 
@@ -403,9 +416,23 @@ watch(
 
     <el-row :gutter="16">
       <el-col :lg="8" :md="24">
-        <section class="panel">
-          <div class="panel-title">运行参数</div>
-          <el-form label-position="top" :disabled="running">
+        <section class="panel run-control-panel">
+          <div class="control-head">
+            <div>
+              <div class="panel-title">运行控制台</div>
+              <p>{{ controlPanelMode === "workflow" ? "配置并提交 AI 工作流任务" : "执行受控文件操作并查看审计事件" }}</p>
+            </div>
+            <el-tag type="primary" effect="plain">
+              {{ controlPanelMode === "workflow" ? "Workflow" : "CodeAgent" }}
+            </el-tag>
+          </div>
+
+          <el-radio-group v-model="controlPanelMode" class="control-mode-switch">
+            <el-radio-button label="workflow">AI 工作流运行</el-radio-button>
+            <el-radio-button label="codeAgent">CodeAgent 文件操作</el-radio-button>
+          </el-radio-group>
+
+          <el-form v-if="controlPanelMode === 'workflow'" label-position="top" :disabled="running" class="control-body">
             <el-form-item label="演示模式">
               <el-switch v-model="form.demo_mode" active-text="启用比赛演示模式" />
             </el-form-item>
@@ -430,6 +457,14 @@ watch(
                 </el-option>
               </el-select>
               <div class="form-help">{{ selectedDemoCase.description }}</div>
+            </el-form-item>
+
+            <el-form-item label="需求构造">
+              <RequirementBuilder
+                v-model="form.requirement"
+                :disabled="running"
+                @template-applied="handleRequirementTemplateApplied"
+              />
             </el-form-item>
 
             <el-form-item label="需求输入">
@@ -498,11 +533,11 @@ watch(
               开始运行
             </el-button>
           </el-form>
-        </section>
 
-        <div class="code-agent-runconsole">
-          <CodeAgentPanel always-visible />
-        </div>
+          <div v-else class="control-body">
+            <CodeAgentPanel always-visible embedded />
+          </div>
+        </section>
       </el-col>
 
       <el-col :lg="16" :md="24">
@@ -540,6 +575,15 @@ watch(
             </router-link>
           </template>
         </el-alert>
+
+        <RunResultHighlight
+          :response="result"
+          :requirement="lastRequirement || form.requirement"
+          :live-events="liveEvents"
+          :is-java-mode="isJavaMode"
+          :running="running"
+          :error-detail="errorDetail"
+        />
 
         <section v-if="showLiveEvents" class="panel live-event-panel">
           <div class="live-event-head">
@@ -654,8 +698,48 @@ watch(
   margin-bottom: 16px;
 }
 
-.code-agent-runconsole {
-  margin-top: 16px;
+.run-control-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.control-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.control-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.control-mode-switch {
+  width: 100%;
+}
+
+.control-mode-switch :deep(.el-radio-button) {
+  flex: 1;
+}
+
+.control-mode-switch :deep(.el-radio-button__inner) {
+  width: 100%;
+  border-color: #d2e3fc;
+  color: #1a73e8;
+  font-weight: 700;
+}
+
+.control-mode-switch :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  border-color: #1a73e8;
+  background: #1a73e8;
+  box-shadow: -1px 0 0 0 #1a73e8;
+}
+
+.control-body {
+  min-width: 0;
 }
 
 .demo-case-option {

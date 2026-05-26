@@ -25,6 +25,8 @@ const keyword = ref("");
 const stageFilter = ref("all");
 const lastInstantiateResult = ref<InstantiateWorkflowResponse | null>(null);
 const paletteCollapsed = ref(localStorage.getItem("ai-agent-pipeline.workflow-editor.palette-collapsed") === "true");
+const codeAgentHintOpen = ref(false);
+const paletteAvoidanceWidth = computed(() => (paletteCollapsed.value ? 80 : 310));
 
 const loading = reactive({
   agents: false,
@@ -65,22 +67,67 @@ const branchAgents: AgentMeta[] = [
     enabled: true,
     version: "1.0",
   },
+  {
+    key: "human_approval",
+    name: "Human Approval",
+    role: "人工确认节点",
+    description: "在平台层暂停工作流，等待用户批准、拒绝或补充说明。",
+    input_fields: ["approval_context"],
+    output_fields: ["approval_result", "human_comment"],
+    stage: "approval",
+    enabled: true,
+    version: "1.0",
+  },
+  {
+    key: "custom_agent",
+    name: "Custom Agent",
+    role: "自定义模板智能体",
+    description: "仅保存到 Workflow 模板中的可视化 Agent 节点，后续可升级为动态 Agent。",
+    input_fields: ["input"],
+    output_fields: ["custom_result"],
+    stage: "custom",
+    enabled: true,
+    version: "1.0",
+  },
 ];
 
 const paletteAgents = computed(() => [...agents.value, ...branchAgents]);
 const selectedNode = computed(() => store.selectedNode);
 const selectedIsCodeAgent = computed(() => selectedNode.value?.agentKey === "code_agent");
+const editorSteps = ["选择模板", "拖拽或调整节点", "检查流程", "保存模板", "生成任务"];
+const activeStep = computed(() => {
+  if (!store.nodes.length) {
+    return 0;
+  }
 
-const stageOptions = computed(() => {
-  const stages = new Set(paletteAgents.value.map((agent) => agent.stage).filter(Boolean));
-  return [...stages].sort();
+  if (store.validateWorkflow().some((issue) => issue.severity === "error")) {
+    return 2;
+  }
+
+  if (lastInstantiateResult.value) {
+    return 4;
+  }
+
+  return 3;
 });
+const stageOptions = [
+  { label: "全部", value: "all" },
+  { label: "Analysis", value: "analysis" },
+  { label: "Implementation", value: "implementation" },
+  { label: "Testing", value: "testing" },
+  { label: "Execution", value: "execution" },
+  { label: "Repair", value: "repair" },
+  { label: "Code Ops", value: "code_ops" },
+  { label: "Approval", value: "approval" },
+  { label: "Custom", value: "custom" },
+  { label: "Report", value: "report" },
+];
 
 const filteredAgents = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase();
 
   return paletteAgents.value.filter((agent) => {
-    if (stageFilter.value !== "all" && agent.stage !== stageFilter.value) {
+    if (stageFilter.value !== "all" && normalizeStage(agent) !== stageFilter.value) {
       return false;
     }
 
@@ -92,9 +139,61 @@ const filteredAgents = computed(() => {
   });
 });
 
-const enabledNodeCount = computed(() => store.nodes.filter((node) => node.enabled).length);
+const workflowStats = computed(() => ({
+  agents: agents.value.length,
+  templates: templates.value.length + platformTemplates.value.length + store.savedTemplates.length,
+}));
+
+function normalizeStage(agent: Pick<AgentMeta, "key" | "stage">) {
+  const key = agent.key.toLowerCase();
+  const stage = (agent.stage || "").toLowerCase();
+
+  if (key === "code_agent") {
+    return "code_ops";
+  }
+
+  if (key.includes("product")) {
+    return "analysis";
+  }
+
+  if (key.includes("coder")) {
+    return "implementation";
+  }
+
+  if (key.includes("tester")) {
+    return "testing";
+  }
+
+  if (key.includes("runner")) {
+    return "execution";
+  }
+
+  if (key.includes("sentry")) {
+    return "repair";
+  }
+
+  if (key.includes("report")) {
+    return "report";
+  }
+
+  if (key === "human_approval") {
+    return "approval";
+  }
+
+  if (key === "custom_agent") {
+    return "custom";
+  }
+
+  return stage === "branch" ? "repair" : stage || "implementation";
+}
+
+function stageLabel(agent: Pick<AgentMeta, "key" | "stage">) {
+  return stageOptions.find((option) => option.value === normalizeStage(agent))?.label || agent.stage || "Custom";
+}
 
 function startPaletteDrag(agent: AgentMeta, event: DragEvent) {
+  store.clearSelection();
+  store.clearConnectionSelection();
   event.dataTransfer?.setData("application/x-agent-key", agent.key);
   event.dataTransfer?.setData("text/plain", agent.key);
 
@@ -164,7 +263,14 @@ function closeInspector() {
   store.selectNode("");
 }
 
-onMounted(refreshAll);
+onMounted(() => {
+  if (window.innerWidth < 1180 && !paletteCollapsed.value) {
+    paletteCollapsed.value = true;
+    localStorage.setItem("ai-agent-pipeline.workflow-editor.palette-collapsed", "true");
+  }
+
+  void refreshAll();
+});
 </script>
 
 <template>
@@ -172,17 +278,16 @@ onMounted(refreshAll);
     <div class="page-header">
       <div>
         <h1>Workflow Editor</h1>
-        <p>Figma 风无限画布：拖拽 Agent、配置节点、保存模板并生成任务视图</p>
+        <p>可视化编排 Agent 节点，生成单人演示工作流</p>
       </div>
-      <el-button :icon="Refresh" :loading="loading.agents || loading.templates" @click="refreshAll">刷新</el-button>
-    </div>
-
-    <div class="mode-tags">
-      <el-tag type="primary" effect="plain">API 模式：{{ apiModeLabel }}</el-tag>
-      <el-tag type="success" effect="plain">Agent Palette：{{ agents.length }}</el-tag>
-      <el-tag type="success" effect="plain">Workflow 模板：{{ templates.length }}</el-tag>
-      <el-tag v-if="isJavaMode" type="success" effect="plain">MySQL 模板：{{ platformTemplates.length }}</el-tag>
-      <el-tag type="warning" effect="plain">当前编辑器不改变默认 LangGraph 流程</el-tag>
+      <div class="header-meta">
+        <el-tag type="primary" effect="plain">{{ apiModeLabel }}</el-tag>
+        <el-tag type="success" effect="plain">Workflow {{ workflowStats.templates }}</el-tag>
+        <el-tag type="success" effect="plain">Agents {{ workflowStats.agents }}</el-tag>
+        <el-button :icon="Refresh" :loading="loading.agents || loading.templates" plain @click="refreshAll">
+          刷新
+        </el-button>
+      </div>
     </div>
 
     <EditorToolbar
@@ -201,8 +306,36 @@ onMounted(refreshAll);
       :closable="false"
     />
 
+    <section class="editor-guide">
+      <div
+        v-for="(step, index) in editorSteps"
+        :key="step"
+        class="guide-step"
+        :class="{ active: index === activeStep, done: index < activeStep }"
+      >
+        <span>{{ index + 1 }}</span>
+        <strong>{{ step }}</strong>
+      </div>
+    </section>
+
+    <section class="code-agent-hint" :class="{ open: codeAgentHintOpen }">
+      <button type="button" class="hint-toggle" @click="codeAgentHintOpen = !codeAgentHintOpen">
+        <div>
+          <strong>CodeAgent 文件操作节点</strong>
+          <span>读取项目文件、跨文件写入、JSONL 审计和安全阻断</span>
+        </div>
+        <el-tag type="primary" effect="plain">{{ codeAgentHintOpen ? "收起" : "展开" }}</el-tag>
+      </button>
+      <div v-if="codeAgentHintOpen" class="hint-body">
+        <el-tag effect="plain">read_file</el-tag>
+        <el-tag effect="plain">write_file</el-tag>
+        <el-tag effect="plain">list_files</el-tag>
+        <span>受 allowed_paths 白名单限制，自动阻断 .env 等敏感路径，事件可在 RunConsole / Replay 中查看。</span>
+      </div>
+    </section>
+
     <section class="editor-workspace">
-      <WorkflowCanvas :agents="paletteAgents" />
+      <WorkflowCanvas :agents="paletteAgents" :palette-avoidance-width="paletteAvoidanceWidth" />
 
       <aside class="floating-palette" :class="{ collapsed: paletteCollapsed }" v-loading="loading.agents">
         <button class="palette-toggle" type="button" @click="togglePalette">
@@ -225,11 +358,11 @@ onMounted(refreshAll);
           </div>
 
           <div class="palette-filters">
-            <el-input v-model="keyword" :prefix-icon="Search" clearable placeholder="搜索 Agent / CodeAgent / Branch" />
+            <el-input v-model="keyword" :prefix-icon="Search" clearable placeholder="搜索节点" />
             <el-select v-model="stageFilter">
               <el-option label="全部阶段" value="all" />
-              <el-option v-for="stage in stageOptions" :key="stage" :label="stage" :value="stage" />
-            </el-select>
+            <el-option v-for="stage in stageOptions" :key="stage.value" :label="stage.label" :value="stage.value" />
+          </el-select>
           </div>
 
           <el-empty v-if="!loading.agents && !filteredAgents.length" description="暂无可用 Agent" />
@@ -238,13 +371,18 @@ onMounted(refreshAll);
               v-for="agent in filteredAgents"
               :key="agent.key"
               class="palette-agent"
-              :class="{ branch: agent.stage === 'branch', code: agent.key === 'code_agent' }"
+              :class="{
+                branch: agent.stage === 'branch',
+                code: agent.key === 'code_agent',
+                approval: agent.key === 'human_approval',
+                custom: agent.key === 'custom_agent',
+              }"
               draggable="true"
               @dragstart="startPaletteDrag(agent, $event)"
             >
               <div class="palette-agent-main">
                 <strong>{{ agent.name }}</strong>
-                <span>{{ agent.key }} · {{ agent.stage }}</span>
+                <span>{{ stageLabel(agent) }} · {{ agent.key }}</span>
               </div>
               <el-tag
                 :type="agent.stage === 'branch' ? 'warning' : agent.enabled ? 'success' : 'info'"
@@ -253,7 +391,17 @@ onMounted(refreshAll);
               >
                 {{ agent.enabled ? "enabled" : "disabled" }}
               </el-tag>
-              <p>{{ agent.description || "暂无描述" }}</p>
+              <p>
+                {{
+                  agent.key === "code_agent"
+                    ? "文件读取 / 跨文件修改 / 审计日志"
+                    : agent.key === "human_approval"
+                      ? "人工确认 / 审批暂停 / 继续或拒绝"
+                      : agent.key === "custom_agent"
+                        ? "前端可编辑 / 保存到模板 / 暂不动态执行"
+                    : agent.description || "暂无描述"
+                }}
+              </p>
             </article>
           </div>
         </div>
@@ -274,26 +422,11 @@ onMounted(refreshAll);
 
           <div class="inspector-scroll">
             <NodePropertiesPanel embedded />
-            <CodeAgentPanel v-if="selectedIsCodeAgent" always-visible />
-
-            <el-card shadow="never" class="preview-card">
-              <template #header>实时预览</template>
-              <div class="preview-metrics">
-                <el-tag type="primary" effect="plain">节点 {{ store.nodes.length }}</el-tag>
-                <el-tag type="success" effect="plain">启用 {{ enabledNodeCount }}</el-tag>
-                <el-tag effect="plain">连线 {{ store.connections.length }}</el-tag>
-              </div>
-              <div class="preview-list">
-                <article v-for="(node, index) in store.orderedNodes" :key="node.nodeId" class="preview-item">
-                  <span>{{ index + 1 }}</span>
-                  <div>
-                    <strong>{{ node.name }}</strong>
-                    <small>{{ node.stage }} · {{ node.enabled ? "启用" : "禁用" }}</small>
-                  </div>
-                </article>
-              </div>
-              <el-empty v-if="!store.nodes.length" description="暂无节点顺序" />
-            </el-card>
+            <el-collapse v-if="selectedIsCodeAgent" class="code-agent-executor">
+              <el-collapse-item title="执行 CodeAgent 节点" name="code-agent-exec">
+                <CodeAgentPanel always-visible />
+              </el-collapse-item>
+            </el-collapse>
           </div>
         </aside>
       </transition>
@@ -304,18 +437,135 @@ onMounted(refreshAll);
 <style scoped>
 .workflow-editor-page {
   gap: 12px;
+  color: #202124;
 }
 
-.mode-tags {
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-header h1 {
+  margin: 0;
+  color: #202124;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+  color: #5f6368;
+}
+
+.header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.editor-guide {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.guide-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #5f6368;
+  box-shadow: 0 6px 16px rgba(60, 64, 67, 0.06);
+}
+
+.guide-step span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1f3f4;
+  color: #5f6368;
+  font-weight: 800;
+}
+
+.guide-step strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-step.done span {
+  background: #e6f4ea;
+  color: #188038;
+}
+
+.guide-step.active {
+  border-color: #8ab4f8;
+  background: #e8f0fe;
+  color: #174ea6;
+}
+
+.guide-step.active span {
+  background: #1a73e8;
+  color: #ffffff;
+}
+
+.code-agent-hint {
+  border: 1px solid #dadce0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(60, 64, 67, 0.06);
+}
+
+.hint-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hint-toggle div {
+  display: grid;
+  gap: 2px;
+}
+
+.hint-toggle strong {
+  color: #202124;
+}
+
+.hint-toggle span,
+.hint-body span {
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.hint-body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+  padding: 0 14px 12px;
 }
 
 .editor-workspace {
   position: relative;
-  height: clamp(680px, calc(100vh - 210px), 900px);
-  border-radius: 12px;
+  height: clamp(660px, calc(100vh - 222px), 940px);
+  border-radius: 16px;
 }
 
 .floating-palette {
@@ -323,16 +573,16 @@ onMounted(refreshAll);
   top: 14px;
   bottom: 14px;
   left: 14px;
-  z-index: 12;
+  z-index: 10;
   display: grid;
   grid-template-rows: auto 1fr;
-  width: 322px;
-  padding: 12px;
+  width: 260px;
+  padding: 10px;
   overflow: hidden;
-  border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.14);
+  border: 1px solid rgba(218, 220, 224, 0.92);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 46px rgba(60, 64, 67, 0.14);
   backdrop-filter: blur(14px);
   transition:
     width 220ms cubic-bezier(0.2, 0, 0, 1),
@@ -341,7 +591,7 @@ onMounted(refreshAll);
 }
 
 .floating-palette.collapsed {
-  width: 64px;
+  width: 58px;
   padding: 10px 8px;
 }
 
@@ -352,10 +602,10 @@ onMounted(refreshAll);
   gap: 6px;
   width: 100%;
   height: 34px;
-  border: 1px solid #dbeafe;
+  border: 1px solid #d2e3fc;
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #e8f0fe;
+  color: #1a73e8;
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -365,7 +615,7 @@ onMounted(refreshAll);
 }
 
 .palette-toggle:hover {
-  background: #dbeafe;
+  background: #d2e3fc;
   transform: translateY(-1px);
 }
 
@@ -379,7 +629,7 @@ onMounted(refreshAll);
   align-content: center;
   gap: 12px;
   min-height: 0;
-  color: #1e40af;
+  color: #1a73e8;
 }
 
 .palette-rail strong {
@@ -394,8 +644,8 @@ onMounted(refreshAll);
   height: 28px;
   place-items: center;
   border-radius: 50%;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #e8f0fe;
+  color: #1a73e8;
   font-weight: 900;
 }
 
@@ -420,12 +670,12 @@ onMounted(refreshAll);
 }
 
 .palette-head strong {
-  color: #0f172a;
+  color: #202124;
   font-size: 15px;
 }
 
 .palette-head span {
-  color: #64748b;
+  color: #5f6368;
   font-size: 12px;
 }
 
@@ -437,7 +687,7 @@ onMounted(refreshAll);
 
 .palette-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
   overflow: auto;
   padding: 2px 2px 4px;
@@ -447,9 +697,9 @@ onMounted(refreshAll);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  padding: 10px;
-  border: 1px solid #dbe4ef;
-  border-radius: 10px;
+  padding: 10px 11px;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
   background: #ffffff;
   cursor: grab;
   transition:
@@ -459,8 +709,8 @@ onMounted(refreshAll);
 }
 
 .palette-agent:hover {
-  border-color: #93c5fd;
-  box-shadow: 0 10px 22px rgba(30, 64, 175, 0.1);
+  border-color: #8ab4f8;
+  box-shadow: 0 10px 22px rgba(26, 115, 232, 0.1);
   transform: translateY(-2px);
 }
 
@@ -469,13 +719,29 @@ onMounted(refreshAll);
 }
 
 .palette-agent.branch {
-  border-color: #fed7aa;
-  background: #fff7ed;
+  border-color: #fbbc04;
+  background: #fffdf4;
+}
+
+.palette-agent.approval {
+  border-color: #a78bfa;
+  background:
+    linear-gradient(90deg, #f3e8ff 0, #f3e8ff 5px, transparent 5px),
+    #ffffff;
+}
+
+.palette-agent.custom {
+  border-color: #94a3b8;
+  background:
+    linear-gradient(90deg, #f1f5f9 0, #f1f5f9 5px, transparent 5px),
+    #ffffff;
 }
 
 .palette-agent.code {
-  border-color: #fecaca;
-  background: #fffafa;
+  border-color: #8ab4f8;
+  background:
+    linear-gradient(90deg, #e8f0fe 0, #e8f0fe 5px, transparent 5px),
+    #ffffff;
 }
 
 .palette-agent-main {
@@ -486,7 +752,7 @@ onMounted(refreshAll);
 
 .palette-agent strong {
   overflow: hidden;
-  color: #0f172a;
+  color: #202124;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -494,7 +760,7 @@ onMounted(refreshAll);
 
 .palette-agent span {
   overflow: hidden;
-  color: #64748b;
+  color: #5f6368;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11px;
   text-overflow: ellipsis;
@@ -506,11 +772,11 @@ onMounted(refreshAll);
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  color: #475569;
+  color: #5f6368;
   font-size: 12px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
 }
 
 .inspector-panel {
@@ -521,12 +787,12 @@ onMounted(refreshAll);
   z-index: 14;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  width: min(398px, calc(100% - 104px));
+  width: min(320px, calc(100% - 104px));
   overflow: hidden;
-  border: 1px solid rgba(203, 213, 225, 0.94);
-  border-radius: 14px;
+  border: 1px solid rgba(218, 220, 224, 0.94);
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 22px 58px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 22px 58px rgba(60, 64, 67, 0.18);
   backdrop-filter: blur(16px);
 }
 
@@ -536,7 +802,7 @@ onMounted(refreshAll);
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #dadce0;
 }
 
 .inspector-head div:first-child {
@@ -546,7 +812,7 @@ onMounted(refreshAll);
 }
 
 .inspector-head span {
-  color: #64748b;
+  color: #5f6368;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -554,8 +820,8 @@ onMounted(refreshAll);
 
 .inspector-head strong {
   overflow: hidden;
-  color: #0f172a;
-  font-size: 17px;
+  color: #202124;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -576,58 +842,8 @@ onMounted(refreshAll);
   padding: 12px;
 }
 
-.preview-card {
-  border-radius: 10px;
-}
-
-.preview-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.preview-list {
-  display: grid;
-  gap: 8px;
-}
-
-.preview-item {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  padding: 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.preview-item > span {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border-radius: 50%;
-  background: #dbeafe;
-  color: #1e40af;
-  font-weight: 800;
-}
-
-.preview-item div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.preview-item strong {
-  overflow: hidden;
-  color: #0f172a;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.preview-item small {
-  color: #64748b;
+.code-agent-executor {
+  border-radius: 14px;
 }
 
 .inspector-slide-enter-active,
@@ -645,11 +861,15 @@ onMounted(refreshAll);
 
 @media (max-width: 1180px) {
   .floating-palette:not(.collapsed) {
-    width: 286px;
+    width: 260px;
   }
 
   .inspector-panel {
     width: min(360px, calc(100% - 96px));
+  }
+
+  .editor-guide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

@@ -6,10 +6,32 @@ import AgentNode from "./AgentNode.vue";
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
 
 import type { AgentMeta } from "@/types/agent";
-import type { WorkflowSelectionBox } from "@/types/workflowEditor";
+import type { PendingConnectionData, WorkflowSelectionBox } from "@/types/workflowEditor";
+
+type EdgeRenderMeta = {
+  key: string;
+  renderKey: string;
+  fromNodeId: string;
+  toNodeId: string;
+  sourceName: string;
+  targetName: string;
+  path: string;
+  minimapPath: string;
+  selected: boolean;
+};
+
+type StageLaneGuide = {
+  key: string;
+  label: string;
+  x: number;
+  index: number;
+  nodeCount: number;
+  active: boolean;
+};
 
 const props = defineProps<{
   agents: AgentMeta[];
+  paletteAvoidanceWidth?: number;
 }>();
 
 const WORLD_WIDTH = 6000;
@@ -17,8 +39,20 @@ const WORLD_HEIGHT = 4200;
 const GRID_SIZE = 24;
 const NODE_WIDTH = 256;
 const NODE_HEIGHT = 154;
-const MINIMAP_WIDTH = 210;
-const MINIMAP_HEIGHT = 148;
+const FANOUT_OFFSET = 12;
+const MINIMAP_WIDTH = 176;
+const MINIMAP_HEIGHT = 120;
+const STAGE_START_X = 320;
+const STAGE_COLUMN_GAP = 336;
+const STAGE_LANES = [
+  { key: "analysis", label: "Analysis" },
+  { key: "implementation", label: "Implementation" },
+  { key: "testing", label: "Testing" },
+  { key: "execution", label: "Execution" },
+  { key: "repair", label: "Repair" },
+  { key: "code_ops", label: "Code Ops" },
+  { key: "report", label: "Report" },
+];
 
 const store = useWorkflowEditorStore();
 const canvasRef = ref<HTMLElement | null>(null);
@@ -27,8 +61,10 @@ const isSpacePressed = ref(false);
 const isPanning = ref(false);
 const ignoreNextClick = ref(false);
 const selectionBox = ref<WorkflowSelectionBox | null>(null);
+const pendingConnection = ref<PendingConnectionData | null>(null);
 const canvasSize = ref({ width: 0, height: 0 });
 const minimapDragging = ref(false);
+const showMinimap = ref(false);
 const draggingNode = ref<{
   nodeId: string;
   startX: number;
@@ -45,10 +81,33 @@ const panning = ref<{
 const canvasNodes = computed(() => store.orderedNodes);
 const zoomPercent = computed(() => `${Math.round(store.viewport.scale * 100)}%`);
 const selectedCount = computed(() => store.selectedNodeIds.length);
+const selectedConnection = computed(() => store.selectedConnectionId);
+const showHandles = computed(() => store.connectionMode === "connecting");
+const shouldRenderMinimap = computed(() => showMinimap.value && store.nodes.length > 8);
+const visibleStageLanes = computed<StageLaneGuide[]>(() => {
+  if (!store.showStageGuide || !store.nodes.length) {
+    return [];
+  }
+
+  const counts = store.nodes.reduce<Record<string, number>>((stageCounts, node) => {
+    const stageKey = stageKeyForNode(node);
+    stageCounts[stageKey] = (stageCounts[stageKey] || 0) + 1;
+    return stageCounts;
+  }, {});
+
+  return STAGE_LANES.map((lane, index) => ({
+    ...lane,
+    index,
+    x: STAGE_START_X + index * STAGE_COLUMN_GAP,
+    nodeCount: counts[lane.key] || 0,
+    active: Boolean(counts[lane.key]),
+  }));
+});
 const canvasStyle = computed(() => ({
   "--grid-size": `${GRID_SIZE * store.viewport.scale}px`,
   "--grid-x": `${store.viewport.x}px`,
   "--grid-y": `${store.viewport.y}px`,
+  "--palette-safe-width": `${props.paletteAvoidanceWidth ?? 0}px`,
 }));
 const worldStyle = computed(() => ({
   width: `${WORLD_WIDTH}px`,
@@ -99,6 +158,71 @@ const minimapViewportStyle = computed(() => {
     height: `${height * scale}px`,
   };
 });
+const pendingConnectionPath = computed(() => {
+  if (!pendingConnection.value) {
+    return "";
+  }
+
+  const start = getNodeAnchor(pendingConnection.value.fromNodeId, "output");
+
+  return start ? stableEdgePath(start, pendingConnection.value.pointer) : "";
+});
+const renderedConnections = computed<EdgeRenderMeta[]>(() => {
+  const nodeById = new Map(store.nodes.map((node) => [node.nodeId, node]));
+  const visualOrder = new Map(
+    [...store.nodes]
+      .sort((left, right) => left.position.x - right.position.x || left.position.y - right.position.y)
+      .map((node, index) => [node.nodeId, index]),
+  );
+  const validConnections = store.connections
+    .filter((connection) => nodeById.has(connection.fromNodeId) && nodeById.has(connection.toNodeId))
+    .map((connection, index) => ({ ...connection, index }))
+    .sort((left, right) => {
+      const leftSource = visualOrder.get(left.fromNodeId) ?? 0;
+      const rightSource = visualOrder.get(right.fromNodeId) ?? 0;
+      const leftTarget = nodeById.get(left.toNodeId);
+      const rightTarget = nodeById.get(right.toNodeId);
+
+      return (
+        leftSource - rightSource ||
+        (leftTarget?.position.y ?? 0) - (rightTarget?.position.y ?? 0) ||
+        (leftTarget?.position.x ?? 0) - (rightTarget?.position.x ?? 0) ||
+        left.index - right.index
+      );
+    });
+  const outgoingGroups = new Map<string, typeof validConnections>();
+  const incomingGroups = new Map<string, typeof validConnections>();
+
+  validConnections.forEach((connection) => {
+    outgoingGroups.set(connection.fromNodeId, [...(outgoingGroups.get(connection.fromNodeId) || []), connection]);
+    incomingGroups.set(connection.toNodeId, [...(incomingGroups.get(connection.toNodeId) || []), connection]);
+  });
+
+  return validConnections.map((connection) => {
+    const key = connectionKey(connection);
+    const sourceNode = nodeById.get(connection.fromNodeId);
+    const targetNode = nodeById.get(connection.toNodeId);
+    const outgoing = outgoingGroups.get(connection.fromNodeId) || [];
+    const incoming = incomingGroups.get(connection.toNodeId) || [];
+    const sourceRank = outgoing.findIndex((item) => item.index === connection.index);
+    const targetRank = incoming.findIndex((item) => item.index === connection.index);
+    const start = getNodeAnchor(connection.fromNodeId, "output", fanoutOffset(sourceRank, outgoing.length));
+    const end = getNodeAnchor(connection.toNodeId, "input", fanoutOffset(targetRank, incoming.length));
+    const path = start && end ? stableEdgePath(start, end) : "";
+
+    return {
+      key,
+      renderKey: `${key}-${connection.index}`,
+      fromNodeId: connection.fromNodeId,
+      toNodeId: connection.toNodeId,
+      sourceName: sourceNode?.name || connection.fromNodeId,
+      targetName: targetNode?.name || connection.toNodeId,
+      path,
+      minimapPath: path ? scalePath(start!, end!, minimapScale.value) : "",
+      selected: key === selectedConnection.value,
+    };
+  });
+});
 
 let resizeObserver: ResizeObserver | null = null;
 
@@ -128,50 +252,102 @@ function canvasPoint(event: Pick<PointerEvent | DragEvent | WheelEvent, "clientX
   };
 }
 
-function nodePorts(connection: { fromNodeId: string; toNodeId: string }) {
-  const fromNode = store.nodes.find((item) => item.nodeId === connection.fromNodeId);
-  const toNode = store.nodes.find((item) => item.nodeId === connection.toNodeId);
+function connectionKey(connection: { fromNodeId: string; toNodeId: string }) {
+  return `${connection.fromNodeId}->${connection.toNodeId}`;
+}
 
-  if (!fromNode || !toNode) {
-    return {
-      start: { x: 0, y: 0 },
-      end: { x: 0, y: 0 },
-    };
+function stageKeyForNode(node: { agentKey: string; stage: string }) {
+  const agentKey = node.agentKey.toLowerCase();
+  const stage = node.stage.toLowerCase().replace(/\s+/g, "_");
+
+  if (agentKey === "code_agent") {
+    return "code_ops";
   }
 
-  const fromRight = fromNode.position.x <= toNode.position.x;
-  const verticalGap = Math.abs(fromNode.position.x - toNode.position.x) < 80;
+  if (agentKey.includes("product")) {
+    return "analysis";
+  }
 
-  if (verticalGap) {
-    return {
-      start: { x: fromNode.position.x + 115, y: fromNode.position.y + 150 },
-      end: { x: toNode.position.x + 115, y: toNode.position.y },
-    };
+  if (agentKey.includes("coder")) {
+    return "implementation";
+  }
+
+  if (agentKey.includes("tester")) {
+    return "testing";
+  }
+
+  if (agentKey.includes("runner")) {
+    return "execution";
+  }
+
+  if (agentKey.includes("sentry")) {
+    return "repair";
+  }
+
+  if (agentKey.includes("report")) {
+    return "report";
+  }
+
+  return STAGE_LANES.some((lane) => lane.key === stage) ? stage : "implementation";
+}
+
+function getNodeAnchor(nodeId: string, side: "input" | "output", yOffset = 0) {
+  const node = store.nodes.find((item) => item.nodeId === nodeId);
+
+  if (!node) {
+    return null;
   }
 
   return {
-    start: {
-      x: fromNode.position.x + (fromRight ? 232 : 0),
-      y: fromNode.position.y + 74,
-    },
-    end: {
-      x: toNode.position.x + (fromRight ? 0 : 232),
-      y: toNode.position.y + 74,
-    },
+    x: node.position.x + (side === "output" ? NODE_WIDTH : 0),
+    y: node.position.y + NODE_HEIGHT / 2 + yOffset,
   };
 }
 
-function connectionPath(connection: { fromNodeId: string; toNodeId: string }) {
-  const { start, end } = nodePorts(connection);
-  const dx = Math.max(80, Math.abs(end.x - start.x) * 0.45);
-  const direction = end.x >= start.x ? 1 : -1;
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
-  if (Math.abs(end.x - start.x) < 80) {
-    const midY = start.y + (end.y - start.y) * 0.5;
-    return `M ${start.x} ${start.y} C ${start.x} ${midY}, ${end.x} ${midY}, ${end.x} ${end.y}`;
+function fanoutOffset(index: number, count: number) {
+  if (count <= 1 || index < 0) {
+    return 0;
   }
 
-  return `M ${start.x} ${start.y} C ${start.x + dx * direction} ${start.y}, ${end.x - dx * direction} ${end.y}, ${end.x} ${end.y}`;
+  return clamp((index - (count - 1) / 2) * FANOUT_OFFSET, -26, 26);
+}
+
+function stableEdgePath(start: { x: number; y: number }, end: { x: number; y: number }) {
+  const horizontalGap = end.x - start.x;
+  const verticalGap = Math.abs(end.y - start.y);
+
+  if (horizontalGap <= 72) {
+    const laneX = Math.max(start.x + 92, end.x + 92);
+    const midY = start.y + (end.y - start.y) / 2;
+    const entryTension = clamp(Math.abs(laneX - end.x) * 0.42, 34, 84);
+
+    return [
+      `M ${start.x} ${start.y}`,
+      `C ${start.x + 52} ${start.y} ${laneX} ${start.y} ${laneX} ${midY}`,
+      `C ${laneX} ${end.y} ${end.x - entryTension} ${end.y} ${end.x} ${end.y}`,
+    ].join(" ");
+  }
+
+  const tension = clamp(horizontalGap * 0.38 + verticalGap * 0.04, 42, 148);
+
+  return `M ${start.x} ${start.y} C ${start.x + tension} ${start.y} ${end.x - tension} ${end.y} ${end.x} ${end.y}`;
+}
+
+function scalePath(start: { x: number; y: number }, end: { x: number; y: number }, scale: number) {
+  return stableEdgePath(
+    {
+      x: start.x * scale,
+      y: start.y * scale,
+    },
+    {
+      x: end.x * scale,
+      y: end.y * scale,
+    },
+  );
 }
 
 function handleWheel(event: WheelEvent) {
@@ -201,7 +377,16 @@ function autoLayoutSelected() {
 }
 
 function deleteSelected() {
+  if (store.selectedConnectionId) {
+    store.deleteSelectedConnection();
+    return;
+  }
+
   store.deleteSelectedNodes();
+}
+
+function rebuildSequentialConnections() {
+  store.rebuildSequentialConnections();
 }
 
 function updateCanvasSize() {
@@ -274,12 +459,14 @@ function handleCanvasClick() {
   }
 
   store.clearSelection();
+  store.clearConnectionSelection();
 }
 
 function startSelectionBox(event: PointerEvent) {
   const point = canvasPoint(event);
 
   event.preventDefault();
+  store.clearConnectionSelection();
   selectionBox.value = {
     startX: point.x,
     startY: point.y,
@@ -370,6 +557,63 @@ function handleDrop(event: DragEvent) {
     x: Math.max(0, worldPoint.x - 115),
     y: Math.max(0, worldPoint.y - 48),
   });
+}
+
+function startConnection(nodeId: string, event: PointerEvent) {
+  if (event.button !== 0) {
+    return;
+  }
+
+  const start = getNodeAnchor(nodeId, "output");
+
+  if (!start) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  pendingConnection.value = {
+    fromNodeId: nodeId,
+    pointer: screenToWorld(event),
+  };
+  store.connectionMode = "connecting";
+  store.selectNode(nodeId);
+  window.addEventListener("pointermove", moveConnection);
+  window.addEventListener("pointerup", cancelConnection);
+}
+
+function moveConnection(event: PointerEvent) {
+  if (!pendingConnection.value) {
+    return;
+  }
+
+  pendingConnection.value = {
+    ...pendingConnection.value,
+    pointer: screenToWorld(event),
+  };
+}
+
+function finishConnection(toNodeId: string, event: PointerEvent) {
+  if (!pendingConnection.value) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  store.addConnection(pendingConnection.value.fromNodeId, toNodeId);
+  ignoreNextClick.value = true;
+  clearPendingConnection();
+}
+
+function clearPendingConnection() {
+  pendingConnection.value = null;
+  store.connectionMode = "idle";
+  window.removeEventListener("pointermove", moveConnection);
+  window.removeEventListener("pointerup", cancelConnection);
+}
+
+function cancelConnection() {
+  clearPendingConnection();
 }
 
 function startDrag(nodeId: string, event: PointerEvent) {
@@ -499,8 +743,19 @@ function handleKeydown(event: KeyboardEvent) {
     event.preventDefault();
   }
 
+  if ((event.key === "Delete" || event.key === "Backspace") && !isEditableTarget(event.target)) {
+    event.preventDefault();
+    if (store.selectedConnectionId) {
+      store.deleteSelectedConnection();
+    } else if (store.selectedNodeIds.length) {
+      store.deleteSelectedNodes();
+    }
+  }
+
   if (event.key === "Escape") {
+    clearPendingConnection();
     store.clearSelection();
+    store.clearConnectionSelection();
   }
 }
 
@@ -524,6 +779,7 @@ onBeforeUnmount(() => {
   stopDrag();
   stopViewportPan();
   stopMinimapDrag();
+  clearPendingConnection();
   resizeObserver?.disconnect();
   window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("keyup", handleKeyup);
@@ -549,20 +805,98 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="workflow-world" :style="worldStyle">
+      <div
+        v-for="lane in visibleStageLanes"
+        :key="lane.key"
+        class="stage-lane"
+        :class="{ active: lane.active }"
+        :style="{ left: `${lane.x}px` }"
+      >
+        <div class="stage-lane-label">
+          <span class="stage-index">{{ lane.index + 1 }}</span>
+          <strong>{{ lane.label }}</strong>
+          <em>{{ lane.nodeCount ? `${lane.nodeCount} node${lane.nodeCount > 1 ? "s" : ""}` : "待配置" }}</em>
+        </div>
+      </div>
+
       <svg class="connection-layer" :width="WORLD_WIDTH" :height="WORLD_HEIGHT">
         <defs>
-          <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
+          <marker
+            id="arrow"
+            viewBox="0 0 14 12"
+            markerWidth="13"
+            markerHeight="11"
+            refX="12"
+            refY="5.5"
+            orient="auto"
+            markerUnits="userSpaceOnUse"
+            overflow="visible"
+          >
+            <path d="M1,1.4 L10.5,5.5 L1,9.6 L4.2,5.5 Z" fill="#64748b" />
           </marker>
+          <marker
+            id="arrow-selected"
+            viewBox="0 0 15 13"
+            markerWidth="14"
+            markerHeight="12"
+            refX="13"
+            refY="6"
+            orient="auto"
+            markerUnits="userSpaceOnUse"
+            overflow="visible"
+          >
+            <path d="M1.2,1.4 L13,6 L1.2,10.6 L5.2,6 Z" fill="#1a73e8" />
+          </marker>
+          <marker
+            id="arrow-pending"
+            viewBox="0 0 15 13"
+            markerWidth="14"
+            markerHeight="12"
+            refX="13"
+            refY="6"
+            orient="auto"
+            markerUnits="userSpaceOnUse"
+            overflow="visible"
+          >
+            <path d="M1.2,1.4 L13,6 L1.2,10.6 L5.2,6 Z" fill="#1a73e8" />
+          </marker>
+          <filter id="connection-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="3" flood-color="#1a73e8" flood-opacity="0.28" stdDeviation="4" />
+          </filter>
         </defs>
+        <g
+          v-for="connection in renderedConnections"
+          :key="connection.renderKey"
+          @click.stop="store.selectConnection(connection.key)"
+          @pointerdown.stop
+        >
+          <title>{{ connection.sourceName }} → {{ connection.targetName }}</title>
+          <path
+            class="connection-hit-path"
+            :d="connection.path"
+            fill="none"
+            stroke="rgba(37, 99, 235, 0.001)"
+            stroke-width="18"
+          />
+          <path class="connection-bg-path" :d="connection.path" fill="none" />
+          <path
+            class="connection-path"
+            :class="{ selected: connection.selected }"
+            :d="connection.path"
+            fill="none"
+            :filter="connection.selected ? 'url(#connection-glow)' : undefined"
+            :marker-end="connection.selected ? 'url(#arrow-selected)' : 'url(#arrow)'"
+            :stroke="connection.selected ? '#1a73e8' : '#64748b'"
+            :stroke-width="connection.selected ? 3 : 2"
+          />
+        </g>
+        <path v-if="pendingConnectionPath" class="connection-bg-path pending-bg" :d="pendingConnectionPath" fill="none" />
         <path
-          v-for="connection in store.connections"
-          :key="`${connection.fromNodeId}-${connection.toNodeId}`"
-          :d="connectionPath(connection)"
+          v-if="pendingConnectionPath"
+          class="connection-path pending"
+          :d="pendingConnectionPath"
           fill="none"
-          stroke="#64748b"
-          stroke-width="2"
-          marker-end="url(#arrow)"
+          marker-end="url(#arrow-pending)"
         />
       </svg>
 
@@ -573,9 +907,12 @@ onBeforeUnmount(() => {
         :index="index"
         :total="canvasNodes.length"
         :selected="store.selectedNodeIds.includes(node.nodeId)"
+        :show-handles="showHandles"
         @select="handleNodeSelect"
         @delete="store.deleteNode"
+        @finish-connection="finishConnection"
         @start-drag="startDrag"
+        @start-connection="startConnection"
         @move-up="store.moveNodeOrder($event, -1)"
         @move-down="store.moveNodeOrder($event, 1)"
       />
@@ -584,7 +921,7 @@ onBeforeUnmount(() => {
     <div v-if="selectionBox" class="selection-box" :style="selectionBoxStyle" />
 
     <div
-      v-if="store.nodes.length"
+      v-if="shouldRenderMinimap"
       ref="minimapRef"
       class="canvas-minimap"
       @click.stop
@@ -595,6 +932,15 @@ onBeforeUnmount(() => {
         <strong>{{ store.nodes.length }} nodes</strong>
       </div>
       <div class="minimap-stage">
+        <svg class="minimap-connections" :width="MINIMAP_WIDTH" :height="MINIMAP_HEIGHT">
+          <path
+            v-for="connection in renderedConnections"
+            :key="`minimap-${connection.renderKey}`"
+            :class="{ selected: connection.selected }"
+            :d="connection.minimapPath"
+            fill="none"
+          />
+        </svg>
         <span
           v-for="node in minimapNodes"
           :key="node.nodeId"
@@ -613,6 +959,14 @@ onBeforeUnmount(() => {
       <el-button size="small" text @click="store.clearSelection">取消</el-button>
     </div>
 
+    <div v-if="selectedConnection" class="connection-toolbar" @click.stop @pointerdown.stop>
+      <strong>连接已选中</strong>
+      <el-button size="small" :icon="Delete" type="danger" plain @click="store.deleteSelectedConnection">
+        删除连接
+      </el-button>
+      <el-button size="small" text @click="store.clearConnectionSelection">取消</el-button>
+    </div>
+
     <div class="canvas-controls" @click.stop @pointerdown.stop>
       <el-tooltip content="缩小" placement="top">
         <el-button :icon="Minus" size="small" circle @click="zoomBy(-0.1)" />
@@ -625,9 +979,17 @@ onBeforeUnmount(() => {
         <el-button :icon="Refresh" size="small" circle @click="resetViewport" />
       </el-tooltip>
       <el-button size="small" :disabled="!store.nodes.length" @click="autoLayout">自动整理</el-button>
+      <el-button size="small" :disabled="store.nodes.length < 2" @click="rebuildSequentialConnections">
+        自动顺序连线
+      </el-button>
+      <el-button size="small" :disabled="store.nodes.length <= 8" @click="showMinimap = !showMinimap">
+        {{ showMinimap ? "隐藏小地图" : "显示小地图" }}
+      </el-button>
     </div>
 
-    <div class="canvas-hint">Space + drag / middle drag 平移 · Wheel 缩放 · Esc 关闭属性</div>
+    <div class="canvas-hint">
+      输出点拖到输入点连线 · Del 删除选中 · Space / middle drag 平移 · Wheel 缩放 · Esc 取消
+    </div>
   </section>
 </template>
 
@@ -635,13 +997,13 @@ onBeforeUnmount(() => {
 .workflow-canvas {
   position: relative;
   height: 100%;
-  min-height: 680px;
+  min-height: 640px;
   overflow: hidden;
   border: 1px solid #dbe4ef;
   border-radius: 12px;
   background:
-    linear-gradient(#e8eef7 1px, transparent 1px),
-    linear-gradient(90deg, #e8eef7 1px, transparent 1px),
+    linear-gradient(rgba(232, 234, 237, 0.42) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 234, 237, 0.42) 1px, transparent 1px),
     #ffffff;
   background-position: var(--grid-x) var(--grid-y);
   background-size: var(--grid-size) var(--grid-size);
@@ -663,6 +1025,84 @@ onBeforeUnmount(() => {
   top: 0;
   left: 0;
   transform-origin: 0 0;
+}
+
+.stage-lane {
+  position: absolute;
+  top: 96px;
+  z-index: 0;
+  width: 256px;
+  height: 0;
+  border-top: 1px solid rgba(218, 220, 224, 0.62);
+  opacity: 0.56;
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    border-color 160ms ease;
+}
+
+.stage-lane.active {
+  border-color: rgba(26, 115, 232, 0.32);
+  opacity: 1;
+}
+
+.stage-lane-label {
+  position: absolute;
+  top: -36px;
+  left: 0;
+  display: inline-flex;
+  max-width: 232px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px 7px 8px;
+  border: 1px solid rgba(218, 220, 224, 0.86);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #5f6368;
+  font-size: 12px;
+  letter-spacing: 0;
+  box-shadow: 0 8px 20px rgba(60, 64, 67, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.stage-lane.active .stage-lane-label {
+  border-color: rgba(26, 115, 232, 0.28);
+  background: rgba(232, 240, 254, 0.92);
+  box-shadow: 0 10px 24px rgba(26, 115, 232, 0.12);
+}
+
+.stage-index {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1f3f4;
+  color: #5f6368;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.stage-lane.active .stage-index {
+  background: #1a73e8;
+  color: #ffffff;
+}
+
+.stage-lane-label strong {
+  color: #202124;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.stage-lane-label em {
+  overflow: hidden;
+  color: #5f6368;
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .canvas-empty {
@@ -687,7 +1127,70 @@ onBeforeUnmount(() => {
 .connection-layer {
   position: absolute;
   inset: 0;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.connection-path {
+  stroke: #64748b;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
   pointer-events: none;
+  transition:
+    stroke 0.16s ease,
+    stroke-width 0.16s ease,
+    filter 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.connection-bg-path {
+  stroke: rgba(15, 23, 42, 0.04);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+  pointer-events: none;
+}
+
+.connection-bg-path.pending-bg {
+  stroke-width: 5;
+}
+
+g:hover .connection-path {
+  stroke: #1a73e8;
+  stroke-width: 3;
+  filter: url(#connection-glow);
+}
+
+.connection-hit-path {
+  stroke-linecap: round;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.connection-path.selected {
+  stroke: #1a73e8;
+  stroke-width: 3;
+  filter: url(#connection-glow);
+}
+
+.connection-path.pending {
+  animation: pending-flow 0.9s linear infinite;
+  stroke: #1a73e8;
+  stroke-dasharray: 14 10;
+  stroke-width: 3;
+  pointer-events: none;
+  filter: url(#connection-glow);
+}
+
+@keyframes pending-flow {
+  from {
+    stroke-dashoffset: 21;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .selection-box {
@@ -702,15 +1205,15 @@ onBeforeUnmount(() => {
 
 .canvas-minimap {
   position: absolute;
-  right: 16px;
-  bottom: 74px;
-  z-index: 8;
-  width: 234px;
-  padding: 10px;
+  right: 14px;
+  bottom: 66px;
+  z-index: 6;
+  width: 196px;
+  padding: 8px;
   border: 1px solid #dbe4ef;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
   cursor: crosshair;
   backdrop-filter: blur(12px);
 }
@@ -720,7 +1223,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #64748b;
   font-size: 11px;
   font-weight: 800;
@@ -734,8 +1237,8 @@ onBeforeUnmount(() => {
 
 .minimap-stage {
   position: relative;
-  width: 210px;
-  height: 148px;
+  width: 176px;
+  height: 120px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
@@ -746,8 +1249,27 @@ onBeforeUnmount(() => {
   background-size: 12px 12px;
 }
 
+.minimap-connections {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.minimap-connections path {
+  stroke: #b6c2d2;
+  stroke-linecap: round;
+  stroke-width: 1.1;
+}
+
+.minimap-connections path.selected {
+  stroke: #1a73e8;
+  stroke-width: 2.6;
+}
+
 .minimap-node {
   position: absolute;
+  z-index: 2;
   border: 1px solid #93c5fd;
   border-radius: 3px;
   background: #bfdbfe;
@@ -766,6 +1288,7 @@ onBeforeUnmount(() => {
 
 .minimap-viewport {
   position: absolute;
+  z-index: 3;
   border: 2px solid #1d4ed8;
   border-radius: 4px;
   background: rgba(29, 78, 216, 0.08);
@@ -789,6 +1312,28 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(12px);
 }
 
+.connection-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 38px rgba(30, 64, 175, 0.16);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.connection-toolbar strong {
+  color: #1e40af;
+  font-size: 12px;
+}
+
 .selection-toolbar strong {
   color: #1e40af;
   font-size: 12px;
@@ -798,7 +1343,7 @@ onBeforeUnmount(() => {
   position: absolute;
   right: 16px;
   bottom: 16px;
-  z-index: 8;
+  z-index: 7;
   display: flex;
   align-items: center;
   gap: 8px;

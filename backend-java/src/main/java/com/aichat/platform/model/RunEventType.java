@@ -23,7 +23,10 @@ public enum RunEventType {
     REPAIR_FINISHED("修复分析完成"),
     QUALITY_EVALUATED("质量评分完成"),
     REPORT_GENERATED("报告生成完成"),
-    WORKFLOW_FINISHED("工作流执行完成");
+    WORKFLOW_FINISHED("工作流执行完成"),
+    HUMAN_APPROVAL_REQUIRED("等待人工确认"),
+    HUMAN_APPROVED("人工确认已批准"),
+    HUMAN_REJECTED("人工确认已拒绝");
 
     private final String description;
 

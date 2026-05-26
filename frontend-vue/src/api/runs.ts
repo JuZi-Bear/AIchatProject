@@ -261,6 +261,23 @@ export function getPlatformRunDetail(platformRunId: string): Promise<PlatformRun
     .then((response) => normalizePlatformRun(unwrapApiResponse(response.data)));
 }
 
+export function approvePlatformRun(
+  platformRunId: string,
+  approved: boolean,
+  comment = "",
+): Promise<PlatformRunRecord> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("Human approval is only available in Java Gateway mode"));
+  }
+
+  return apiClient
+    .post<ApiResponse<RawPlatformRunRecord>>(`/platform/runs/${platformRunId}/approval`, {
+      approved,
+      comment,
+    })
+    .then((response) => normalizePlatformRun(unwrapApiResponse(response.data)));
+}
+
 export function postRun(payload: RunRequest): Promise<RunResponse> {
   return apiClient.post<RunResponse>("/runs", payload).then((response) => response.data);
 }

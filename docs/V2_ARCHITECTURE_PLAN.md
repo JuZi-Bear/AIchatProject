@@ -34,11 +34,12 @@ Vue3 + TypeScript
 
 ### MySQL
 
-- 保存平台运行记录、事件、报告索引、配置和模板。
+- 保存平台运行记录、事件、报告索引、配置、Workflow 模板和 Workspace 配置。
 
 ### CodeAgent
 
 - 提供 `read_file`、`write_file`、`list_files`。
+- 支持受控文件夹工作区模式：扫描、读取、生成计划、dry-run diff、应用变更。
 - 遵守路径白名单、阻断路径和读取长度限制。
 - 写入 JSONL 审计日志。
 - 事件进入 Java RunEvent、SSE 和 Replay。
@@ -69,6 +70,13 @@ Vue3 + TypeScript
 - [x] Docker Compose v2-only 总集成。
 - [x] Figma-first UI 设计源规范。
 - [x] v2 Demo Polish：Workflow Editor 小地图/多选、Replay 筛选、Dashboard CodeAgent 操作卡片。
+- [x] Workflow Editor 可视化编排体验增强：手动连线、连接删除、快捷键提示、小地图连接预览。
+- [x] v2 Demo Polish：连线视觉增强、RunConsole 结构化输入、运行结果高光区。
+- [x] Workflow Editor 连线视觉二次打磨：Bezier noodle 曲线、端点/箭头分层、Palette 避让。
+- [x] CodeAgent 文件夹工作流模板和 Project Workspace 受控工作区管理。
+- [x] Human Approval 平台层审批节点、事件和 Replay 确认入口。
+- [x] Workflow Editor 自定义 Agent 模板节点。
+- [x] Java Gateway 模型 API Key masked 状态和加密保存接口。
 
 ## v2-only 收敛结果
 
@@ -79,7 +87,12 @@ Vue3 + TypeScript
 
 ## 当前限制
 
-- Workflow Editor 当前编辑平台模板和可回放任务视图，不直接驱动动态 LangGraph 分支。
+- Workflow Editor 当前编辑平台模板和可回放任务视图；手动连线和强化连接线用于前端编排表达和模板保存，不直接驱动动态 LangGraph 分支。
+- Custom Agent 当前是模板可视化节点，不会自动注册到 Python Agent Registry。
+- Human Approval 第一阶段是 Java 平台层审批事件，不会中断真实 LangGraph 运行。
+- Java Gateway 可保存平台层模型密钥状态，但 Python Direct 仍通过 `.env` 配置模型 Key。
+- Java Gateway Workspace 是平台体验层配置；Python CodeAgent 仍依据 `config/settings.yaml` 做最终路径安全裁判。
+- RunConsole 结构化需求构造器只在前端拼接 `requirement`，不改变 POST `/runs` 请求结构。
 - CodeAgent 是简化文件操作模块，不是完整 Codex。
 - C++ Runner 当前不是完整安全沙箱。
 - 用户系统、权限系统、团队协作和任务队列暂未启用。
@@ -87,7 +100,7 @@ Vue3 + TypeScript
 ## 推荐下一步
 
 1. 继续稳定 v2-only 演示版和验收脚本。
-2. 继续优化 Workflow Editor 手动连线、小地图细节和键盘快捷键提示。
+2. 预研动态 Workflow Runtime，让模板连接未来可以安全映射到后端执行拓扑。
 3. 增强 Replay 事件对比和导出。
 4. 继续同步 Figma 设计源与 Vue 实现。
 5. 暂缓用户/权限/团队协作等复杂平台功能。

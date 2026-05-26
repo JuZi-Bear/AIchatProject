@@ -5,9 +5,12 @@ import { computed, onMounted, ref } from "vue";
 
 import { getApiModeLabel } from "@/api/client";
 import { getAgents } from "@/api/agents";
+import { getPlatformWorkflowTemplates } from "@/api/workflows";
 import type { AgentMeta } from "@/types/agent";
+import type { AgentNodeData } from "@/types/workflowEditor";
 
 const agents = ref<AgentMeta[]>([]);
+const templateAgents = ref<AgentMeta[]>([]);
 const loading = ref(false);
 const keyword = ref("");
 const stageFilter = ref("all");
@@ -15,13 +18,16 @@ const apiModeLabel = getApiModeLabel();
 
 const stageOptions = computed(() => {
   const stages = new Set(agents.value.map((agent) => agent.stage).filter(Boolean));
+  templateAgents.value.map((agent) => agent.stage).filter(Boolean).forEach((stage) => stages.add(stage));
   return [...stages].sort();
 });
+
+const allAgents = computed(() => [...agents.value, ...templateAgents.value]);
 
 const filteredAgents = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase();
 
-  return agents.value.filter((agent) => {
+  return allAgents.value.filter((agent) => {
     if (stageFilter.value !== "all" && agent.stage !== stageFilter.value) {
       return false;
     }
@@ -38,7 +44,33 @@ async function loadAgents() {
   loading.value = true;
 
   try {
-    agents.value = await getAgents();
+    const [registeredResult, templateResult] = await Promise.allSettled([
+      getAgents(),
+      getPlatformWorkflowTemplates(),
+    ]);
+    agents.value = registeredResult.status === "fulfilled" ? registeredResult.value : [];
+    templateAgents.value =
+      templateResult.status === "fulfilled"
+        ? templateResult.value.flatMap((template) =>
+            template.nodes
+              .filter((node: AgentNodeData) => node.nodeType === "custom_agent" || node.agentKey === "custom_agent")
+              .map((node: AgentNodeData) => ({
+                key: `${template.workflowTemplateKey}:${node.agentKey}`,
+                name: node.name,
+                role: node.customAgentMeta?.role || node.role || "模板内自定义 Agent",
+                description: `${node.description || "模板内自定义 Agent 节点"}（来源：${template.name}）`,
+                input_fields: node.input_fields || [],
+                output_fields: node.output_fields || [],
+                stage: node.stage || "custom",
+                enabled: node.enabled,
+                version: node.customAgentMeta?.version || template.version || "1.0",
+              })),
+          )
+        : [];
+
+    if (registeredResult.status === "rejected") {
+      throw registeredResult.reason;
+    }
   } catch (error) {
     agents.value = [];
     ElMessage.error(error instanceof Error ? error.message : "加载 Agent 注册中心失败");
@@ -63,6 +95,7 @@ onMounted(loadAgents);
     <div class="mode-tags">
       <el-tag type="primary" effect="plain">API 模式：{{ apiModeLabel }}</el-tag>
       <el-tag type="success" effect="plain">已注册 Agent：{{ agents.length }}</el-tag>
+      <el-tag type="warning" effect="plain">模板自定义 Agent：{{ templateAgents.length }}</el-tag>
     </div>
 
     <section class="panel">

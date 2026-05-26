@@ -61,7 +61,7 @@ API 模式映射：
 | VITE_API_MODE | 调用模式 | Base URL | Health 路径 | 其他接口路径 |
 | --- | --- | --- | --- | --- |
 | `python` | Python Direct | `VITE_PYTHON_API_BASE_URL` | `/health` | `/models`、`/plugins`、`/agents`、`/api/workflows/templates`、`/api/workflows/instantiate`、`/runs`、`/reports` |
-| `java` | Java Gateway | `VITE_JAVA_API_BASE_URL` | `/agent/health` | `/models`、`/plugins`、`/agents`、`/workflows/templates`、`/workflows/instantiate`、`/platform/workflows/templates`、`/runs`、`/reports`、`/settings`、`/platform/runs`、`/platform/events/recent` |
+| `java` | Java Gateway | `VITE_JAVA_API_BASE_URL` | `/agent/health` | `/models`、`/plugins`、`/agents`、`/workflows/templates`、`/workflows/instantiate`、`/platform/workflows/templates`、`/platform/workspaces`、`/runs`、`/reports`、`/settings`、`/platform/runs`、`/platform/events/recent` |
 
 v2-only 演示版默认推荐 Java Gateway；Python Direct 保留为开发调试模式。
 
@@ -1616,3 +1616,121 @@ String responseJson = client.post()
 - Java 后端只做任务、权限、审计和业务元数据，不解析 LangGraph state。
 - Python Agent Engine 继续负责 Agent、LangGraph、插件、报告和运行历史。
 - `state` 只在历史详情和调试场景使用，不能作为正式前端的强依赖。
+
+## Platform Human Approval API
+
+### POST `/api/platform/runs/{platformRunId}/approval`
+
+Java Gateway 模式下用于提交 Human Approval 节点的人工确认结果。该接口只写入平台任务状态和 RunEvent，不会动态改写 LangGraph。
+
+请求：
+
+```json
+{
+  "approved": true,
+  "comment": "确认继续执行后续节点"
+}
+```
+
+响应：
+
+```json
+{
+  "success": true,
+  "message": "ok",
+  "data": {
+    "platformRunId": "workflow_template_20260526_034500_ab12cd34",
+    "status": "APPROVED",
+    "approved": true,
+    "requireHumanApproval": false
+  }
+}
+```
+
+相关事件：
+
+- `HUMAN_APPROVAL_REQUIRED`
+- `HUMAN_APPROVED`
+- `HUMAN_REJECTED`
+- `STATUS_CHANGED`
+
+## Platform Model Secret API
+
+### GET `/api/platform/secrets/models`
+
+返回模型 API Key 配置状态。该接口不会返回明文密钥。
+
+```json
+{
+  "success": true,
+  "message": "ok",
+  "data": [
+    {
+      "provider": "deepseek",
+      "name": "DeepSeek",
+      "envKey": "DEEPSEEK_API_KEY",
+      "configured": true,
+      "stored": true,
+      "envConfigured": false,
+      "maskedKey": "sk-****abcd",
+      "updatedAt": "2026-05-26T11:40:00",
+      "message": "密钥已加密保存到 Java 平台层。当前不会通过 GET 接口返回明文。"
+    }
+  ]
+}
+```
+
+### POST `/api/platform/secrets/models/{provider}`
+
+提交一次新的模型 API Key。明文只允许出现在请求体中，Java 保存加密值，前端不写入 localStorage。
+
+```json
+{
+  "apiKey": "sk-..."
+}
+```
+
+### DELETE `/api/platform/secrets/models/{provider}`
+
+清除 Java 平台层保存的模型 API Key。Python Direct 模式仍通过 `.env` 管理密钥。
+
+## Platform Workspace API
+
+Java Gateway 模式下用于管理 CodeAgent 文件夹模式的受控工作区。Workspace 是平台体验层配置，用于 Vue 默认填充文件夹路径、dry-run、备份和读取限制；Python CodeAgent 仍会依据 `config/settings.yaml` 做最终路径白名单和阻断校验。
+
+### GET `/api/platform/workspaces`
+
+返回平台层保存的 Workspace 列表。如果数据库为空，Java 会初始化一个默认演示工作区。
+
+```json
+{
+  "success": true,
+  "message": "ok",
+  "data": [
+    {
+      "id": 1,
+      "name": "CodeAgent Demo Workspace",
+      "rootPath": "output/code_agent_workspace",
+      "enabled": true,
+      "isDefault": true,
+      "description": "默认受控文件夹工作区。",
+      "maxFiles": 80,
+      "maxReadChars": 500000,
+      "dryRunDefault": true,
+      "backupBeforeWrite": true
+    }
+  ]
+}
+```
+
+### POST `/api/platform/workspaces`
+
+新增 Workspace。若请求中 `isDefault=true`，Java 会取消其他 Workspace 的默认状态。
+
+### PUT `/api/platform/workspaces/{id}`
+
+更新 Workspace。默认 Workspace 不允许被更新成禁用状态；如果设为默认，会自动启用。
+
+### DELETE `/api/platform/workspaces/{id}`
+
+删除 Workspace。若删除的是默认 Workspace，Java 会把剩余第一条工作区设为默认。

@@ -130,18 +130,19 @@ public class WorkflowTemplateService {
                     "基于 Workflow 模板生成可回放任务视图: " + asString(template.get("name"))
             );
             List<Map<String, Object>> workflowEvents = buildWorkflowEvents(platformRunId, template, nodes);
+            boolean waitingForHuman = containsHumanApproval(nodes);
             Map<String, Object> runSummary = buildTemplateRunSummary(platformRunId, template, workflowEvents);
             Map<String, Object> uiViewModel = buildTemplateUiViewModel(template, nodes, workflowEvents);
 
             RunRecordEntity record = new RunRecordEntity();
             record.setPlatformRunId(platformRunId);
             record.setPythonRunId("");
-            record.setStatus("SUCCESS");
+            record.setStatus(waitingForHuman ? "WAITING_FOR_HUMAN" : "SUCCESS");
             record.setRequirement(requirement);
             record.setModelProvider("workflow_template");
             record.setModelName("Workflow Template Replay");
             record.setModelBaseUrl("");
-            record.setSuccess(true);
+            record.setSuccess(!waitingForHuman);
             record.setRetryCount(0);
             record.setTestSuccess(true);
             record.setCoveragePercent(0);
@@ -155,8 +156,8 @@ public class WorkflowTemplateService {
             record.setUiViewModelJson(serializeObject(uiViewModel));
             record.setPluginResultsJson("[]");
             record.setErrorSummary("");
-            record.setApproved(true);
-            record.setRequireHumanApproval(false);
+            record.setApproved(!waitingForHuman);
+            record.setRequireHumanApproval(waitingForHuman);
             record.setRawResponse(serializeObject(Map.of(
                     "platformRunId", platformRunId,
                     "template", template,
@@ -207,6 +208,28 @@ public class WorkflowTemplateService {
             String agentKey = asString(node.get("agentKey"));
             String nodeName = firstNonBlank(asString(node.get("name")), agentKey);
             String stage = asString(node.get("stage"));
+            boolean humanApprovalNode = "human_approval".equals(agentKey)
+                    || "human_approval".equals(asString(node.get("nodeType")));
+
+            if (humanApprovalNode) {
+                events.add(workflowEvent(
+                        "HUMAN_APPROVAL_REQUIRED",
+                        nodeName + " 等待人工确认",
+                        "human_approval",
+                        "WAITING_FOR_HUMAN",
+                        firstNonBlank(
+                                asString(nestedValue(node, "humanApprovalConfig", "question")),
+                                "请确认是否继续执行后续节点"
+                        ),
+                        Map.of(
+                                "nodeId", asString(node.get("nodeId")),
+                                "stage", stage,
+                                "approval", node.get("humanApprovalConfig") == null ? Map.of() : node.get("humanApprovalConfig")
+                        )
+                ));
+                break;
+            }
+
             events.add(workflowEvent(
                     "AGENT_STARTED",
                     nodeName + " 开始执行",
@@ -229,16 +252,24 @@ public class WorkflowTemplateService {
             ));
         }
 
+        boolean waitingForHuman = containsHumanApproval(nodes);
         events.add(workflowEvent(
-                "WORKFLOW_FINISHED",
-                "Workflow 模板任务完成",
+                waitingForHuman ? "STATUS_CHANGED" : "WORKFLOW_FINISHED",
+                waitingForHuman ? "Workflow 模板等待人工确认" : "Workflow 模板任务完成",
                 "workflow",
-                "SUCCESS",
-                "可回放任务视图已生成",
+                waitingForHuman ? "WAITING_FOR_HUMAN" : "SUCCESS",
+                waitingForHuman ? "平台任务已暂停，等待用户批准或拒绝" : "可回放任务视图已生成",
                 Map.of("platformRunId", platformRunId, "nodeCount", nodes.size())
         ));
 
         return events;
+    }
+
+    private boolean containsHumanApproval(List<Map<String, Object>> nodes) {
+        return nodes.stream().anyMatch(node ->
+                "human_approval".equals(asString(node.get("agentKey")))
+                        || "human_approval".equals(asString(node.get("nodeType")))
+        );
     }
 
     private Map<String, Object> workflowEvent(
@@ -266,8 +297,10 @@ public class WorkflowTemplateService {
             Map<String, Object> template,
             List<Map<String, Object>> workflowEvents
     ) {
+        boolean waitingForHuman = workflowEvents.stream()
+                .anyMatch(event -> "WAITING_FOR_HUMAN".equals(asString(event.get("status"))));
         Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("success", true);
+        summary.put("success", !waitingForHuman);
         summary.put("retry_count", 0);
         summary.put("test_success", true);
         summary.put("coverage_percent", 0);
@@ -276,6 +309,9 @@ public class WorkflowTemplateService {
         summary.put("model_provider", "workflow_template");
         summary.put("runner_mode", "workflow_template");
         summary.put("runner_warning", "模板实例化不会执行 LangGraph 或模型调用");
+        summary.put("status", waitingForHuman ? "WAITING_FOR_HUMAN" : "SUCCESS");
+        summary.put("require_human_approval", waitingForHuman);
+        summary.put("approved", !waitingForHuman);
         summary.put("report_path", "");
         summary.put("platformRunId", platformRunId);
         summary.put("workflow_template", template.get("templateKey"));
@@ -299,8 +335,10 @@ public class WorkflowTemplateService {
             step.put("key", firstNonBlank(asString(node.get("nodeId")), asString(node.get("agentKey")) + "_" + (index + 1)));
             step.put("agent_key", asString(node.get("agentKey")));
             step.put("label", firstNonBlank(asString(node.get("name")), asString(node.get("agentKey"))));
-            step.put("status", "done");
-            step.put("summary", "模板回放节点已完成");
+            boolean waitingNode = "human_approval".equals(asString(node.get("agentKey")))
+                    || "human_approval".equals(asString(node.get("nodeType")));
+            step.put("status", waitingNode ? "waiting" : "done");
+            step.put("summary", waitingNode ? "等待人工确认" : "模板回放节点已完成");
             step.put("order", index + 1);
             workflowSteps.add(step);
         }
@@ -388,6 +426,17 @@ public class WorkflowTemplateService {
 
     private String asString(Object value) {
         return value == null ? "" : String.valueOf(value);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object nestedValue(Map<String, Object> source, String firstKey, String secondKey) {
+        Object nested = source.get(firstKey);
+
+        if (nested instanceof Map<?, ?> nestedMap) {
+            return ((Map<String, Object>) nestedMap).get(secondKey);
+        }
+
+        return null;
     }
 
     private String firstNonBlank(String... values) {

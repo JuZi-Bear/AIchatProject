@@ -32,3 +32,32 @@ code_agent:
     - .env
   audit_log_path: output/code_agent_audit.jsonl
   max_read_chars: 200000
+  allowed_workspace_roots: []
+  blocked_patterns:
+    - .env
+    - .git/**
+    - node_modules/**
+    - frontend-vue/node_modules/**
+    - frontend-vue/dist/**
+    - backend-java/target/**
+    - runner-cpp/build/**
+  max_files_per_folder: 80
+  max_total_read_chars: 500000
+  max_file_size_bytes: 200000
+  text_file_extensions:
+    - .py
+    - .ts
+    - .tsx
+    - .js
+    - .jsx
+    - .vue
+    - .java
+    - .md
+    - .txt
+    - .json
+    - .yaml
+    - .yml
+    - .css
+    - .html
+  dry_run_default: true
+  backup_before_write: true

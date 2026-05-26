@@ -38,6 +38,11 @@ public class ModelConfigEntity {
     @Column(name = "is_default")
     private boolean defaultModel;
 
+    @Column(length = 2048)
+    private String apiKeyCipher;
+
+    private LocalDateTime apiKeyUpdatedAt;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
@@ -112,6 +117,22 @@ public class ModelConfigEntity {
 
     public void setDefaultModel(boolean defaultModel) {
         this.defaultModel = defaultModel;
+    }
+
+    public String getApiKeyCipher() {
+        return apiKeyCipher;
+    }
+
+    public void setApiKeyCipher(String apiKeyCipher) {
+        this.apiKeyCipher = apiKeyCipher;
+    }
+
+    public LocalDateTime getApiKeyUpdatedAt() {
+        return apiKeyUpdatedAt;
+    }
+
+    public void setApiKeyUpdatedAt(LocalDateTime apiKeyUpdatedAt) {
+        this.apiKeyUpdatedAt = apiKeyUpdatedAt;
     }
 
     public LocalDateTime getCreatedAt() {

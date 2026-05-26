@@ -10,6 +10,7 @@ import RunHistory from "@/views/RunHistory.vue";
 import WorkflowEditor from "@/views/WorkflowEditor.vue";
 import WorkflowTemplates from "@/views/WorkflowTemplates.vue";
 import WorkflowReplay from "@/views/WorkflowReplay.vue";
+import WorkspaceSettings from "@/views/WorkspaceSettings.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -57,6 +58,11 @@ const router = createRouter({
       path: "/models",
       name: "models",
       component: Models,
+    },
+    {
+      path: "/workspace",
+      name: "workspace-settings",
+      component: WorkspaceSettings,
     },
     {
       path: "/plugins",
