@@ -7,11 +7,12 @@ import { useRouter } from "vue-router";
 import { currentApiMode, getApiModeLabel } from "@/api/client";
 import {
   executePlatformWorkflowTemplate,
+  exportPlatformWorkflowSkill,
   getPlatformWorkflowTemplates,
   getWorkflowTemplates,
   instantiateWorkflow,
 } from "@/api/workflows";
-import type { InstantiateWorkflowResponse, WorkflowTemplate } from "@/types/workflow";
+import type { InstantiateWorkflowResponse, WorkflowSkillExportResult, WorkflowTemplate } from "@/types/workflow";
 import type { WorkflowTemplateData } from "@/types/workflowEditor";
 
 const apiModeLabel = getApiModeLabel();
@@ -26,7 +27,9 @@ const requirement = ref("");
 const loading = ref(false);
 const creating = ref(false);
 const executingRuntime = ref(false);
+const exportingSkillKey = ref("");
 const createResult = ref<InstantiateWorkflowResponse | null>(null);
+const skillExportResult = ref<WorkflowSkillExportResult | null>(null);
 const createError = ref("");
 const isJavaMode = currentApiMode === "java";
 
@@ -107,6 +110,18 @@ async function createTemplateTask() {
   }
 }
 
+function runtimeResultMessage(result: InstantiateWorkflowResponse) {
+  const summary = result.run_summary || {};
+  const status = String(summary.status || "");
+  const reportPath = String(summary.report_path || "");
+  const waiting = status === "WAITING_FOR_HUMAN" || Boolean(summary.require_human_approval);
+  const reportText = reportPath ? `，报告已生成：${reportPath}` : "";
+
+  return waiting
+    ? `Workflow Runtime Lite 已执行，当前等待人工确认${reportText}`
+    : `Workflow Runtime Lite 已执行，正在打开回放${reportText}`;
+}
+
 async function executePlatformTemplate(template = selectedPlatformTemplate.value) {
   if (!template) {
     ElMessage.warning("请先选择一个 Java MySQL Workflow 模板");
@@ -124,13 +139,46 @@ async function executePlatformTemplate(template = selectedPlatformTemplate.value
       runtime_mode: "workflow_runtime_lite",
     });
     createResult.value = result;
-    ElMessage.success("Workflow Runtime Lite 已执行，正在打开回放");
+    ElMessage.success(runtimeResultMessage(result));
     await router.push(`/replay/${result.platformRunId}`);
   } catch (error) {
     createError.value = error instanceof Error ? error.message : "执行 Workflow Runtime Lite 失败";
     ElMessage.error(createError.value);
   } finally {
     executingRuntime.value = false;
+  }
+}
+
+async function exportSkill(template: WorkflowTemplateData) {
+  if (!isJavaMode) {
+    ElMessage.warning("Skill 导出仅 Java Gateway 模式支持");
+    return;
+  }
+
+  exportingSkillKey.value = template.workflowTemplateKey;
+  skillExportResult.value = null;
+
+  try {
+    const result = await exportPlatformWorkflowSkill(template.workflowTemplateKey);
+    skillExportResult.value = result;
+    ElMessage.success(`已导出 Skill：${result.skillName}`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "导出 Workflow Skill 失败");
+  } finally {
+    exportingSkillKey.value = "";
+  }
+}
+
+async function copySkillPath() {
+  if (!skillExportResult.value?.skillPath) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(skillExportResult.value.skillPath);
+    ElMessage.success("Skill 路径已复制");
+  } catch {
+    ElMessage.info(skillExportResult.value.skillPath);
   }
 }
 
@@ -280,10 +328,30 @@ onMounted(loadTemplates);
       <div class="runtime-head">
         <div>
           <h2>Java MySQL 模板执行</h2>
-          <p>Workflow Runtime Lite 会按模板节点顺序写入事件，CodeAgent 节点真实执行，其它 Agent 节点作为平台事件模拟。</p>
+          <p>可执行 Runtime Lite，也可把 MySQL 模板导出为本地 Codex Skill 包。</p>
         </div>
         <el-tag type="primary" effect="plain">Runtime Lite</el-tag>
       </div>
+
+      <el-alert
+        v-if="skillExportResult"
+        type="success"
+        show-icon
+        :closable="false"
+        class="skill-export-alert"
+      >
+        <template #title>
+          已导出 Skill：{{ skillExportResult.skillName }}
+        </template>
+        <div class="skill-export-result">
+          <span>路径：<code>{{ skillExportResult.skillPath }}</code></span>
+          <el-button size="small" text type="primary" @click="copySkillPath">复制路径</el-button>
+          <div class="tag-line">
+            <el-tag v-for="file in skillExportResult.files" :key="file" size="small" effect="plain">{{ file }}</el-tag>
+          </div>
+          <small>已生成但未自动安装到 Codex。</small>
+        </div>
+      </el-alert>
 
       <el-empty v-if="!loading && !platformTemplates.length" description="暂无 Java MySQL Workflow 模板" />
       <div v-else class="platform-template-grid" v-loading="loading">
@@ -314,6 +382,14 @@ onMounted(loadTemplates);
             @click.stop="executePlatformTemplate(template)"
           >
             执行
+          </el-button>
+          <el-button
+            type="success"
+            plain
+            :loading="exportingSkillKey === template.workflowTemplateKey"
+            @click.stop="exportSkill(template)"
+          >
+            导出 Skill
           </el-button>
         </article>
       </div>
@@ -465,6 +541,21 @@ onMounted(loadTemplates);
 .runtime-panel {
   display: grid;
   gap: 14px;
+}
+
+.skill-export-alert {
+  border-radius: 12px;
+}
+
+.skill-export-result {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.skill-export-result code {
+  color: #174ea6;
+  font-family: "Cascadia Code", Consolas, monospace;
 }
 
 .runtime-head {

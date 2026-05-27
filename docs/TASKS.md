@@ -80,15 +80,33 @@
 - [x] Java 平台模型 API Key 安全状态管理。
 - [x] Models 页面 API Key 更新 / 清除入口。
 - [x] Java Workflow Runtime Lite 模板执行接口。
+- [x] Runtime Lite Report 节点生成 Markdown 演示报告。
+- [x] Runtime Lite run_summary / ui_view_model 输出 runtime summary。
 - [x] Workflow Editor 执行模板工作流入口。
 - [x] Workflow Templates 页面 MySQL 模板执行入口。
 - [x] Replay 展示 executed / simulated / waiting 执行模式。
+- [x] Replay Runtime Lite 汇总区。
+- [x] Runtime Lite smoke 脚本。
+- [x] Dynamic LangGraph Runtime 模板 schema 与校验器。
+- [x] Dynamic LangGraph Runtime 节点适配器和 graph builder。
+- [x] Dynamic LangGraph Runtime 暂停 / 恢复 state 保存。
+- [x] Python Dynamic LangGraph validate / execute / resume API。
+- [x] Java Gateway Dynamic LangGraph validate / execute / resume 代理接口。
+- [x] Workflow Editor 验证 LangGraph 图 / 执行 LangGraph 图入口。
+- [x] Replay 支持 Dynamic LangGraph Human Approval resume。
+- [x] Java Workflow Template 导出 Codex Skill 接口。
+- [x] Vue Workflow Templates / Workflow Editor 导出 Skill 入口。
+- [x] Codex Skill 文件结构：`SKILL.md`、`references/workflow-template.json`、`scripts/run_workflow.py`。
+- [x] Docker Compose 挂载 `generated-skills` 导出目录。
 - [x] Replay 事件筛选和搜索。
 - [x] Dashboard 最近 CodeAgent 操作卡片增强。
 - [x] RunConsole 结构化需求构造器。
 - [x] RunConsole 运行结果高光区。
 - [x] RunConsole 结果详情紧凑化。
-- [ ] 从 Runtime Lite 预研动态 LangGraph 编排。
+- [x] 从 Runtime Lite 预研动态 LangGraph 编排。
+- [ ] Dynamic LangGraph 字段级 runtime context 真实传值。
+- [x] Workflow Template 生成 Codex Skill 包。
+- [ ] 导出的 Skill 自动安装 / 启用流程。
 - [ ] 更强 CodeAgent diff 可视化。
 - [ ] C++ Runner 资源限制增强。
 
@@ -98,4 +116,4 @@
 - [ ] 权限系统。
 - [ ] 团队协作。
 - [ ] 任务队列。
-- [ ] 动态改写 LangGraph 主流程。
+- [ ] 任意开放式动态改写 LangGraph 主流程。

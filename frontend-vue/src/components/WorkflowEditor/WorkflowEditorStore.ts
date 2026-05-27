@@ -10,6 +10,14 @@ import type {
   WorkflowViewport,
 } from "@/types/workflowEditor";
 import type { WorkflowTemplate } from "@/types/workflow";
+import {
+  classifyWorkflowField,
+  enrichConnectionFields,
+  primaryInputField,
+  primaryOutputField,
+  workflowConnectionKey,
+  workflowPortColor,
+} from "@/utils/workflowPorts";
 
 const STORAGE_KEY = "ai-agent-pipeline.workflow-editor.templates";
 const DEFAULT_VIEWPORT: WorkflowViewport = {
@@ -22,7 +30,7 @@ const MAX_SCALE = 1.8;
 const LAYOUT_START_X = 320;
 const LAYOUT_START_Y = 196;
 const LAYOUT_COLUMN_GAP = 336;
-const LAYOUT_ROW_GAP = 158;
+const LAYOUT_ROW_GAP = 220;
 
 const agentLabels: Record<string, string> = {
   product: "Product Agent",
@@ -81,14 +89,150 @@ function writeSavedTemplates(templates: WorkflowTemplateData[]) {
 }
 
 function buildSequentialConnections(nodes: AgentNodeData[]): ConnectionData[] {
-  return nodes.slice(0, -1).map((node, index) => ({
-    fromNodeId: node.nodeId,
-    toNodeId: nodes[index + 1].nodeId,
-  }));
+  return nodes.slice(0, -1).map((node, index) =>
+    buildConnection(node, nodes[index + 1]),
+  );
 }
 
 function connectionKey(connection: ConnectionData) {
-  return `${connection.fromNodeId}->${connection.toNodeId}`;
+  return workflowConnectionKey(connection);
+}
+
+function defaultFieldsForAgent(agentKey: string, previousAgentKey = "") {
+  const normalized = agentKey.toLowerCase();
+
+  if (normalized === "product") {
+    return {
+      inputs: ["requirement"],
+      outputs: ["product_result", "acceptance_criteria"],
+    };
+  }
+
+  if (normalized === "coder") {
+    return {
+      inputs: ["product_result", "acceptance_criteria"],
+      outputs: ["code", "file_changes"],
+    };
+  }
+
+  if (normalized === "tester") {
+    return {
+      inputs: ["code", "acceptance_criteria"],
+      outputs: ["test_result", "test_stdout", "test_stderr"],
+    };
+  }
+
+  if (normalized === "runner") {
+    return {
+      inputs: ["code"],
+      outputs: ["stdout", "stderr", "returncode"],
+    };
+  }
+
+  if (normalized === "sentry") {
+    return {
+      inputs: ["stderr", "test_stderr", "error_log"],
+      outputs: ["error_summary", "repair_plan"],
+    };
+  }
+
+  if (normalized === "code_agent") {
+    return {
+      inputs: ["repair_plan", "code", "target_path"],
+      outputs: ["diff", "audit_path", "file_result"],
+    };
+  }
+
+  if (normalized === "human_approval") {
+    return {
+      inputs: ["approval_request"],
+      outputs: ["approval_result"],
+    };
+  }
+
+  if (normalized === "quality") {
+    return {
+      inputs: ["test_result", "coverage_percent", "security_result"],
+      outputs: ["quality_score", "quality_summary"],
+    };
+  }
+
+  if (normalized === "report") {
+    return {
+      inputs: ["product_result", "code", "test_result", "diff", "quality_score"],
+      outputs: ["report_markdown", "report_path"],
+    };
+  }
+
+  if (normalized.startsWith("branch_")) {
+    return {
+      inputs: [`${previousAgentKey || "previous"}_result`],
+      outputs: ["true_branch", "false_branch"],
+    };
+  }
+
+  return {
+    inputs: previousAgentKey ? [`${previousAgentKey}_result`] : ["input"],
+    outputs: [`${normalized || "agent"}_result`],
+  };
+}
+
+function preferredInputForOutput(targetNode: AgentNodeData, outputField = "") {
+  const outputType = classifyWorkflowField(outputField);
+  const exact = targetNode.input_fields.find((field) => field === outputField);
+
+  if (exact) {
+    return exact;
+  }
+
+  return (
+    targetNode.input_fields.find((field) => classifyWorkflowField(field) === outputType) ||
+    primaryInputField(targetNode)
+  );
+}
+
+function buildConnection(
+  sourceNode: AgentNodeData,
+  targetNode: AgentNodeData,
+  fromOutputField = primaryOutputField(sourceNode),
+  toInputField = preferredInputForOutput(targetNode, fromOutputField),
+): ConnectionData {
+  const dataType = classifyWorkflowField(fromOutputField || toInputField);
+
+  return {
+    fromNodeId: sourceNode.nodeId,
+    toNodeId: targetNode.nodeId,
+    fromOutputField,
+    toInputField,
+    dataType,
+    color: workflowPortColor(fromOutputField || toInputField, dataType),
+    label: `${fromOutputField || "output"} → ${toInputField || "input"}`,
+    edgeType: sourceNode.nodeType === "branch" || sourceNode.nodeType === "condition" ? "branch" : "control",
+    condition:
+      fromOutputField === "true_path" || fromOutputField === "true_branch"
+        ? "success == true"
+        : fromOutputField === "false_path" || fromOutputField === "false_branch"
+          ? "success == false"
+          : "",
+  };
+}
+
+function isSafeWorkflowCondition(condition = "") {
+  const normalized = condition.trim();
+
+  if (!normalized || ["always", "else", "default"].includes(normalized.toLowerCase())) {
+    return true;
+  }
+
+  return /^[A-Za-z_][A-Za-z0-9_]*\s*(==|!=|>=|<=|>|<)\s*(true|false|null|none|-?\d+(\.\d+)?|'[^']*'|"[^"]*")$/i.test(normalized);
+}
+
+function enrichConnections(nodes: AgentNodeData[], connections: ConnectionData[]) {
+  const nodeById = new Map(nodes.map((node) => [node.nodeId, node]));
+
+  return connections.map((connection) =>
+    enrichConnectionFields(connection, nodeById.get(connection.fromNodeId), nodeById.get(connection.toNodeId)),
+  );
 }
 
 function normalizeTemplateKey(value: string) {
@@ -214,7 +358,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.workflowName = template.name;
       this.workflowDescription = template.description;
       this.nodes = template.nodes.map((node) => ({ ...node, position: { ...node.position } }));
-      this.connections = template.connections.map((connection) => ({ ...connection }));
+      this.connections = enrichConnections(this.nodes, template.connections.map((connection) => ({ ...connection })));
       this.viewport = defaultViewport();
       this.showStageGuide = false;
       this.selectedConnectionId = "";
@@ -247,47 +391,51 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.workflowTemplateKey = template.key;
       this.workflowName = template.name;
       this.workflowDescription = template.description;
-      this.nodes = template.agent_sequence.map((agentKey, index) => ({
-        nodeId: `${template.key}_${agentKey}_${index + 1}`,
-        agentKey,
-        nodeType:
-          agentKey === "code_agent"
-            ? "code_agent"
-            : agentKey === "human_approval"
-              ? "human_approval"
-              : agentKey.startsWith("branch_")
-                ? "branch"
-                : "agent",
-        name: agentLabels[agentKey] || agentKey,
-        role: "",
-        position: compactPosition(index, {
+      this.nodes = template.agent_sequence.map((agentKey, index) => {
+        const fieldDefaults = defaultFieldsForAgent(agentKey, template.agent_sequence[index - 1]);
+
+        return {
+          nodeId: `${template.key}_${agentKey}_${index + 1}`,
           agentKey,
+          nodeType:
+            agentKey === "code_agent"
+              ? "code_agent"
+              : agentKey === "human_approval"
+                ? "human_approval"
+                : agentKey.startsWith("branch_")
+                  ? "condition"
+                  : "agent",
+          name: agentLabels[agentKey] || agentKey,
+          role: "",
+          position: compactPosition(index, {
+            agentKey,
+            stage: template.stage_sequence[index] || "未分类",
+          }),
+          input_fields: fieldDefaults.inputs,
+          output_fields: fieldDefaults.outputs,
           stage: template.stage_sequence[index] || "未分类",
-        }),
-        input_fields: index === 0 ? ["requirement"] : [`${template.agent_sequence[index - 1]}_result`],
-        output_fields: [`${agentKey}_result`],
-        stage: template.stage_sequence[index] || "未分类",
-        enabled: template.enabled,
-        description: `${template.name} 的 ${agentLabels[agentKey] || agentKey} 节点`,
-        codeAgentConfig:
-          agentKey === "code_agent"
-            ? {
-                operation: "write_file",
-                target_path: "output/code_agent_demo.txt",
-                content: "",
-                audit_log_path: "output/code_agent_audit.jsonl",
-              }
-            : undefined,
-        humanApprovalConfig:
-          agentKey === "human_approval"
-            ? {
-                question: "是否批准继续执行后续节点？",
-                approveLabel: "批准继续",
-                rejectLabel: "拒绝停止",
-                required: true,
-              }
-            : undefined,
-      }));
+          enabled: template.enabled,
+          description: `${template.name} 的 ${agentLabels[agentKey] || agentKey} 节点`,
+          codeAgentConfig:
+            agentKey === "code_agent"
+              ? {
+                  operation: "write_file",
+                  target_path: "output/code_agent_demo.txt",
+                  content: "",
+                  audit_log_path: "output/code_agent_audit.jsonl",
+                }
+              : undefined,
+          humanApprovalConfig:
+            agentKey === "human_approval"
+              ? {
+                  question: "是否批准继续执行后续节点？",
+                  approveLabel: "批准继续",
+                  rejectLabel: "拒绝停止",
+                  required: true,
+                }
+              : undefined,
+        };
+      });
       this.refreshConnections();
       this.viewport = defaultViewport();
       this.showStageGuide = false;
@@ -304,18 +452,18 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
         agentKey: agent.key,
         nodeType: agent.key === "code_agent"
           ? "code_agent"
-          : agent.key === "human_approval"
-            ? "human_approval"
+            : agent.key === "human_approval"
+              ? "human_approval"
             : agent.key === "custom_agent"
               ? "custom_agent"
               : agent.key.startsWith("branch_")
-                ? "branch"
+                ? "condition"
                 : "agent",
         name: agent.name || agent.key,
         role: agent.role || "",
         position,
-        input_fields: [...agent.input_fields],
-        output_fields: [...agent.output_fields],
+        input_fields: agent.input_fields.length ? [...agent.input_fields] : defaultFieldsForAgent(agent.key).inputs,
+        output_fields: agent.output_fields.length ? [...agent.output_fields] : defaultFieldsForAgent(agent.key).outputs,
         stage: agent.stage || "custom",
         enabled: agent.enabled,
         description: agent.description || "",
@@ -352,10 +500,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       const previousNode = this.nodes[this.nodes.length - 2];
 
       if (previousNode) {
-        const nextConnection = {
-          fromNodeId: previousNode.nodeId,
-          toNodeId: node.nodeId,
-        };
+        const nextConnection = buildConnection(previousNode, node);
 
         if (!this.connections.some((connection) => connectionKey(connection) === connectionKey(nextConnection))) {
           this.connections.push(nextConnection);
@@ -402,19 +547,19 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       this.selectedConnectionId = "";
       this.connectionMode = "idle";
     },
-    addConnection(fromNodeId: string, toNodeId: string) {
+    addConnection(fromNodeId: string, toNodeId: string, fromOutputField?: string, toInputField?: string) {
       if (!fromNodeId || !toNodeId || fromNodeId === toNodeId) {
         return;
       }
 
-      const fromExists = this.nodes.some((node) => node.nodeId === fromNodeId);
-      const toExists = this.nodes.some((node) => node.nodeId === toNodeId);
+      const sourceNode = this.nodes.find((node) => node.nodeId === fromNodeId);
+      const targetNode = this.nodes.find((node) => node.nodeId === toNodeId);
 
-      if (!fromExists || !toExists) {
+      if (!sourceNode || !targetNode) {
         return;
       }
 
-      const nextConnection: ConnectionData = { fromNodeId, toNodeId };
+      const nextConnection = buildConnection(sourceNode, targetNode, fromOutputField, toInputField);
       const nextKey = connectionKey(nextConnection);
 
       if (this.connections.some((connection) => connectionKey(connection) === nextKey)) {
@@ -423,6 +568,15 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       }
 
       this.commitHistory();
+      if (nextConnection.toInputField) {
+        this.connections = this.connections.filter(
+          (connection) =>
+            !(
+              connection.toNodeId === nextConnection.toNodeId &&
+              connection.toInputField === nextConnection.toInputField
+            ),
+        );
+      }
       this.connections.push(nextConnection);
       this.showStageGuide = false;
       this.selectConnection(nextKey);
@@ -449,6 +603,25 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
       }
 
       this.deleteConnection(this.selectedConnectionId);
+    },
+    updateConnection(connectionId: string, patch: Partial<ConnectionData>) {
+      const index = this.connections.findIndex((connection) => connectionKey(connection) === connectionId);
+
+      if (index < 0) {
+        return;
+      }
+
+      const currentConnection = this.connections[index];
+      const nextConnection = {
+        ...currentConnection,
+        ...patch,
+      };
+      const sourceNode = this.nodes.find((node) => node.nodeId === nextConnection.fromNodeId);
+      const targetNode = this.nodes.find((node) => node.nodeId === nextConnection.toNodeId);
+
+      this.commitHistory();
+      this.connections.splice(index, 1, enrichConnectionFields(nextConnection, sourceNode, targetNode));
+      this.selectedConnectionId = connectionKey(this.connections[index]);
     },
     updateNode(nodeId: string, patch: Partial<AgentNodeData>) {
       const node = this.nodes.find((item) => item.nodeId === nodeId);
@@ -585,6 +758,7 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
         ];
       }
 
+      const nodeById = new Map(this.nodes.map((node) => [node.nodeId, node]));
       const missingSourceConnections = this.connections.filter((connection) => !nodeIds.has(connection.fromNodeId));
       const missingTargetConnections = this.connections.filter((connection) => !nodeIds.has(connection.toNodeId));
       const selfConnections = this.connections.filter((connection) => connection.fromNodeId === connection.toNodeId);
@@ -631,6 +805,88 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
           message: `发现 ${selfConnections.length} 条节点连接到自己的连线，请删除后重新连接。`,
         });
       }
+
+      const fieldInputBindings = new Map<string, ConnectionData[]>();
+
+      this.connections
+        .filter((connection) => nodeIds.has(connection.fromNodeId) && nodeIds.has(connection.toNodeId))
+        .forEach((connection) => {
+          const sourceNode = nodeById.get(connection.fromNodeId);
+          const targetNode = nodeById.get(connection.toNodeId);
+
+          if (connection.fromOutputField && sourceNode && !sourceNode.output_fields.includes(connection.fromOutputField)) {
+            issues.push({
+              severity: "error",
+              title: "输出字段不存在",
+              message: `${sourceNode.name} 不包含输出字段 ${connection.fromOutputField}，请重新选择输出端口。`,
+              nodeId: sourceNode.nodeId,
+            });
+          }
+
+          if (connection.toInputField && targetNode && !targetNode.input_fields.includes(connection.toInputField)) {
+            issues.push({
+              severity: "error",
+              title: "输入字段不存在",
+              message: `${targetNode.name} 不包含输入字段 ${connection.toInputField}，请重新选择输入端口。`,
+              nodeId: targetNode.nodeId,
+            });
+          }
+
+          if (connection.toInputField) {
+            const bindingKey = `${connection.toNodeId}:${connection.toInputField}`;
+            fieldInputBindings.set(bindingKey, [...(fieldInputBindings.get(bindingKey) || []), connection]);
+          }
+
+          if (connection.fromOutputField && connection.toInputField) {
+            const sourceType = classifyWorkflowField(connection.fromOutputField);
+            const targetType = classifyWorkflowField(connection.toInputField);
+
+            if (sourceType !== targetType && sourceType !== "custom" && targetType !== "custom") {
+              issues.push({
+                severity: "warning",
+                title: "字段类型可能不匹配",
+                message: `${sourceNode?.name || connection.fromNodeId}.${connection.fromOutputField} (${sourceType}) 连接到 ${targetNode?.name || connection.toNodeId}.${connection.toInputField} (${targetType})，请确认数据语义。`,
+                nodeId: connection.toNodeId,
+              });
+            }
+          }
+
+          if (connection.condition && !isSafeWorkflowCondition(connection.condition)) {
+            issues.push({
+              severity: "error",
+              title: "非法条件表达式",
+              message: "条件只支持白名单字段与常量比较，例如 success == true。",
+              nodeId: connection.fromNodeId,
+              edge: connection,
+            });
+          }
+
+          if (connection.edgeType === "loop" && !connection.loopPolicy?.maxIterations) {
+            issues.push({
+              severity: "error",
+              title: "循环缺少上限",
+              message: "loop 连线必须设置 maxIterations，避免动态 LangGraph 无限循环。",
+              nodeId: connection.fromNodeId,
+              edge: connection,
+            });
+          }
+        });
+
+      fieldInputBindings.forEach((connections, bindingKey) => {
+        if (connections.length <= 1) {
+          return;
+        }
+
+        const [targetNodeId, inputField] = bindingKey.split(":");
+        const targetNode = nodeById.get(targetNodeId);
+
+        issues.push({
+          severity: "warning",
+          title: "输入字段存在多个上游",
+          message: `${targetNode?.name || targetNodeId}.${inputField} 被 ${connections.length} 条连线同时写入，建议保留一个主输入或拆成不同字段。`,
+          nodeId: targetNodeId,
+        });
+      });
 
       const validConnections = this.connections.filter(
         (connection) =>
@@ -716,6 +972,26 @@ export const useWorkflowEditorStore = defineStore("workflow-editor", {
               severity: "error",
               title: "CodeAgent 缺少 target_path",
               message: `${node.name} 需要配置目标文件或目录路径。`,
+              nodeId: node.nodeId,
+            });
+          }
+        });
+
+      this.nodes
+        .filter((node) => node.agentKey === "report" || node.stage === "report")
+        .forEach((node) => {
+          const boundInputs = new Set(
+            validConnections
+              .filter((connection) => connection.toNodeId === node.nodeId)
+              .map((connection) => connection.toInputField)
+              .filter(Boolean),
+          );
+
+          if (node.input_fields.length && boundInputs.size === 0) {
+            issues.push({
+              severity: "warning",
+              title: "Report 缺少输入映射",
+              message: `${node.name} 没有字段级输入来源，报告可能缺少 CodeAgent diff、测试结果或质量评分。`,
               nodeId: node.nodeId,
             });
           }

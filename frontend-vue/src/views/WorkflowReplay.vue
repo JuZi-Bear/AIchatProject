@@ -7,6 +7,7 @@ import { useRoute, useRouter } from "vue-router";
 import { getWorkflowReplay } from "@/api/replay";
 import { currentApiMode } from "@/api/client";
 import { approvePlatformRun } from "@/api/runs";
+import { resumePlatformDynamicLangGraphRun } from "@/api/workflows";
 import ReplayControlPanel from "@/components/ReplayControlPanel.vue";
 import ReplayEventCard from "@/components/ReplayEventCard.vue";
 import WorkflowReplayTimeline from "@/components/WorkflowReplayTimeline.vue";
@@ -62,6 +63,37 @@ const failedEventCount = computed(
   () => allEvents.value.filter((event) => event.status === "FAILED" || event.eventType.includes("FAILED") || event.eventType === "ERROR_OCCURRED").length,
 );
 const waitingForHuman = computed(() => replay.value?.status === "WAITING_FOR_HUMAN");
+const runtimeSummary = computed(() => {
+  const uiSummary = replay.value?.uiViewModel?.runtime_summary;
+  const runSummary = replay.value?.runSummary || {};
+  const nodeCounts =
+    (uiSummary && typeof uiSummary === "object" && "node_counts" in uiSummary
+      ? (uiSummary as Record<string, unknown>).node_counts
+      : runSummary.runtime_node_counts) || {};
+
+  return {
+    mode:
+      (uiSummary && typeof uiSummary === "object" ? String((uiSummary as Record<string, unknown>).mode || "") : "") ||
+      String(runSummary.runtime_mode || ""),
+    nodeCounts: nodeCounts as Record<string, unknown>,
+    reportPath:
+      (uiSummary && typeof uiSummary === "object"
+        ? String((uiSummary as Record<string, unknown>).report_path || "")
+        : "") || String(runSummary.report_path || ""),
+    codeAgent:
+      (uiSummary && typeof uiSummary === "object" && "code_agent" in uiSummary
+        ? ((uiSummary as Record<string, unknown>).code_agent as Record<string, unknown>)
+        : {}) || {},
+    connectionMappings:
+      (uiSummary && typeof uiSummary === "object" && Array.isArray((uiSummary as Record<string, unknown>).connection_mappings)
+        ? ((uiSummary as Record<string, unknown>).connection_mappings as Array<Record<string, unknown>>)
+        : Array.isArray(runSummary.connection_mappings)
+          ? (runSummary.connection_mappings as Array<Record<string, unknown>>)
+          : []),
+  };
+});
+const isRuntimeLiteReplay = computed(() => runtimeSummary.value.mode === "workflow_runtime_lite");
+const isDynamicLangGraphReplay = computed(() => runtimeSummary.value.mode === "dynamic_langgraph");
 const agentOptions = [
   { label: "全部 Agent", value: "all" },
   { label: "CodeAgent", value: "code_agent" },
@@ -220,8 +252,13 @@ async function submitApproval(approved: boolean) {
   approving.value = true;
 
   try {
-    await approvePlatformRun(platformRunId.value, approved, approvalComment.value);
-    ElMessage.success(approved ? "已批准继续执行" : "已拒绝继续执行");
+    if (isDynamicLangGraphReplay.value) {
+      await resumePlatformDynamicLangGraphRun(platformRunId.value, approved, approvalComment.value);
+      ElMessage.success(approved ? "Dynamic LangGraph 已恢复执行" : "Dynamic LangGraph 已拒绝继续");
+    } else {
+      await approvePlatformRun(platformRunId.value, approved, approvalComment.value);
+      ElMessage.success(approved ? "已批准继续执行" : "已拒绝继续执行");
+    }
     await loadReplay();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : "提交人工确认失败");
@@ -298,6 +335,55 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="requirement-block">{{ replay.requirement || "无需求摘要" }}</div>
+      </el-card>
+
+      <el-card v-if="isRuntimeLiteReplay || isDynamicLangGraphReplay" shadow="never" class="runtime-summary-card">
+        <template #header>
+          <div class="runtime-summary-head">
+            <span>{{ isDynamicLangGraphReplay ? "Dynamic LangGraph 汇总" : "Workflow Runtime Lite 汇总" }}</span>
+            <el-tag :type="isDynamicLangGraphReplay ? 'warning' : 'success'" effect="plain">
+              {{ isDynamicLangGraphReplay ? "受控 LangGraph" : "模板执行" }}
+            </el-tag>
+          </div>
+        </template>
+        <div class="runtime-summary-grid">
+          <div>
+            <span>真实执行</span>
+            <strong>{{ runtimeSummary.nodeCounts.executed || 0 }}</strong>
+          </div>
+          <div>
+            <span>平台模拟</span>
+            <strong>{{ runtimeSummary.nodeCounts.simulated || 0 }}</strong>
+          </div>
+          <div>
+            <span>等待确认</span>
+            <strong>{{ runtimeSummary.nodeCounts.waiting || 0 }}</strong>
+          </div>
+          <div>
+            <span>报告路径</span>
+            <strong>{{ runtimeSummary.reportPath || "未生成" }}</strong>
+          </div>
+          <div>
+            <span>审计日志</span>
+            <strong>{{ runtimeSummary.codeAgent.auditPath || "无" }}</strong>
+          </div>
+          <div>
+            <span>CodeAgent 写入</span>
+            <strong>{{ runtimeSummary.codeAgent.actualWrites ?? 0 }}</strong>
+          </div>
+        </div>
+        <div v-if="runtimeSummary.connectionMappings.length" class="runtime-mapping-strip">
+          <strong>字段级数据流</strong>
+          <span
+            v-for="(mapping, index) in runtimeSummary.connectionMappings.slice(0, 6)"
+            :key="`${mapping.fromNodeId}-${mapping.fromOutputField}-${mapping.toNodeId}-${mapping.toInputField}-${index}`"
+            class="runtime-mapping-pill"
+            :style="{ '--mapping-color': String(mapping.color || '#64748b') }"
+          >
+            {{ mapping.fromNodeName }}.{{ mapping.fromOutputField }} → {{ mapping.toNodeName }}.{{ mapping.toInputField }}
+          </span>
+          <em v-if="runtimeSummary.connectionMappings.length > 6">+{{ runtimeSummary.connectionMappings.length - 6 }}</em>
+        </div>
       </el-card>
 
       <el-card shadow="never" class="replay-filter-card">
@@ -428,6 +514,83 @@ onBeforeUnmount(() => {
   line-height: 1.55;
 }
 
+.runtime-summary-card :deep(.el-card__body) {
+  padding: 12px;
+}
+
+.runtime-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.runtime-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-summary-grid div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.runtime-summary-grid span {
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runtime-summary-grid strong {
+  overflow-wrap: anywhere;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.runtime-mapping-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #dbeafe;
+}
+
+.runtime-mapping-strip strong {
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.runtime-mapping-pill {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--mapping-color) 32%, #ffffff);
+  border-left: 4px solid var(--mapping-color);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mapping-color) 8%, #ffffff);
+  color: #334155;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-mapping-strip em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .replay-filter-card :deep(.el-card__body) {
   padding: 12px;
 }
@@ -496,6 +659,10 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1280px) {
   .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .runtime-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

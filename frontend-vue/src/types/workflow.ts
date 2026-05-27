@@ -39,8 +39,46 @@ export type WorkflowRuntimeNodeEvent = {
   created_at?: string;
 } & Record<string, unknown>;
 
+export type RuntimeNodeExecutionMode = "executed" | "simulated" | "waiting";
+
+export type WorkflowRuntimeSummary = {
+  mode?: string;
+  node_counts?: {
+    executed?: number;
+    simulated?: number;
+    waiting?: number;
+  };
+  code_agent?: Record<string, unknown>;
+  report_path?: string;
+  connection_mappings?: Array<Record<string, unknown>>;
+};
+
 export type WorkflowRuntimeExecutionResult = InstantiateWorkflowResponse & {
   status?: string;
   events?: WorkflowRuntimeNodeEvent[];
   warnings?: string[];
+  validation_result?: DynamicLangGraphValidationResult;
+};
+
+export type DynamicLangGraphValidationResult = {
+  valid: boolean;
+  errors: Array<Record<string, unknown>>;
+  warnings: Array<Record<string, unknown>>;
+  issues: Array<Record<string, unknown>>;
+  node_count?: number;
+  edge_count?: number;
+  template_key?: string;
+};
+
+export type DynamicLangGraphExecutionResult = WorkflowRuntimeExecutionResult & {
+  validation_result?: DynamicLangGraphValidationResult;
+};
+
+export type WorkflowSkillExportResult = {
+  templateKey: string;
+  skillName: string;
+  skillPath: string;
+  files: string[];
+  installed: false;
+  warnings: string[];
 };

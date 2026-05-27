@@ -2,10 +2,13 @@ import { apiClient, currentApiMode } from "./client";
 
 import type { ApiResponse } from "@/types/api";
 import type {
+  DynamicLangGraphExecutionResult,
+  DynamicLangGraphValidationResult,
   InstantiateWorkflowRequest,
   InstantiateWorkflowResponse,
   WorkflowRuntimeExecutionResult,
   WorkflowRuntimeNodeEvent,
+  WorkflowSkillExportResult,
   WorkflowTemplate,
 } from "@/types/workflow";
 import type { AgentNodeData, ConnectionData, WorkflowTemplateData } from "@/types/workflowEditor";
@@ -25,6 +28,7 @@ type RawWorkflowRuntimeExecutionResult = RawInstantiateWorkflowResponse &
     events?: WorkflowRuntimeNodeEvent[];
     warnings?: string[];
     status?: string;
+    validation_result?: DynamicLangGraphValidationResult;
   };
 
 type RawPlatformWorkflowTemplate = Partial<WorkflowTemplateData> & {
@@ -92,6 +96,7 @@ function normalizeRuntimeExecutionResponse(response: RawWorkflowRuntimeExecution
     status: response.status || String(response.run_summary?.status || ""),
     events: response.events || response.workflow_events || [],
     warnings: response.warnings || [],
+    validation_result: response.validation_result,
   };
 }
 
@@ -100,6 +105,8 @@ function normalizeNode(node: Partial<AgentNodeData>, index: number): AgentNodeDa
     nodeId: node.nodeId || `${node.agentKey || "agent"}_${index + 1}`,
     agentKey: node.agentKey || "",
     nodeType: node.nodeType,
+    executionMode: node.executionMode,
+    langGraphKey: node.langGraphKey,
     name: node.name || node.agentKey || `Agent ${index + 1}`,
     role: node.role,
     position: {
@@ -114,6 +121,8 @@ function normalizeNode(node: Partial<AgentNodeData>, index: number): AgentNodeDa
     codeAgentConfig: node.codeAgentConfig,
     humanApprovalConfig: node.humanApprovalConfig,
     customAgentMeta: node.customAgentMeta,
+    pausePolicy: node.pausePolicy,
+    loopPolicy: node.loopPolicy,
   };
 }
 
@@ -121,6 +130,14 @@ function normalizeConnection(connection: Partial<ConnectionData>): ConnectionDat
   return {
     fromNodeId: connection.fromNodeId || "",
     toNodeId: connection.toNodeId || "",
+    fromOutputField: connection.fromOutputField || "",
+    toInputField: connection.toInputField || "",
+    dataType: connection.dataType,
+    color: connection.color || "",
+    label: connection.label || "",
+    edgeType: connection.edgeType || "control",
+    condition: connection.condition || "",
+    loopPolicy: connection.loopPolicy,
   };
 }
 
@@ -216,6 +233,72 @@ export function executePlatformWorkflowTemplate(
     .then((response) =>
       normalizeRuntimeExecutionResponse(unwrapApiResponse<RawWorkflowRuntimeExecutionResult>(response.data)),
     );
+}
+
+export function validatePlatformDynamicLangGraphTemplate(
+  templateKey: string,
+  inputData: Record<string, unknown> = {},
+): Promise<DynamicLangGraphValidationResult> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("Dynamic LangGraph 校验仅 Java Gateway 模式支持"));
+  }
+
+  return apiClient
+    .post<ApiResponse<DynamicLangGraphValidationResult>>(
+      platformWorkflowPath(`/templates/${templateKey}/validate-langgraph`),
+      { input_data: inputData },
+    )
+    .then((response) => unwrapApiResponse<DynamicLangGraphValidationResult>(response.data));
+}
+
+export function executePlatformDynamicLangGraphTemplate(
+  templateKey: string,
+  inputData: Record<string, unknown>,
+): Promise<DynamicLangGraphExecutionResult> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("Dynamic LangGraph 执行仅 Java Gateway 模式支持"));
+  }
+
+  return apiClient
+    .post<ApiResponse<RawWorkflowRuntimeExecutionResult>>(platformWorkflowPath(`/templates/${templateKey}/execute-langgraph`), {
+      input_data: inputData,
+    })
+    .then((response) =>
+      normalizeRuntimeExecutionResponse(
+        unwrapApiResponse<RawWorkflowRuntimeExecutionResult>(response.data),
+      ) as DynamicLangGraphExecutionResult,
+    );
+}
+
+export function resumePlatformDynamicLangGraphRun(
+  platformRunId: string,
+  approved: boolean,
+  comment = "",
+): Promise<DynamicLangGraphExecutionResult> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("Dynamic LangGraph 恢复仅 Java Gateway 模式支持"));
+  }
+
+  return apiClient
+    .post<ApiResponse<RawWorkflowRuntimeExecutionResult>>(platformWorkflowPath(`/runs/${platformRunId}/resume`), {
+      approved,
+      comment,
+    })
+    .then((response) =>
+      normalizeRuntimeExecutionResponse(
+        unwrapApiResponse<RawWorkflowRuntimeExecutionResult>(response.data),
+      ) as DynamicLangGraphExecutionResult,
+    );
+}
+
+export function exportPlatformWorkflowSkill(templateKey: string): Promise<WorkflowSkillExportResult> {
+  if (currentApiMode !== "java") {
+    return Promise.reject(new Error("Workflow Skill 导出仅 Java Gateway 模式支持"));
+  }
+
+  return apiClient
+    .post<ApiResponse<WorkflowSkillExportResult>>(platformWorkflowPath(`/templates/${templateKey}/export-skill`))
+    .then((response) => unwrapApiResponse<WorkflowSkillExportResult>(response.data));
 }
 
 export function deletePlatformWorkflowTemplate(templateKey: string): Promise<WorkflowTemplateData> {

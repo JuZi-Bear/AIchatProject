@@ -77,7 +77,9 @@ Vue3 + TypeScript
 - [x] Human Approval 平台层审批节点、事件和 Replay 确认入口。
 - [x] Workflow Editor 自定义 Agent 模板节点。
 - [x] Java Gateway 模型 API Key masked 状态和加密保存接口。
-- [x] Workflow Runtime Lite：Java 平台层按模板节点顺序执行演示链路，CodeAgent 节点真实执行，其它 Agent 节点记录可回放事件。
+- [x] Workflow Runtime Lite：Java 平台层按模板节点顺序执行演示链路，CodeAgent 节点真实执行，Report 节点生成 Markdown 演示报告，其它 Agent 节点记录可回放事件。
+- [x] Dynamic LangGraph Runtime v1：Python 将 Workflow Editor 模板校验并编译为受控 LangGraph 执行图，支持安全条件分支、有上限循环、Human Approval 暂停/恢复和 Java Gateway 代理执行。
+- [x] Workflow Template → Codex Skill Export：Java MySQL 模板可导出为本地 Skill 包，包含 `SKILL.md`、模板 JSON 和平台执行脚本。
 
 ## v2-only 收敛结果
 
@@ -88,8 +90,10 @@ Vue3 + TypeScript
 
 ## 当前限制
 
-- Workflow Runtime Lite 当前是 Java 平台层演示执行器；它让模板进入“可执行演示”闭环，但不等于动态 LangGraph Runtime。
-- Workflow Editor 当前编辑平台模板、Runtime Lite 演示链路和可回放任务视图；手动连线和强化连接线用于前端编排表达和模板保存，不直接驱动动态 LangGraph 分支。
+- Workflow Runtime Lite 当前是 Java 平台层演示执行器；它让模板进入“可执行演示”闭环，支持 CodeAgent 文件夹操作、Human Approval 等待状态和 Report Markdown 产物，但不等于动态 LangGraph Runtime。
+- Dynamic LangGraph Runtime v1 已经提供受控动态执行路径，但不替换固定 `/runs` 主流程；条件表达式必须白名单解析，循环必须配置 `maxIterations`，暂停/恢复依赖平台保存的 dynamic state。
+- Workflow Editor 当前编辑平台模板、Runtime Lite 演示链路、Dynamic LangGraph 执行图和可回放任务视图；字段级连线已进入模板和校验，但真实字段值在节点间传递仍是后续深化方向。
+- Skill Export 当前只导出文件到 `generated-skills/`，不会自动安装到 Codex，也不会绕过 Java Gateway 和 CodeAgent 安全边界。
 - Custom Agent 当前是模板可视化节点，不会自动注册到 Python Agent Registry。
 - Human Approval 第一阶段是 Java 平台层审批事件，不会中断真实 LangGraph 运行。
 - Java Gateway 可保存平台层模型密钥状态，但 Python Direct 仍通过 `.env` 配置模型 Key。
@@ -102,7 +106,8 @@ Vue3 + TypeScript
 ## 推荐下一步
 
 1. 继续稳定 v2-only 演示版和验收脚本。
-2. 继续验证 Workflow Runtime Lite，沉淀哪些节点适合从平台事件升级为真实执行。
-3. 增强 Replay 事件对比和导出。
-4. 继续同步 Figma 设计源与 Vue 实现。
-5. 暂缓用户/权限/团队协作等复杂平台功能。
+2. 用 Dynamic LangGraph Runtime 验证分支、循环、暂停、恢复和字段级映射的演示稳定性。
+3. 验证导出的 Skill 包在本地 Codex 工作流中的可读性和可复用性。
+4. 增强 Replay 事件对比和导出。
+5. 继续同步 Figma 设计源与 Vue 实现。
+6. 暂缓用户/权限/团队协作等复杂平台功能。

@@ -16,6 +16,7 @@ __pycache__/
 node_modules/
 frontend-vue/node_modules/
 frontend-vue/dist/
+frontend-vue/test-results/
 backend-java/target/
 runner-cpp/build/
 output/

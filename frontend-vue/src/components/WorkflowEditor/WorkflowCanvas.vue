@@ -6,15 +6,30 @@ import AgentNode from "./AgentNode.vue";
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
 
 import type { AgentMeta } from "@/types/agent";
-import type { PendingConnectionData, WorkflowSelectionBox } from "@/types/workflowEditor";
+import type { ConnectionData, PendingConnectionData, WorkflowSelectionBox } from "@/types/workflowEditor";
+import {
+  classifyWorkflowField,
+  workflowConnectionKey,
+  workflowConnectionLabel,
+  workflowPortColor,
+} from "@/utils/workflowPorts";
 
 type EdgeRenderMeta = {
   key: string;
   renderKey: string;
   fromNodeId: string;
   toNodeId: string;
+  fromOutputField?: string;
+  toInputField?: string;
   sourceName: string;
   targetName: string;
+  label: string;
+  edgeType?: string;
+  condition?: string;
+  maxIterations?: number;
+  color: string;
+  labelX: number;
+  labelY: number;
   path: string;
   minimapPath: string;
   selected: boolean;
@@ -37,8 +52,10 @@ const props = defineProps<{
 const WORLD_WIDTH = 6000;
 const WORLD_HEIGHT = 4200;
 const GRID_SIZE = 24;
-const NODE_WIDTH = 256;
-const NODE_HEIGHT = 154;
+const NODE_WIDTH = 288;
+const NODE_HEIGHT = 190;
+const PORT_START_Y = 61;
+const PORT_GAP = 26;
 const FANOUT_OFFSET = 12;
 const MINIMAP_WIDTH = 176;
 const MINIMAP_HEIGHT = 120;
@@ -62,6 +79,7 @@ const isPanning = ref(false);
 const ignoreNextClick = ref(false);
 const selectionBox = ref<WorkflowSelectionBox | null>(null);
 const pendingConnection = ref<PendingConnectionData | null>(null);
+const hoveredConnectionKey = ref("");
 const canvasSize = ref({ width: 0, height: 0 });
 const minimapDragging = ref(false);
 const showMinimap = ref(false);
@@ -82,6 +100,9 @@ const canvasNodes = computed(() => store.orderedNodes);
 const zoomPercent = computed(() => `${Math.round(store.viewport.scale * 100)}%`);
 const selectedCount = computed(() => store.selectedNodeIds.length);
 const selectedConnection = computed(() => store.selectedConnectionId);
+const selectedConnectionData = computed(() =>
+  store.connections.find((connection) => workflowConnectionKey(connection) === store.selectedConnectionId) || null,
+);
 const showHandles = computed(() => store.connectionMode === "connecting");
 const shouldRenderMinimap = computed(() => showMinimap.value && store.nodes.length > 8);
 const visibleStageLanes = computed<StageLaneGuide[]>(() => {
@@ -163,10 +184,11 @@ const pendingConnectionPath = computed(() => {
     return "";
   }
 
-  const start = getNodeAnchor(pendingConnection.value.fromNodeId, "output");
+  const start = getNodeAnchor(pendingConnection.value.fromNodeId, "output", pendingConnection.value.fromOutputField);
 
   return start ? stableEdgePath(start, pendingConnection.value.pointer) : "";
 });
+const pendingConnectionColor = computed(() => pendingConnection.value?.color || "#1a73e8");
 const renderedConnections = computed<EdgeRenderMeta[]>(() => {
   const nodeById = new Map(store.nodes.map((node) => [node.nodeId, node]));
   const visualOrder = new Map(
@@ -194,34 +216,79 @@ const renderedConnections = computed<EdgeRenderMeta[]>(() => {
   const incomingGroups = new Map<string, typeof validConnections>();
 
   validConnections.forEach((connection) => {
-    outgoingGroups.set(connection.fromNodeId, [...(outgoingGroups.get(connection.fromNodeId) || []), connection]);
-    incomingGroups.set(connection.toNodeId, [...(incomingGroups.get(connection.toNodeId) || []), connection]);
+    const outputGroupKey = `${connection.fromNodeId}:${connection.fromOutputField || "*"}`;
+    const inputGroupKey = `${connection.toNodeId}:${connection.toInputField || "*"}`;
+
+    outgoingGroups.set(outputGroupKey, [...(outgoingGroups.get(outputGroupKey) || []), connection]);
+    incomingGroups.set(inputGroupKey, [...(incomingGroups.get(inputGroupKey) || []), connection]);
   });
 
   return validConnections.map((connection) => {
     const key = connectionKey(connection);
     const sourceNode = nodeById.get(connection.fromNodeId);
     const targetNode = nodeById.get(connection.toNodeId);
-    const outgoing = outgoingGroups.get(connection.fromNodeId) || [];
-    const incoming = incomingGroups.get(connection.toNodeId) || [];
+    const outgoing = outgoingGroups.get(`${connection.fromNodeId}:${connection.fromOutputField || "*"}`) || [];
+    const incoming = incomingGroups.get(`${connection.toNodeId}:${connection.toInputField || "*"}`) || [];
     const sourceRank = outgoing.findIndex((item) => item.index === connection.index);
     const targetRank = incoming.findIndex((item) => item.index === connection.index);
-    const start = getNodeAnchor(connection.fromNodeId, "output", fanoutOffset(sourceRank, outgoing.length));
-    const end = getNodeAnchor(connection.toNodeId, "input", fanoutOffset(targetRank, incoming.length));
+    const start = getNodeAnchor(
+      connection.fromNodeId,
+      "output",
+      connection.fromOutputField,
+      fanoutOffset(sourceRank, outgoing.length),
+    );
+    const end = getNodeAnchor(
+      connection.toNodeId,
+      "input",
+      connection.toInputField,
+      fanoutOffset(targetRank, incoming.length),
+    );
     const path = start && end ? stableEdgePath(start, end) : "";
+    const dataType = connection.dataType || classifyWorkflowField(connection.fromOutputField || connection.toInputField || "");
+    const color = connection.color || workflowPortColor(connection.fromOutputField || connection.toInputField || "", dataType);
 
     return {
       key,
       renderKey: `${key}-${connection.index}`,
       fromNodeId: connection.fromNodeId,
       toNodeId: connection.toNodeId,
+      fromOutputField: connection.fromOutputField,
+      toInputField: connection.toInputField,
       sourceName: sourceNode?.name || connection.fromNodeId,
       targetName: targetNode?.name || connection.toNodeId,
+      label: workflowConnectionLabel(connection, sourceNode?.name || "", targetNode?.name || ""),
+      edgeType: connection.edgeType || "control",
+      condition: connection.condition || "",
+      maxIterations: connection.loopPolicy?.maxIterations,
+      color,
+      labelX: start && end ? start.x + (end.x - start.x) * 0.42 : 0,
+      labelY: start && end ? start.y + (end.y - start.y) * 0.42 - 10 : 0,
       path,
       minimapPath: path ? scalePath(start!, end!, minimapScale.value) : "",
       selected: key === selectedConnection.value,
     };
   });
+});
+const activePortFieldsByNode = computed(() => {
+  const activeKeys = new Set([selectedConnection.value, hoveredConnectionKey.value].filter(Boolean));
+  const inputs = new Map<string, string[]>();
+  const outputs = new Map<string, string[]>();
+
+  store.connections.forEach((connection) => {
+    if (!activeKeys.has(connectionKey(connection))) {
+      return;
+    }
+
+    if (connection.fromOutputField) {
+      outputs.set(connection.fromNodeId, [...(outputs.get(connection.fromNodeId) || []), connection.fromOutputField]);
+    }
+
+    if (connection.toInputField) {
+      inputs.set(connection.toNodeId, [...(inputs.get(connection.toNodeId) || []), connection.toInputField]);
+    }
+  });
+
+  return { inputs, outputs };
 });
 
 let resizeObserver: ResizeObserver | null = null;
@@ -253,7 +320,7 @@ function canvasPoint(event: Pick<PointerEvent | DragEvent | WheelEvent, "clientX
 }
 
 function connectionKey(connection: { fromNodeId: string; toNodeId: string }) {
-  return `${connection.fromNodeId}->${connection.toNodeId}`;
+  return workflowConnectionKey(connection as ConnectionData);
 }
 
 function stageKeyForNode(node: { agentKey: string; stage: string }) {
@@ -291,16 +358,20 @@ function stageKeyForNode(node: { agentKey: string; stage: string }) {
   return STAGE_LANES.some((lane) => lane.key === stage) ? stage : "implementation";
 }
 
-function getNodeAnchor(nodeId: string, side: "input" | "output", yOffset = 0) {
+function getNodeAnchor(nodeId: string, side: "input" | "output", field?: string, yOffset = 0) {
   const node = store.nodes.find((item) => item.nodeId === nodeId);
 
   if (!node) {
     return null;
   }
 
+  const fields = side === "output" ? node.output_fields : node.input_fields;
+  const fieldIndex = field ? fields.indexOf(field) : -1;
+  const portY = fieldIndex >= 0 ? PORT_START_Y + fieldIndex * PORT_GAP : NODE_HEIGHT / 2;
+
   return {
     x: node.position.x + (side === "output" ? NODE_WIDTH : 0),
-    y: node.position.y + NODE_HEIGHT / 2 + yOffset,
+    y: node.position.y + portY + yOffset,
   };
 }
 
@@ -387,6 +458,27 @@ function deleteSelected() {
 
 function rebuildSequentialConnections() {
   store.rebuildSequentialConnections();
+}
+
+function markSelectedConnection(edgeType: ConnectionData["edgeType"]) {
+  if (!selectedConnectionData.value) {
+    return;
+  }
+
+  store.updateConnection(store.selectedConnectionId, {
+    edgeType,
+    condition:
+      edgeType === "branch"
+        ? selectedConnectionData.value.condition || "success == true"
+        : selectedConnectionData.value.condition || "",
+    loopPolicy:
+      edgeType === "loop"
+        ? {
+            maxIterations: selectedConnectionData.value.loopPolicy?.maxIterations || 3,
+            exitCondition: selectedConnectionData.value.loopPolicy?.exitCondition || "",
+          }
+        : selectedConnectionData.value.loopPolicy,
+  });
 }
 
 function updateCanvasSize() {
@@ -559,12 +651,13 @@ function handleDrop(event: DragEvent) {
   });
 }
 
-function startConnection(nodeId: string, event: PointerEvent) {
+function startConnection(nodeId: string, outputField: string, event: PointerEvent) {
   if (event.button !== 0) {
     return;
   }
 
-  const start = getNodeAnchor(nodeId, "output");
+  const dataType = classifyWorkflowField(outputField);
+  const start = getNodeAnchor(nodeId, "output", outputField);
 
   if (!start) {
     return;
@@ -574,6 +667,9 @@ function startConnection(nodeId: string, event: PointerEvent) {
   event.stopPropagation();
   pendingConnection.value = {
     fromNodeId: nodeId,
+    fromOutputField: outputField,
+    dataType,
+    color: workflowPortColor(outputField, dataType),
     pointer: screenToWorld(event),
   };
   store.connectionMode = "connecting";
@@ -593,14 +689,14 @@ function moveConnection(event: PointerEvent) {
   };
 }
 
-function finishConnection(toNodeId: string, event: PointerEvent) {
+function finishConnection(toNodeId: string, inputField: string, event: PointerEvent) {
   if (!pendingConnection.value) {
     return;
   }
 
   event.preventDefault();
   event.stopPropagation();
-  store.addConnection(pendingConnection.value.fromNodeId, toNodeId);
+  store.addConnection(pendingConnection.value.fromNodeId, toNodeId, pendingConnection.value.fromOutputField, inputField);
   ignoreNextClick.value = true;
   clearPendingConnection();
 }
@@ -679,6 +775,14 @@ function handleNodeSelect(nodeId: string, event: MouseEvent) {
   }
 
   store.selectNode(nodeId);
+}
+
+function activeInputFields(nodeId: string) {
+  return activePortFieldsByNode.value.inputs.get(nodeId) || [];
+}
+
+function activeOutputFields(nodeId: string) {
+  return activePortFieldsByNode.value.outputs.get(nodeId) || [];
 }
 
 function minimapPoint(event: Pick<PointerEvent, "clientX" | "clientY">) {
@@ -832,7 +936,7 @@ onBeforeUnmount(() => {
             markerUnits="userSpaceOnUse"
             overflow="visible"
           >
-            <path d="M1,1.4 L10.5,5.5 L1,9.6 L4.2,5.5 Z" fill="#64748b" />
+            <path d="M1,1.4 L10.5,5.5 L1,9.6 L4.2,5.5 Z" fill="context-stroke" />
           </marker>
           <marker
             id="arrow-selected"
@@ -845,7 +949,7 @@ onBeforeUnmount(() => {
             markerUnits="userSpaceOnUse"
             overflow="visible"
           >
-            <path d="M1.2,1.4 L13,6 L1.2,10.6 L5.2,6 Z" fill="#1a73e8" />
+            <path d="M1.2,1.4 L13,6 L1.2,10.6 L5.2,6 Z" fill="context-stroke" />
           </marker>
           <marker
             id="arrow-pending"
@@ -858,7 +962,7 @@ onBeforeUnmount(() => {
             markerUnits="userSpaceOnUse"
             overflow="visible"
           >
-            <path d="M1.2,1.4 L13,6 L1.2,10.6 L5.2,6 Z" fill="#1a73e8" />
+            <path d="M1.2,1.4 L13,6 L1.2,10.6 L5.2,6 Z" fill="context-stroke" />
           </marker>
           <filter id="connection-glow" x="-30%" y="-30%" width="160%" height="160%">
             <feDropShadow dx="0" dy="3" flood-color="#1a73e8" flood-opacity="0.28" stdDeviation="4" />
@@ -867,10 +971,13 @@ onBeforeUnmount(() => {
         <g
           v-for="connection in renderedConnections"
           :key="connection.renderKey"
+          :style="{ '--edge-color': connection.color }"
           @click.stop="store.selectConnection(connection.key)"
+          @mouseenter="hoveredConnectionKey = connection.key"
+          @mouseleave="hoveredConnectionKey = ''"
           @pointerdown.stop
         >
-          <title>{{ connection.sourceName }} → {{ connection.targetName }}</title>
+          <title>{{ connection.label }}</title>
           <path
             class="connection-hit-path"
             :d="connection.path"
@@ -886,9 +993,23 @@ onBeforeUnmount(() => {
             fill="none"
             :filter="connection.selected ? 'url(#connection-glow)' : undefined"
             :marker-end="connection.selected ? 'url(#arrow-selected)' : 'url(#arrow)'"
-            :stroke="connection.selected ? '#1a73e8' : '#64748b'"
+            :stroke="connection.selected ? '#1a73e8' : connection.color"
             :stroke-width="connection.selected ? 3 : 2"
           />
+          <text
+            v-if="connection.selected"
+            class="connection-label"
+            :x="connection.labelX"
+            :y="connection.labelY"
+          >
+            {{ connection.fromOutputField || "output" }} → {{ connection.toInputField || "input" }}
+            <tspan v-if="connection.edgeType === 'branch' && connection.condition" dx="8">
+              if {{ connection.condition }}
+            </tspan>
+            <tspan v-else-if="connection.edgeType === 'loop'" dx="8">
+              loop max {{ connection.maxIterations || "?" }}
+            </tspan>
+          </text>
         </g>
         <path v-if="pendingConnectionPath" class="connection-bg-path pending-bg" :d="pendingConnectionPath" fill="none" />
         <path
@@ -897,6 +1018,7 @@ onBeforeUnmount(() => {
           :d="pendingConnectionPath"
           fill="none"
           marker-end="url(#arrow-pending)"
+          :style="{ '--pending-edge-color': pendingConnectionColor }"
         />
       </svg>
 
@@ -908,6 +1030,8 @@ onBeforeUnmount(() => {
         :total="canvasNodes.length"
         :selected="store.selectedNodeIds.includes(node.nodeId)"
         :show-handles="showHandles"
+        :active-input-fields="activeInputFields(node.nodeId)"
+        :active-output-fields="activeOutputFields(node.nodeId)"
         @select="handleNodeSelect"
         @delete="store.deleteNode"
         @finish-connection="finishConnection"
@@ -960,7 +1084,13 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="selectedConnection" class="connection-toolbar" @click.stop @pointerdown.stop>
-      <strong>连接已选中</strong>
+      <strong>
+        连接已选中
+        <em v-if="selectedConnectionData?.edgeType">· {{ selectedConnectionData.edgeType }}</em>
+      </strong>
+      <el-button size="small" plain @click="markSelectedConnection('control')">控制边</el-button>
+      <el-button size="small" plain @click="markSelectedConnection('branch')">分支边</el-button>
+      <el-button size="small" plain @click="markSelectedConnection('loop')">循环边</el-button>
       <el-button size="small" :icon="Delete" type="danger" plain @click="store.deleteSelectedConnection">
         删除连接
       </el-button>
@@ -1132,7 +1262,7 @@ onBeforeUnmount(() => {
 }
 
 .connection-path {
-  stroke: #64748b;
+  stroke: var(--edge-color, #64748b);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
@@ -1176,11 +1306,22 @@ g:hover .connection-path {
 
 .connection-path.pending {
   animation: pending-flow 0.9s linear infinite;
-  stroke: #1a73e8;
+  stroke: var(--pending-edge-color, #1a73e8);
   stroke-dasharray: 14 10;
   stroke-width: 3;
   pointer-events: none;
   filter: url(#connection-glow);
+}
+
+.connection-label {
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 5px;
+  fill: #1a73e8;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 850;
+  pointer-events: none;
 }
 
 @keyframes pending-flow {

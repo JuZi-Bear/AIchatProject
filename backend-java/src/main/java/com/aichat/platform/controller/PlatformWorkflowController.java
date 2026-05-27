@@ -1,7 +1,9 @@
 package com.aichat.platform.controller;
 
 import com.aichat.platform.dto.ApiResponse;
+import com.aichat.platform.service.PlatformDynamicWorkflowService;
 import com.aichat.platform.service.PlatformWorkflowRuntimeService;
+import com.aichat.platform.service.WorkflowSkillExportService;
 import com.aichat.platform.service.WorkflowTemplateService;
 import java.util.List;
 import java.util.Map;
@@ -19,13 +21,19 @@ public class PlatformWorkflowController {
 
     private final WorkflowTemplateService workflowTemplateService;
     private final PlatformWorkflowRuntimeService platformWorkflowRuntimeService;
+    private final PlatformDynamicWorkflowService platformDynamicWorkflowService;
+    private final WorkflowSkillExportService workflowSkillExportService;
 
     public PlatformWorkflowController(
             WorkflowTemplateService workflowTemplateService,
-            PlatformWorkflowRuntimeService platformWorkflowRuntimeService
+            PlatformWorkflowRuntimeService platformWorkflowRuntimeService,
+            PlatformDynamicWorkflowService platformDynamicWorkflowService,
+            WorkflowSkillExportService workflowSkillExportService
     ) {
         this.workflowTemplateService = workflowTemplateService;
         this.platformWorkflowRuntimeService = platformWorkflowRuntimeService;
+        this.platformDynamicWorkflowService = platformDynamicWorkflowService;
+        this.workflowSkillExportService = workflowSkillExportService;
     }
 
     @GetMapping("/templates")
@@ -61,6 +69,43 @@ public class PlatformWorkflowController {
             @RequestBody(required = false) Map<String, Object> request
     ) {
         return platformWorkflowRuntimeService.executeTemplate(templateKey, request)
+                .map(ApiResponse::ok)
+                .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
+    }
+
+    @PostMapping("/templates/{templateKey}/validate-langgraph")
+    public ApiResponse<Map<String, Object>> validateDynamicLangGraphTemplate(
+            @PathVariable String templateKey,
+            @RequestBody(required = false) Map<String, Object> request
+    ) {
+        return platformDynamicWorkflowService.validateTemplate(templateKey, request)
+                .map(ApiResponse::ok)
+                .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
+    }
+
+    @PostMapping("/templates/{templateKey}/execute-langgraph")
+    public ApiResponse<Map<String, Object>> executeDynamicLangGraphTemplate(
+            @PathVariable String templateKey,
+            @RequestBody(required = false) Map<String, Object> request
+    ) {
+        return platformDynamicWorkflowService.executeTemplate(templateKey, request)
+                .map(ApiResponse::ok)
+                .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
+    }
+
+    @PostMapping("/runs/{platformRunId}/resume")
+    public ApiResponse<Map<String, Object>> resumeDynamicLangGraphRun(
+            @PathVariable String platformRunId,
+            @RequestBody(required = false) Map<String, Object> request
+    ) {
+        return platformDynamicWorkflowService.resumeRun(platformRunId, request)
+                .map(ApiResponse::ok)
+                .orElseGet(() -> ApiResponse.fail("dynamic workflow run not found: " + platformRunId));
+    }
+
+    @PostMapping("/templates/{templateKey}/export-skill")
+    public ApiResponse<Map<String, Object>> exportWorkflowSkill(@PathVariable String templateKey) {
+        return workflowSkillExportService.exportSkill(templateKey)
                 .map(ApiResponse::ok)
                 .orElseGet(() -> ApiResponse.fail("workflow template not found: " + templateKey));
     }

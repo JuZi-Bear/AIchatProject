@@ -37,3 +37,15 @@ class AgentState(TypedDict, total=False):
     run_id: str
     report_path: str
     workflow_events: list[dict]
+    code_agent_result: dict
+    _dynamic_status: str
+    _dynamic_template_key: str
+    _dynamic_runtime_mode: str
+    _dynamic_connection_mappings: list[dict]
+    _dynamic_current_node: str
+    _dynamic_error: str
+    _dynamic_pause_node: str
+    _dynamic_resume_node: str
+    _dynamic_resume_approved: bool
+    _dynamic_resume_comment: str
+    _dynamic_loop_counts: dict

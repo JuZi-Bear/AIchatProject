@@ -17,3 +17,7 @@ spring:
 agent:
   engine:
     base-url: ${AGENT_ENGINE_BASE_URL:http://127.0.0.1:8001}
+
+platform:
+  skill-export:
+    root: ${PLATFORM_SKILL_EXPORT_ROOT:generated-skills}

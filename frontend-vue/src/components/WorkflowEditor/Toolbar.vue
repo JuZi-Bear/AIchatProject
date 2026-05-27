@@ -7,12 +7,20 @@ import { useRouter } from "vue-router";
 import { currentApiMode } from "@/api/client";
 import {
   deletePlatformWorkflowTemplate,
+  executePlatformDynamicLangGraphTemplate,
   executePlatformWorkflowTemplate,
+  exportPlatformWorkflowSkill,
   instantiatePlatformWorkflowTemplate,
   instantiateWorkflow,
   savePlatformWorkflowTemplate,
+  validatePlatformDynamicLangGraphTemplate,
 } from "@/api/workflows";
-import type { InstantiateWorkflowResponse, WorkflowTemplate } from "@/types/workflow";
+import type {
+  DynamicLangGraphValidationResult,
+  InstantiateWorkflowResponse,
+  WorkflowSkillExportResult,
+  WorkflowTemplate,
+} from "@/types/workflow";
 import type { WorkflowTemplateData, WorkflowValidationIssue } from "@/types/workflowEditor";
 
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
@@ -39,8 +47,13 @@ const savingPlatform = ref(false);
 const deletingPlatform = ref(false);
 const instantiatingPlatform = ref(false);
 const executingRuntime = ref(false);
+const validatingDynamicLangGraph = ref(false);
+const executingDynamicLangGraph = ref(false);
 const executingSelectedPlatform = ref(false);
+const exportingSelectedSkill = ref(false);
 const lastResult = ref<InstantiateWorkflowResponse | null>(null);
+const lastDynamicValidation = ref<DynamicLangGraphValidationResult | null>(null);
+const lastSkillExport = ref<WorkflowSkillExportResult | null>(null);
 const isJavaMode = currentApiMode === "java";
 
 const saveForm = reactive({
@@ -221,6 +234,22 @@ function issueHtml(issues: WorkflowValidationIssue[]) {
   `;
 }
 
+function dynamicValidationHtml(result: DynamicLangGraphValidationResult) {
+  const list = (items: Array<Record<string, unknown>>) =>
+    items
+      .map((item) => `<li><strong>${escapeHtml(String(item.title || ""))}</strong>：${escapeHtml(String(item.message || ""))}</li>`)
+      .join("");
+
+  return `
+    <div class="workflow-check-result">
+      <p><b>${result.valid ? "Dynamic LangGraph 校验通过" : "Dynamic LangGraph 校验未通过"}</b></p>
+      ${result.errors?.length ? `<p>阻断问题 ${result.errors.length} 个</p><ul>${list(result.errors)}</ul>` : ""}
+      ${result.warnings?.length ? `<p>提醒 ${result.warnings.length} 个</p><ul>${list(result.warnings)}</ul>` : ""}
+      ${!result.errors?.length && !result.warnings?.length ? "<p>没有发现动态执行图问题。</p>" : ""}
+    </div>
+  `;
+}
+
 async function runWorkflowCheck(showSuccess = true) {
   const issues = store.validateWorkflow();
   const errors = issues.filter((issue) => issue.severity === "error");
@@ -331,12 +360,47 @@ async function executeSelectedPlatformTemplate() {
     lastResult.value = result;
     emit("instantiated", result);
     detailDialogVisible.value = false;
-    ElMessage.success("Workflow Runtime Lite 已执行，正在打开回放");
+    ElMessage.success(runtimeResultMessage(result));
     await router.push(`/replay/${result.platformRunId}`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : "执行 Workflow Runtime Lite 失败");
   } finally {
     executingSelectedPlatform.value = false;
+  }
+}
+
+async function exportSelectedPlatformSkill() {
+  const template = selectedTemplateInfo.value;
+
+  if (!template || template.source !== "platform") {
+    ElMessage.warning("只有 Java MySQL 模板支持导出 Codex Skill");
+    return;
+  }
+
+  exportingSelectedSkill.value = true;
+  lastSkillExport.value = null;
+
+  try {
+    const result = await exportPlatformWorkflowSkill(template.key);
+    lastSkillExport.value = result;
+    ElMessage.success(`已导出 Skill：${result.skillName}`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "导出 Workflow Skill 失败");
+  } finally {
+    exportingSelectedSkill.value = false;
+  }
+}
+
+async function copyExportedSkillPath() {
+  if (!lastSkillExport.value?.skillPath) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(lastSkillExport.value.skillPath);
+    ElMessage.success("Skill 路径已复制");
+  } catch {
+    ElMessage.info(lastSkillExport.value.skillPath);
   }
 }
 
@@ -382,6 +446,18 @@ function exportJson() {
 
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
+}
+
+function runtimeResultMessage(result: InstantiateWorkflowResponse) {
+  const summary = result.run_summary || {};
+  const status = String(summary.status || "");
+  const reportPath = String(summary.report_path || "");
+  const waiting = status === "WAITING_FOR_HUMAN" || Boolean(summary.require_human_approval);
+  const reportText = reportPath ? `，报告已生成：${reportPath}` : "";
+
+  return waiting
+    ? `Workflow Runtime Lite 已执行，当前等待人工确认${reportText}`
+    : `Workflow Runtime Lite 已执行，CodeAgent/报告事件已进入回放${reportText}`;
 }
 
 async function openInstantiateDialog() {
@@ -450,12 +526,99 @@ async function executeCurrentWorkflowRuntime() {
     });
     lastResult.value = result;
     emit("instantiated", result);
-    ElMessage.success("Workflow Runtime Lite 已执行，正在打开回放");
+    ElMessage.success(runtimeResultMessage(result));
     await router.push(`/replay/${result.platformRunId}`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : "执行 Workflow Runtime Lite 失败");
   } finally {
     executingRuntime.value = false;
+  }
+}
+
+async function validateCurrentDynamicLangGraph(showDialog = true) {
+  if (!isJavaMode) {
+    ElMessage.warning("Dynamic LangGraph 校验仅 Java Gateway 模式支持");
+    return false;
+  }
+
+  if (!(await runWorkflowCheck(false))) {
+    return false;
+  }
+
+  validatingDynamicLangGraph.value = true;
+
+  try {
+    const template = store.saveCurrentTemplate(
+      store.workflowTemplateKey || `dynamic_${Date.now()}`,
+      store.workflowName || "Dynamic LangGraph Workflow",
+      store.workflowDescription,
+    );
+    await savePlatformWorkflowTemplate(template);
+    emit("reloadTemplates");
+    const result = await validatePlatformDynamicLangGraphTemplate(template.workflowTemplateKey, {
+      editor_mode: true,
+      runtime_mode: "dynamic_langgraph",
+    });
+    lastDynamicValidation.value = result;
+
+    if (showDialog) {
+      await ElMessageBox.alert(dynamicValidationHtml(result), result.valid ? "Dynamic LangGraph 校验通过" : "Dynamic LangGraph 校验未通过", {
+        confirmButtonText: "知道了",
+        type: result.valid ? "success" : "error",
+        dangerouslyUseHTMLString: true,
+      });
+    }
+
+    return result.valid;
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "Dynamic LangGraph 校验失败");
+    return false;
+  } finally {
+    validatingDynamicLangGraph.value = false;
+  }
+}
+
+async function executeCurrentDynamicLangGraph() {
+  if (!isJavaMode) {
+    ElMessage.warning("Dynamic LangGraph 执行仅 Java Gateway 模式支持");
+    return;
+  }
+
+  if (!(await validateCurrentDynamicLangGraph(false))) {
+    ElMessage.error("Dynamic LangGraph 校验未通过，已阻止执行");
+    return;
+  }
+
+  executingDynamicLangGraph.value = true;
+  lastResult.value = null;
+
+  try {
+    const template = store.saveCurrentTemplate(
+      store.workflowTemplateKey || `dynamic_${Date.now()}`,
+      store.workflowName || "Dynamic LangGraph Workflow",
+      store.workflowDescription,
+    );
+    await savePlatformWorkflowTemplate(template);
+    emit("reloadTemplates");
+    const result = await executePlatformDynamicLangGraphTemplate(template.workflowTemplateKey, {
+      requirement:
+        instantiateForm.requirement.trim() ||
+        `执行 Dynamic LangGraph: ${template.name || template.workflowTemplateKey}`,
+      editor_mode: true,
+      runtime_mode: "dynamic_langgraph",
+    });
+    lastResult.value = result;
+    emit("instantiated", result);
+    ElMessage.success(
+      result.status === "WAITING_FOR_HUMAN"
+        ? "Dynamic LangGraph 已暂停，等待人工确认"
+        : "Dynamic LangGraph 已执行，事件已进入 Replay",
+    );
+    await router.push(`/replay/${result.platformRunId}`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "执行 Dynamic LangGraph 失败");
+  } finally {
+    executingDynamicLangGraph.value = false;
   }
 }
 </script>
@@ -482,6 +645,15 @@ async function executeCurrentWorkflowRuntime() {
         <div class="group-actions">
           <el-button :icon="View" plain @click="runWorkflowCheck()">检查流程</el-button>
           <el-button plain @click="previewExecutionOrder">预览执行顺序</el-button>
+          <el-button
+            v-if="isJavaMode"
+            type="primary"
+            plain
+            :loading="validatingDynamicLangGraph"
+            @click="validateCurrentDynamicLangGraph()"
+          >
+            验证 LangGraph 图
+          </el-button>
         </div>
       </section>
 
@@ -497,6 +669,14 @@ async function executeCurrentWorkflowRuntime() {
           >
             执行模板工作流
           </el-button>
+          <el-button
+            v-if="isJavaMode"
+            type="warning"
+            :loading="executingDynamicLangGraph"
+            @click="executeCurrentDynamicLangGraph"
+          >
+            执行 LangGraph 图
+          </el-button>
           <el-button type="success" class="create-task-button" @click="openInstantiateDialog">生成任务</el-button>
           <el-dropdown trigger="click">
             <el-button :icon="MoreFilled" circle plain />
@@ -507,6 +687,14 @@ async function executeCurrentWorkflowRuntime() {
                 </el-dropdown-item>
                 <el-dropdown-item :icon="Refresh" @click="emit('reloadTemplates')">刷新模板</el-dropdown-item>
                 <el-dropdown-item :icon="Download" @click="exportJson">导出 JSON</el-dropdown-item>
+                <el-dropdown-item
+                  v-if="isJavaMode"
+                  :icon="Download"
+                  :disabled="selectedTemplateInfo?.source !== 'platform'"
+                  @click="exportSelectedPlatformSkill"
+                >
+                  导出 Skill
+                </el-dropdown-item>
                 <el-dropdown-item
                   v-if="isJavaMode"
                   :icon="Delete"
@@ -608,9 +796,38 @@ async function executeCurrentWorkflowRuntime() {
           <pre class="json-preview">{{ formatJson(selectedTemplateInfo.connections) }}</pre>
         </el-collapse-item>
       </el-collapse>
+
+      <el-alert
+        v-if="lastSkillExport"
+        type="success"
+        show-icon
+        :closable="false"
+        class="skill-export-alert"
+      >
+        <template #title>
+          已导出 Skill：{{ lastSkillExport.skillName }}
+        </template>
+        <div class="skill-export-result">
+          <span>路径：<code>{{ lastSkillExport.skillPath }}</code></span>
+          <el-button text type="primary" size="small" @click="copyExportedSkillPath">复制路径</el-button>
+          <div class="tag-list">
+            <el-tag v-for="file in lastSkillExport.files" :key="file" size="small" effect="plain">{{ file }}</el-tag>
+          </div>
+          <small>Skill 已生成但不会自动安装到 Codex。</small>
+        </div>
+      </el-alert>
     </section>
     <template #footer>
       <el-button @click="detailDialogVisible = false">关闭</el-button>
+      <el-button
+        v-if="isJavaMode && selectedTemplateInfo?.source === 'platform'"
+        type="success"
+        plain
+        :loading="exportingSelectedSkill"
+        @click="exportSelectedPlatformSkill"
+      >
+        导出 Skill
+      </el-button>
       <el-button
         v-if="isJavaMode && selectedTemplateInfo?.source === 'platform'"
         type="success"
@@ -742,6 +959,21 @@ async function executeCurrentWorkflowRuntime() {
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.skill-export-alert {
+  border-radius: 12px;
+}
+
+.skill-export-result {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.skill-export-result code {
+  color: #174ea6;
+  font-family: "Cascadia Code", Consolas, monospace;
 }
 
 :global(.workflow-check-result ul),

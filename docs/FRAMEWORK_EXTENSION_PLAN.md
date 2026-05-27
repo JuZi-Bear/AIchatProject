@@ -28,7 +28,7 @@
 ## 当前架构不足
 
 - Java 任务生命周期还可以更细。
-- Workflow Editor 尚未驱动真实动态 LangGraph 分支。
+- Workflow Editor 已接入受控 Dynamic LangGraph Runtime v1，但字段级真实数据传递、复杂条件编排和 Skill 导出仍待稳定。
 - C++ Runner 仍是最小安全执行雏形。
 - 缺少多任务队列。
 - 缺少用户、权限和团队协作。
@@ -72,6 +72,7 @@
 - Workflow Editor 自定义 Agent 节点和 Human Approval 节点。
 - Models 页面平台层 API Key 更新 / 清除入口。
 - Workflow Runtime Lite：Java 平台层读取 MySQL 模板并按节点顺序写入事件，CodeAgent 节点真实执行，其它 Agent 节点作为可回放模拟事件。
+- Dynamic LangGraph Runtime v1 入口：Workflow Editor 可触发 Java 代理 Python 校验 / 执行 / 恢复受控模板图。
 
 后续建议：
 
@@ -80,7 +81,7 @@
 - 手动连线编辑。
 - Replay 过滤和搜索。
 - Figma Component Variants 同步。
-- 将自定义 Agent 从“模板节点”升级为可注册 Agent 前，需要先从 Workflow Runtime Lite 演进到 Dynamic Workflow Runtime。
+- 继续补强 Dynamic LangGraph Runtime 的字段值传递、复杂分支可视化、Replay 对比和错误定位。
 
 ## 第三阶段：AI Agent Engine 增强
 
@@ -92,13 +93,15 @@
 - Prompt 模板目录。
 - Workflow Templates。
 - workflow_events。
+- Dynamic LangGraph Runtime v1：模板 schema、图校验器、节点适配器、受控 graph builder、暂停恢复 state。
 
 后续建议：
 
 - 多模型 Provider 抽象层。
 - Prompt 版本管理。
 - 本地模型接口预留。
-- Workflow 模板协议稳定后，再考虑动态编排。
+- 将字段级模板连接升级为真实 runtime context 数据传递。
+- Dynamic LangGraph 稳定后再做 `Workflow Template -> Codex Skill Export`。
 
 ## 第四阶段：执行安全增强
 
@@ -136,7 +139,8 @@
 ## 当前推荐路线
 
 1. 稳定 v2-only 演示版。
-2. 继续验证 Workflow Runtime Lite 的节点执行边界。
-3. 增强 Replay 和事件分析。
-4. 提升 CodeAgent diff / 审计展示。
-5. 再进入 Dynamic Workflow Runtime、任务生命周期和配置中心深水区。
+2. 继续验证 Dynamic LangGraph Runtime 的分支、循环、暂停和恢复。
+3. 在动态执行图稳定后推进 Workflow Template 生成 Codex Skill。
+4. 增强 Replay 和事件分析。
+5. 提升 CodeAgent diff / 审计展示。
+6. 再进入任务生命周期、队列、权限和配置中心深水区。

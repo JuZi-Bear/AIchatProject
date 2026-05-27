@@ -3,6 +3,13 @@ import { ElMessage } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 
 import { useWorkflowEditorStore } from "./WorkflowEditorStore";
+import type { ConnectionData } from "@/types/workflowEditor";
+import {
+  classifyWorkflowField,
+  workflowConnectionKey,
+  workflowPortColor,
+  workflowPortTypeLabel,
+} from "@/utils/workflowPorts";
 
 const props = withDefaults(
   defineProps<{
@@ -60,6 +67,36 @@ const selectedWarnings = computed(() => {
 
   return store.validateWorkflow().filter((issue) => issue.nodeId === selectedNode.value?.nodeId);
 });
+const inboundConnections = computed(() =>
+  selectedNode.value
+    ? store.connections.filter((connection) => connection.toNodeId === selectedNode.value?.nodeId)
+    : [],
+);
+const outboundConnections = computed(() =>
+  selectedNode.value
+    ? store.connections.filter((connection) => connection.fromNodeId === selectedNode.value?.nodeId)
+    : [],
+);
+const inputBindingMap = computed(() => {
+  const map = new Map<string, ConnectionData[]>();
+
+  inboundConnections.value.forEach((connection) => {
+    const key = connection.toInputField || "default";
+    map.set(key, [...(map.get(key) || []), connection]);
+  });
+
+  return map;
+});
+const outputBindingMap = computed(() => {
+  const map = new Map<string, ConnectionData[]>();
+
+  outboundConnections.value.forEach((connection) => {
+    const key = connection.fromOutputField || "default";
+    map.set(key, [...(map.get(key) || []), connection]);
+  });
+
+  return map;
+});
 const isCodeAgentNode = computed(() => selectedNode.value?.agentKey === "code_agent" || selectedNode.value?.nodeType === "code_agent");
 const isHumanApprovalNode = computed(
   () => selectedNode.value?.agentKey === "human_approval" || selectedNode.value?.nodeType === "human_approval",
@@ -77,6 +114,47 @@ function textToFields(value: string) {
     .split(/[\n,]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function nodeName(nodeId: string) {
+  return store.nodes.find((node) => node.nodeId === nodeId)?.name || nodeId;
+}
+
+function nodeOutputFields(nodeId: string) {
+  return store.nodes.find((node) => node.nodeId === nodeId)?.output_fields || [];
+}
+
+function nodeInputFields(nodeId: string) {
+  return store.nodes.find((node) => node.nodeId === nodeId)?.input_fields || [];
+}
+
+function fieldColor(field = "") {
+  return workflowPortColor(field, classifyWorkflowField(field));
+}
+
+function fieldTypeLabel(field = "") {
+  return workflowPortTypeLabel(field, classifyWorkflowField(field));
+}
+
+function updateConnectionMapping(connection: ConnectionData, patch: Partial<ConnectionData>) {
+  const fromOutputField = patch.fromOutputField ?? connection.fromOutputField;
+  const toInputField = patch.toInputField ?? connection.toInputField;
+  const dataType = classifyWorkflowField(fromOutputField || toInputField || "");
+
+  store.updateConnection(workflowConnectionKey(connection), {
+    ...patch,
+    dataType,
+    color: workflowPortColor(fromOutputField || toInputField || "", dataType),
+    label: `${fromOutputField || "output"} → ${toInputField || "input"}`,
+  });
+}
+
+function updateConnectionFromOutput(connection: ConnectionData, value: string | number) {
+  updateConnectionMapping(connection, { fromOutputField: String(value) });
+}
+
+function updateConnectionToInput(connection: ConnectionData, value: string | number) {
+  updateConnectionMapping(connection, { toInputField: String(value) });
 }
 
 watch(
@@ -218,6 +296,112 @@ function saveNode() {
               />
             </el-collapse-item>
           </el-collapse>
+        </el-tab-pane>
+
+        <el-tab-pane label="映射关系" name="mapping">
+          <div class="mapping-stack">
+            <section class="mapping-section">
+              <div class="mapping-title">
+                <strong>输入来源</strong>
+                <span>{{ inboundConnections.length }} 条上游连接</span>
+              </div>
+              <article v-for="field in textToFields(form.inputFieldsText)" :key="`input-map-${field}`" class="field-map-card">
+                <div class="field-map-head">
+                  <span class="field-dot" :style="{ background: fieldColor(field) }" />
+                  <strong>{{ field }}</strong>
+                  <el-tag size="small" effect="plain">{{ fieldTypeLabel(field) }}</el-tag>
+                </div>
+                <template v-if="inputBindingMap.get(field)?.length">
+                  <div
+                    v-for="connection in inputBindingMap.get(field)"
+                    :key="workflowConnectionKey(connection)"
+                    class="mapping-row"
+                  >
+                    <span>{{ nodeName(connection.fromNodeId) }}</span>
+                    <el-select
+                      :model-value="connection.fromOutputField"
+                      size="small"
+                      class="mapping-select"
+                      @change="updateConnectionFromOutput(connection, $event)"
+                    >
+                      <el-option
+                        v-for="option in nodeOutputFields(connection.fromNodeId)"
+                        :key="option"
+                        :label="option"
+                        :value="option"
+                      />
+                    </el-select>
+                    <span>→</span>
+                    <el-select
+                      :model-value="connection.toInputField"
+                      size="small"
+                      class="mapping-select"
+                      @change="updateConnectionToInput(connection, $event)"
+                    >
+                      <el-option
+                        v-for="option in nodeInputFields(connection.toNodeId)"
+                        :key="option"
+                        :label="option"
+                        :value="option"
+                      />
+                    </el-select>
+                  </div>
+                </template>
+                <span v-else class="unbound-text">未绑定上游输出</span>
+              </article>
+            </section>
+
+            <section class="mapping-section">
+              <div class="mapping-title">
+                <strong>输出分发</strong>
+                <span>{{ outboundConnections.length }} 条下游连接</span>
+              </div>
+              <article v-for="field in textToFields(form.outputFieldsText)" :key="`output-map-${field}`" class="field-map-card">
+                <div class="field-map-head">
+                  <span class="field-dot" :style="{ background: fieldColor(field) }" />
+                  <strong>{{ field }}</strong>
+                  <el-tag size="small" effect="plain">{{ fieldTypeLabel(field) }}</el-tag>
+                </div>
+                <template v-if="outputBindingMap.get(field)?.length">
+                  <div
+                    v-for="connection in outputBindingMap.get(field)"
+                    :key="workflowConnectionKey(connection)"
+                    class="mapping-row"
+                  >
+                    <el-select
+                      :model-value="connection.fromOutputField"
+                      size="small"
+                      class="mapping-select"
+                      @change="updateConnectionFromOutput(connection, $event)"
+                    >
+                      <el-option
+                        v-for="option in nodeOutputFields(connection.fromNodeId)"
+                        :key="option"
+                        :label="option"
+                        :value="option"
+                      />
+                    </el-select>
+                    <span>→</span>
+                    <span>{{ nodeName(connection.toNodeId) }}</span>
+                    <el-select
+                      :model-value="connection.toInputField"
+                      size="small"
+                      class="mapping-select"
+                      @change="updateConnectionToInput(connection, $event)"
+                    >
+                      <el-option
+                        v-for="option in nodeInputFields(connection.toNodeId)"
+                        :key="option"
+                        :label="option"
+                        :value="option"
+                      />
+                    </el-select>
+                  </div>
+                </template>
+                <span v-else class="unbound-text">未分发到下游输入</span>
+              </article>
+            </section>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane v-if="isCodeAgentNode" label="Code" name="code-agent">
@@ -396,6 +580,96 @@ function saveNode() {
   flex-wrap: wrap;
   gap: 12px;
   margin: 2px 0 12px;
+}
+
+.mapping-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.mapping-section {
+  display: grid;
+  gap: 8px;
+}
+
+.mapping-title,
+.field-map-head,
+.mapping-row {
+  display: flex;
+  align-items: center;
+}
+
+.mapping-title {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mapping-title strong {
+  color: #202124;
+  font-size: 13px;
+}
+
+.mapping-title span {
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.field-map-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.field-map-head {
+  gap: 8px;
+}
+
+.field-map-head strong {
+  flex: 1;
+  overflow: hidden;
+  color: #202124;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px rgba(100, 116, 139, 0.18);
+}
+
+.mapping-row {
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px;
+  border-radius: 10px;
+  background: #f8fafd;
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.mapping-row > span {
+  color: #334155;
+  font-weight: 700;
+}
+
+.mapping-select {
+  width: 126px;
+}
+
+.unbound-text {
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .preview-stack {

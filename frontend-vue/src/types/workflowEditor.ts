@@ -18,15 +18,39 @@ export type WorkflowSelectionBox = {
 
 export type WorkflowConnectionMode = "idle" | "connecting";
 
+export type WorkflowDataType =
+  | "requirement"
+  | "product"
+  | "code"
+  | "test"
+  | "error"
+  | "file"
+  | "report"
+  | "approval"
+  | "custom";
+
+export type WorkflowPortDirection = "input" | "output";
+
+export type WorkflowPortRef = {
+  nodeId: string;
+  field: string;
+  direction: WorkflowPortDirection;
+};
+
 export type PendingConnectionData = {
   fromNodeId: string;
+  fromOutputField?: string;
+  dataType?: WorkflowDataType;
+  color?: string;
   pointer: NodePosition;
 };
 
 export type AgentNodeData = {
   nodeId: string;
   agentKey: string;
-  nodeType?: "agent" | "code_agent" | "human_approval" | "custom_agent" | "branch";
+  nodeType?: "agent" | "code_agent" | "human_approval" | "condition" | "join" | "loop" | "report" | "custom_agent" | "branch";
+  executionMode?: "real" | "simulated" | "paused";
+  langGraphKey?: string;
   name: string;
   role?: string;
   position: NodePosition;
@@ -65,11 +89,32 @@ export type AgentNodeData = {
     promptRef?: string;
     version?: string;
   };
+  pausePolicy?: {
+    enabled?: boolean;
+    resumeFields?: string[];
+  };
+  loopPolicy?: {
+    maxIterations?: number;
+    exitCondition?: string;
+  };
 };
+
+export type WorkflowEdgeType = "data" | "control" | "branch" | "loop" | "resume";
 
 export type ConnectionData = {
   fromNodeId: string;
   toNodeId: string;
+  fromOutputField?: string;
+  toInputField?: string;
+  dataType?: WorkflowDataType;
+  color?: string;
+  label?: string;
+  edgeType?: WorkflowEdgeType;
+  condition?: string;
+  loopPolicy?: {
+    maxIterations?: number;
+    exitCondition?: string;
+  };
 };
 
 export type WorkflowTemplateData = {
@@ -89,6 +134,7 @@ export type WorkflowValidationIssue = {
   title: string;
   message: string;
   nodeId?: string;
+  edge?: Partial<ConnectionData>;
 };
 
 export type WorkflowEditorState = {

@@ -28,7 +28,7 @@ import type { HealthResponse, ModelConfig, PluginConfig } from "@/types/api";
 import type { PlatformRunRecord, PlatformStats } from "@/types/platformRun";
 import type { ReportItem, RunHistoryItem } from "@/types/run";
 import type { RunEvent } from "@/types/runEvent";
-import { isCodeAgentRun, isWorkflowTemplateRun, runKindLabel, runKindTagType } from "@/utils/runKind";
+import { isCodeAgentRun, isWorkflowRuntimeRun, isWorkflowTemplateRun, runKindLabel, runKindTagType } from "@/utils/runKind";
 
 const settingsStore = useSettingsStore();
 const apiModeLabel = getApiModeLabel();
@@ -105,7 +105,7 @@ const recentReports = computed(() => sortedReports.value.slice(0, 5));
 const recentPlatformRuns = computed(() => platformRuns.value.slice(0, 5));
 const recentPlatformEvents = computed(() => recentEvents.value.slice(0, 10));
 const recentWorkflowTemplateRuns = computed(() =>
-  platformRuns.value.filter((record) => isWorkflowTemplateRun(record)).slice(0, 5),
+  platformRuns.value.filter((record) => isWorkflowTemplateRun(record) || isWorkflowRuntimeRun(record)).slice(0, 5),
 );
 const recentCodeAgentRuns = computed(() =>
   platformRuns.value.filter((record) => isCodeAgentRun(record)).slice(0, 5),
@@ -386,7 +386,7 @@ onMounted(() => {
     <el-card v-if="isJavaMode" shadow="never" class="platform-record-card workflow-template-card">
       <template #header>
         <div class="platform-record-head">
-          <span>最近 Workflow 模板回放</span>
+          <span>最近 Workflow 模板执行</span>
           <div class="platform-record-tags">
             <el-tag type="primary" effect="plain">模板任务 {{ recentWorkflowTemplateRuns.length }}</el-tag>
             <router-link to="/workflows/editor">
@@ -398,7 +398,7 @@ onMounted(() => {
 
       <el-empty
         v-if="!recentWorkflowTemplateRuns.length && !loading.platformRuns"
-        description="暂无 Workflow 模板回放任务"
+        description="暂无 Workflow 模板执行任务"
       />
       <div v-else class="workflow-template-list">
         <article v-for="record in recentWorkflowTemplateRuns" :key="record.platformRunId" class="workflow-template-item">
@@ -407,8 +407,8 @@ onMounted(() => {
             <div class="platform-run-subtitle">{{ record.requirement || "Workflow 模板回放任务" }}</div>
           </div>
           <div class="platform-run-tags">
-            <el-tag type="primary" effect="plain" size="small">模板回放</el-tag>
-            <el-tag type="info" effect="plain" size="small">不执行 LangGraph</el-tag>
+            <el-tag :type="runKindTagType(record)" effect="plain" size="small">{{ runKindLabel(record) }}</el-tag>
+            <el-tag type="info" effect="plain" size="small">不动态改写 LangGraph</el-tag>
             <el-tag effect="plain" size="small">事件回放</el-tag>
             <router-link :to="`/replay/${record.platformRunId}`">
               <el-button size="small" type="primary" plain>回放</el-button>

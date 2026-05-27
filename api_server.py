@@ -16,6 +16,7 @@ from services.run_service import (
     list_run_history,
 )
 from utils.simple_code_agent import execute_code_agent
+from dynamic_workflow import execute_dynamic_workflow, resume_dynamic_workflow, validate_dynamic_workflow
 
 
 app = FastAPI(
@@ -93,6 +94,24 @@ def instantiate_workflow(request: dict):
         return instantiate_workflow_template(request)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/workflows/dynamic/validate")
+def validate_dynamic_workflow_template(request: dict):
+    return validate_dynamic_workflow(request or {})
+
+
+@app.post("/api/workflows/dynamic/execute")
+def execute_dynamic_workflow_template(request: dict):
+    return execute_dynamic_workflow(request or {})
+
+
+@app.post("/api/workflows/dynamic/runs/{run_id}/resume")
+def resume_dynamic_workflow_run(run_id: str, request: dict):
+    try:
+        return resume_dynamic_workflow(run_id, request or {})
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.post("/api/code-agent/execute")

@@ -44,3 +44,29 @@
 | CodeAgent smoke | `.\scripts\smoke_codeagent.ps1 -ApiMode java -CheckBlockedPath` | 通过 | 文件写入、阻断路径、SSE、RunEvent、Replay、审计日志均通过 | 不适用 |
 | Workflow 模板 smoke | `.\scripts\smoke_workflow_template.ps1` | 通过 | 保存、版本递增、实例化、回放、删除均通过 | 不适用 |
 | v2 最终验收脚本 | `.\scripts\final_v2_acceptance.ps1` | 通过 | 脚本退出码 0，生成演示数据并检查关键页面 | 不适用 |
+
+## 2026-05-26 Workflow Runtime Lite 增强记录
+
+| 测试项 | 命令/页面 | 结果 | 问题 | 是否修复 |
+|---|---|---|---|---|
+| 前端生产构建 | `cd frontend-vue && npm run build` | 通过 | 仅 Vite chunk size 常规警告 | 不适用 |
+| Java 打包 | `cd backend-java && mvn -DskipTests package` | 通过 | 无 | 不适用 |
+| Runtime Lite smoke 脚本 | `.\scripts\smoke_workflow_runtime_lite.ps1` | 待执行 | 当前本地 Python / Java 服务未启动，需启动 v2 主链路后执行 | 待确认 |
+
+## 2026-05-27 Dynamic LangGraph Runtime v1 记录
+
+| 测试项 | 命令/页面 | 结果 | 问题 | 是否修复 |
+|---|---|---|---|---|
+| Python 编译 | `python -m compileall api_server.py core/state.py dynamic_workflow` | 通过 | 无 | 不适用 |
+| Python 动态暂停/恢复 smoke | `execute_dynamic_workflow` + `resume_dynamic_workflow` inline smoke | 通过 | 执行先进入 `WAITING_FOR_HUMAN`，批准后进入 `SUCCESS` 并生成动态报告 | 不适用 |
+| 前端生产构建 | `cd frontend-vue && npm run build` | 通过 | 仅 Vite chunk size / VueUse pure comment 常规警告 | 不适用 |
+| Java clean package | `cd backend-java && mvn -DskipTests clean package` | 通过 | 无 | 不适用 |
+| Diff 格式检查 | `git diff --check` | 通过 | 仅 LF/CRLF 提示，不影响格式检查 | 不适用 |
+
+## 2026-05-27 Workflow Skill Export 记录
+
+| 测试项 | 命令/页面 | 结果 | 问题 | 是否修复 |
+|---|---|---|---|---|
+| Java clean package | `cd backend-java && mvn -DskipTests clean package` | 通过 | 新增 `WorkflowSkillExportService` 编译通过 | 不适用 |
+| 前端生产构建 | `cd frontend-vue && npm run build` | 通过 | 仅 Vite chunk size / VueUse pure comment 常规警告 | 不适用 |
+| Diff 格式检查 | `git diff --check` | 通过 | 仅 LF/CRLF 提示，不影响格式检查 | 不适用 |

@@ -34,6 +34,24 @@ const executionMode = computed(() => {
     return "";
   }
 });
+const connectionMappings = computed(() => {
+  if (!props.event.detailJson) {
+    return [] as Array<Record<string, unknown>>;
+  }
+
+  try {
+    const detail = JSON.parse(props.event.detailJson) as Record<string, unknown>;
+    const mappings = [
+      ...(Array.isArray(detail.connectionMappings) ? detail.connectionMappings : []),
+      ...(Array.isArray(detail.inputMappings) ? detail.inputMappings : []),
+      ...(Array.isArray(detail.outputMappings) ? detail.outputMappings : []),
+    ];
+
+    return mappings as Array<Record<string, unknown>>;
+  } catch {
+    return [] as Array<Record<string, unknown>>;
+  }
+});
 
 function executionModeLabel(mode: string) {
   const labels: Record<string, string> = {
@@ -128,6 +146,17 @@ function agentTagType(agent?: string) {
       <span class="event-time">{{ props.event.createdAt || "未记录时间" }}</span>
     </div>
     <p>{{ props.event.message || "无事件描述" }}</p>
+    <div v-if="connectionMappings.length" class="event-mapping-list">
+      <span
+        v-for="(mapping, index) in connectionMappings.slice(0, 5)"
+        :key="`${mapping.fromNodeId}-${mapping.fromOutputField}-${mapping.toNodeId}-${mapping.toInputField}-${index}`"
+        class="event-mapping-pill"
+        :style="{ '--mapping-color': String(mapping.color || '#64748b') }"
+      >
+        {{ mapping.fromNodeName }}.{{ mapping.fromOutputField }} → {{ mapping.toNodeName }}.{{ mapping.toInputField }}
+      </span>
+      <em v-if="connectionMappings.length > 5">+{{ connectionMappings.length - 5 }}</em>
+    </div>
     <el-collapse v-if="props.event.detailJson && props.event.detailJson !== '{}'" class="detail-collapse">
       <el-collapse-item title="detailJson" name="detail">
         <pre>{{ props.event.detailJson }}</pre>
@@ -200,6 +229,35 @@ p {
   margin: 0;
   color: #334155;
   line-height: 1.5;
+}
+
+.event-mapping-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.event-mapping-pill {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--mapping-color) 32%, #ffffff);
+  border-left: 4px solid var(--mapping-color);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mapping-color) 8%, #ffffff);
+  color: #334155;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-mapping-list em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .detail-collapse pre {

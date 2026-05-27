@@ -72,6 +72,33 @@ public class PythonAgentClient {
                 });
     }
 
+    public Map<String, Object> validateDynamicWorkflow(Map<String, Object> request) {
+        return restClient.post()
+                .uri("/api/workflows/dynamic/validate")
+                .body(request)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+    }
+
+    public Map<String, Object> executeDynamicWorkflow(Map<String, Object> request) {
+        return restClient.post()
+                .uri("/api/workflows/dynamic/execute")
+                .body(request)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+    }
+
+    public Map<String, Object> resumeDynamicWorkflow(String runId, Map<String, Object> request) {
+        return restClient.post()
+                .uri(uriBuilder -> uriBuilder.path("/api/workflows/dynamic/runs/{runId}/resume").build(runId))
+                .body(request)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+    }
+
     public Map<String, Object> executeCodeAgent(Map<String, Object> request) {
         return restClient.post()
                 .uri("/api/code-agent/execute")

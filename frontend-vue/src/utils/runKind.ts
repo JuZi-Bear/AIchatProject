@@ -42,7 +42,7 @@ export function isCodeAgentRun(run?: RunKindSource | null) {
 
 export function runKindLabel(run?: RunKindSource | null) {
   if (isWorkflowRuntimeRun(run)) {
-    return "Runtime 执行";
+    return "模板执行";
   }
 
   if (isWorkflowTemplateRun(run)) {

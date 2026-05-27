@@ -5,6 +5,10 @@ import com.aichat.platform.model.RunEventType;
 import com.aichat.platform.repository.RunRecordRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -25,6 +29,7 @@ public class PlatformWorkflowRuntimeService {
     private final RunRecordRepository runRecordRepository;
     private final RunEventService runEventService;
     private final PythonAgentClient pythonAgentClient;
+    private final ReportIndexService reportIndexService;
     private final ObjectMapper objectMapper;
 
     public PlatformWorkflowRuntimeService(
@@ -32,12 +37,14 @@ public class PlatformWorkflowRuntimeService {
             RunRecordRepository runRecordRepository,
             RunEventService runEventService,
             PythonAgentClient pythonAgentClient,
+            ReportIndexService reportIndexService,
             ObjectMapper objectMapper
     ) {
         this.workflowTemplateService = workflowTemplateService;
         this.runRecordRepository = runRecordRepository;
         this.runEventService = runEventService;
         this.pythonAgentClient = pythonAgentClient;
+        this.reportIndexService = reportIndexService;
         this.objectMapper = objectMapper;
     }
 
@@ -53,6 +60,7 @@ public class PlatformWorkflowRuntimeService {
             List<Map<String, Object>> nodes = mapList(template.get("nodes"));
             List<Map<String, Object>> connections = mapList(template.get("connections"));
             List<Map<String, Object>> orderedNodes = orderNodes(nodes, connections);
+            List<Map<String, Object>> connectionMappings = buildConnectionMappings(nodes, connections);
             List<Map<String, Object>> workflowEvents = new ArrayList<>();
             List<String> warnings = buildConnectionWarnings(nodes, connections, orderedNodes);
             String platformRunId = "workflow_runtime_" + java.time.Instant.now().toEpochMilli();
@@ -72,7 +80,8 @@ public class PlatformWorkflowRuntimeService {
                     Map.of(
                             "templateKey", templateKey,
                             "runtimeMode", "workflow_runtime_lite",
-                            "warnings", warnings
+                            "warnings", warnings,
+                            "connectionMappings", connectionMappings
                     )
             ));
 
@@ -80,6 +89,8 @@ public class PlatformWorkflowRuntimeService {
             boolean success = true;
             boolean waitingForHuman = false;
             String errorSummary = "";
+            String reportPath = "";
+            Map<String, Object> codeAgentSummary = Map.of();
 
             for (Map<String, Object> node : orderedNodes) {
                 String nodeType = firstNonBlank(asString(node.get("nodeType")), asString(node.get("agentKey")));
@@ -117,7 +128,9 @@ public class PlatformWorkflowRuntimeService {
                         Map.of(
                                 "nodeId", asString(node.get("nodeId")),
                                 "stage", asString(node.get("stage")),
-                                "executionMode", nodeExecutionMode(node)
+                                "executionMode", nodeExecutionMode(node),
+                                "inputMappings", mappingsForNode(connectionMappings, asString(node.get("nodeId")), "input"),
+                                "outputMappings", mappingsForNode(connectionMappings, asString(node.get("nodeId")), "output")
                         )
                 ));
 
@@ -142,6 +155,7 @@ public class PlatformWorkflowRuntimeService {
                         break;
                     }
 
+                    codeAgentSummary = summarizeCodeAgentResponse(codeAgentResponse);
                     if (!asBoolean(codeAgentResponse.get("success"))) {
                         status = "FAILED";
                         success = false;
@@ -186,6 +200,44 @@ public class PlatformWorkflowRuntimeService {
                 }
             }
 
+            if (containsReportNode(orderedNodes)) {
+                try {
+                    Map<String, Object> reportNode = firstReportNode(orderedNodes);
+                    reportPath = generateRuntimeReport(
+                            platformRunId,
+                            template,
+                            orderedNodes,
+                            workflowEvents,
+                            status,
+                            warnings,
+                            codeAgentSummary
+                    );
+                    appendWorkflowEvent(workflowEvents, platformRunId, workflowEvent(
+                            "REPORT_GENERATED",
+                            "Report Generator 生成 Runtime Lite 演示报告",
+                            "report",
+                            "SUCCESS",
+                            "已生成平台层 Runtime Lite Markdown 报告: " + reportPath,
+                            Map.of(
+                                    "nodeId", asString(reportNode.get("nodeId")),
+                                    "executionMode", "executed",
+                                    "reportPath", reportPath,
+                                    "runtimeStatus", status
+                            )
+                    ));
+                } catch (Exception error) {
+                    warnings.add("Runtime Lite 报告生成失败: " + error.getMessage());
+                    appendWorkflowEvent(workflowEvents, platformRunId, workflowEvent(
+                            "AGENT_FAILED",
+                            "Report Generator 报告生成失败",
+                            "report",
+                            "FAILED",
+                            "Runtime Lite 报告生成失败: " + error.getMessage(),
+                            Map.of("executionMode", "executed")
+                    ));
+                }
+            }
+
             if (!waitingForHuman && success) {
                 appendWorkflowEvent(workflowEvents, platformRunId, workflowEvent(
                         "WORKFLOW_FINISHED",
@@ -206,7 +258,9 @@ public class PlatformWorkflowRuntimeService {
                     template,
                     orderedNodes,
                     workflowEvents,
-                    warnings
+                    warnings,
+                    reportPath,
+                    codeAgentSummary
             );
 
             Map<String, Object> response = new LinkedHashMap<>();
@@ -262,7 +316,9 @@ public class PlatformWorkflowRuntimeService {
             Map<String, Object> template,
             List<Map<String, Object>> nodes,
             List<Map<String, Object>> workflowEvents,
-            List<String> warnings
+            List<String> warnings,
+            String reportPath,
+            Map<String, Object> codeAgentSummary
     ) {
         record.setStatus(status);
         record.setSuccess(success);
@@ -272,16 +328,21 @@ public class PlatformWorkflowRuntimeService {
         record.setErrorSummary(errorSummary);
         record.setApproved(success && !waitingForHuman);
         record.setRequireHumanApproval(waitingForHuman);
+        record.setReportPath(reportPath);
         record.setRunnerWarning(warnings.isEmpty() ? "平台层演示执行器，不动态改写 LangGraph" : String.join("; ", warnings));
-        record.setRunSummaryJson(serializeObject(buildRunSummary(record, template, workflowEvents, warnings)));
-        record.setUiViewModelJson(serializeObject(buildUiViewModel(template, nodes, workflowEvents)));
+        record.setRunSummaryJson(serializeObject(buildRunSummary(record, template, workflowEvents, warnings, reportPath)));
+        record.setUiViewModelJson(serializeObject(buildUiViewModel(template, nodes, workflowEvents, codeAgentSummary, reportPath)));
         record.setRawResponse(serializeObject(Map.of(
                 "template", template,
                 "workflow_events", workflowEvents,
                 "warnings", warnings,
-                "status", status
+                "status", status,
+                "report_path", reportPath,
+                "code_agent_summary", codeAgentSummary
         )));
-        return runRecordRepository.save(record);
+        RunRecordEntity savedRecord = runRecordRepository.save(record);
+        reportIndexService.saveReportIndexFromRunRecord(savedRecord);
+        return savedRecord;
     }
 
     private Map<String, Object> executeCodeAgentNode(String platformRunId, Map<String, Object> node) {
@@ -304,6 +365,37 @@ public class PlatformWorkflowRuntimeService {
         request.put("backupBeforeWrite", config.getOrDefault("backupBeforeWrite", true));
 
         return pythonAgentClient.executeCodeAgent(request);
+    }
+
+    private Map<String, Object> summarizeCodeAgentResponse(Map<String, Object> response) {
+        List<Map<String, Object>> results = mapList(response.get("results"));
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("success", asBoolean(response.get("success")));
+        summary.put("operation", asString(response.get("operation")));
+        summary.put("filePath", asString(response.get("filePath")));
+        summary.put("message", asString(response.get("message")));
+        summary.put("auditPath", firstNonBlank(
+                asString(response.get("auditPath")),
+                results.stream()
+                        .map(result -> asString(result.get("auditPath")))
+                        .filter(value -> !value.isBlank())
+                        .findFirst()
+                        .orElse("")
+        ));
+        summary.put("resultCount", results.size());
+        summary.put("blockedFiles", results.stream().mapToInt(result -> mapList(result.get("blockedFiles")).size()).sum());
+        summary.put("plannedChanges", results.stream().mapToInt(result -> mapList(result.get("changes")).size()).sum());
+        summary.put("actualWrites", results.stream()
+                .map(result -> nestedMap(result, "summary").get("actualWrites"))
+                .mapToInt(value -> {
+                    try {
+                        return Integer.parseInt(asString(value));
+                    } catch (NumberFormatException error) {
+                        return 0;
+                    }
+                })
+                .sum());
+        return summary;
     }
 
     private void appendWorkflowEvent(List<Map<String, Object>> workflowEvents, String platformRunId, Map<String, Object> event) {
@@ -393,6 +485,68 @@ public class PlatformWorkflowRuntimeService {
         return ordered;
     }
 
+    private List<Map<String, Object>> buildConnectionMappings(
+            List<Map<String, Object>> nodes,
+            List<Map<String, Object>> connections
+    ) {
+        if (nodes.isEmpty() || connections.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Map<String, Object>> nodeById = new LinkedHashMap<>();
+        nodes.forEach(node -> nodeById.put(asString(node.get("nodeId")), node));
+        List<Map<String, Object>> mappings = new ArrayList<>();
+
+        for (Map<String, Object> connection : connections) {
+            String fromNodeId = asString(connection.get("fromNodeId"));
+            String toNodeId = asString(connection.get("toNodeId"));
+            Map<String, Object> sourceNode = nodeById.get(fromNodeId);
+            Map<String, Object> targetNode = nodeById.get(toNodeId);
+
+            if (sourceNode == null || targetNode == null || fromNodeId.equals(toNodeId)) {
+                continue;
+            }
+
+            String fromOutputField = firstNonBlank(
+                    asString(connection.get("fromOutputField")),
+                    firstStringValue(sourceNode.get("output_fields")),
+                    "output"
+            );
+            String toInputField = firstNonBlank(
+                    asString(connection.get("toInputField")),
+                    firstStringValue(targetNode.get("input_fields")),
+                    "input"
+            );
+            String dataType = firstNonBlank(
+                    asString(connection.get("dataType")),
+                    classifyWorkflowField(firstNonBlank(fromOutputField, toInputField))
+            );
+            String color = firstNonBlank(asString(connection.get("color")), workflowFieldColor(dataType));
+            Map<String, Object> mapping = new LinkedHashMap<>();
+
+            mapping.put("fromNodeId", fromNodeId);
+            mapping.put("fromNodeName", firstNonBlank(asString(sourceNode.get("name")), asString(sourceNode.get("agentKey")), fromNodeId));
+            mapping.put("fromOutputField", fromOutputField);
+            mapping.put("toNodeId", toNodeId);
+            mapping.put("toNodeName", firstNonBlank(asString(targetNode.get("name")), asString(targetNode.get("agentKey")), toNodeId));
+            mapping.put("toInputField", toInputField);
+            mapping.put("dataType", dataType);
+            mapping.put("color", color);
+            mapping.put("label", firstNonBlank(asString(connection.get("label")), fromOutputField + " -> " + toInputField));
+            mappings.add(mapping);
+        }
+
+        return mappings;
+    }
+
+    private List<Map<String, Object>> mappingsForNode(List<Map<String, Object>> mappings, String nodeId, String direction) {
+        return mappings.stream()
+                .filter(mapping -> "input".equals(direction)
+                        ? nodeId.equals(asString(mapping.get("toNodeId")))
+                        : nodeId.equals(asString(mapping.get("fromNodeId"))))
+                .toList();
+    }
+
     private List<String> buildConnectionWarnings(
             List<Map<String, Object>> nodes,
             List<Map<String, Object>> connections,
@@ -400,7 +554,12 @@ public class PlatformWorkflowRuntimeService {
     ) {
         List<String> warnings = new ArrayList<>();
         Set<String> nodeIds = new HashSet<>();
-        nodes.forEach(node -> nodeIds.add(asString(node.get("nodeId"))));
+        Map<String, Map<String, Object>> nodeById = new LinkedHashMap<>();
+        nodes.forEach(node -> {
+            String nodeId = asString(node.get("nodeId"));
+            nodeIds.add(nodeId);
+            nodeById.put(nodeId, node);
+        });
 
         for (Map<String, Object> connection : connections) {
             String from = asString(connection.get("fromNodeId"));
@@ -414,6 +573,19 @@ public class PlatformWorkflowRuntimeService {
             if (from.equals(to)) {
                 warnings.add("存在自连接，Runtime Lite 已按节点顺序兜底");
                 break;
+            }
+
+            Map<String, Object> sourceNode = nodeById.get(from);
+            Map<String, Object> targetNode = nodeById.get(to);
+            String fromOutputField = asString(connection.get("fromOutputField"));
+            String toInputField = asString(connection.get("toInputField"));
+
+            if (!fromOutputField.isBlank() && sourceNode != null && !stringList(sourceNode.get("output_fields")).contains(fromOutputField)) {
+                warnings.add("存在指向不存在输出字段的连线: " + fromOutputField);
+            }
+
+            if (!toInputField.isBlank() && targetNode != null && !stringList(targetNode.get("input_fields")).contains(toInputField)) {
+                warnings.add("存在指向不存在输入字段的连线: " + toInputField);
             }
         }
 
@@ -432,7 +604,8 @@ public class PlatformWorkflowRuntimeService {
             RunRecordEntity record,
             Map<String, Object> template,
             List<Map<String, Object>> workflowEvents,
-            List<String> warnings
+            List<String> warnings,
+            String reportPath
     ) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("success", record.isSuccess());
@@ -447,12 +620,14 @@ public class PlatformWorkflowRuntimeService {
         summary.put("status", record.getStatus());
         summary.put("require_human_approval", record.isRequireHumanApproval());
         summary.put("approved", record.isApproved());
-        summary.put("report_path", "");
+        summary.put("report_path", reportPath);
         summary.put("platformRunId", record.getPlatformRunId());
         summary.put("workflow_template", template.get("templateKey"));
         summary.put("workflow_template_name", template.get("name"));
         summary.put("runtime_mode", "workflow_runtime_lite");
         summary.put("warnings", warnings);
+        summary.put("runtime_node_counts", runtimeNodeCounts(workflowEvents));
+        summary.put("connection_mappings", buildConnectionMappings(mapList(template.get("nodes")), mapList(template.get("connections"))));
         summary.put("event_count", workflowEvents.size());
         summary.put("last_event", workflowEvents.isEmpty() ? Map.of() : workflowEvents.get(workflowEvents.size() - 1));
         return summary;
@@ -461,7 +636,9 @@ public class PlatformWorkflowRuntimeService {
     private Map<String, Object> buildUiViewModel(
             Map<String, Object> template,
             List<Map<String, Object>> nodes,
-            List<Map<String, Object>> workflowEvents
+            List<Map<String, Object>> workflowEvents,
+            Map<String, Object> codeAgentSummary,
+            String reportPath
     ) {
         List<Map<String, Object>> workflowSteps = new ArrayList<>();
 
@@ -481,6 +658,13 @@ public class PlatformWorkflowRuntimeService {
         uiViewModel.put("workflow_template", template);
         uiViewModel.put("workflow_steps", workflowSteps);
         uiViewModel.put("workflow_events", workflowEvents);
+        uiViewModel.put("runtime_summary", Map.of(
+                "mode", "workflow_runtime_lite",
+                "node_counts", runtimeNodeCounts(workflowEvents),
+                "code_agent", codeAgentSummary,
+                "report_path", reportPath,
+                "connection_mappings", buildConnectionMappings(nodes, mapList(template.get("connections")))
+        ));
         uiViewModel.put("agent_outputs", Map.of(
                 "stdout", "Workflow Runtime Lite 平台层执行结果",
                 "error_summary", ""
@@ -535,6 +719,25 @@ public class PlatformWorkflowRuntimeService {
         return "human_approval".equals(asString(node.get("agentKey"))) || "human_approval".equals(asString(node.get("nodeType")));
     }
 
+    private boolean isReportNode(Map<String, Object> node) {
+        String agentKey = asString(node.get("agentKey"));
+        String nodeType = asString(node.get("nodeType"));
+        String stage = asString(node.get("stage"));
+
+        return "report".equals(agentKey)
+                || "report_generator".equals(agentKey)
+                || "report".equals(nodeType)
+                || "report".equals(stage);
+    }
+
+    private boolean containsReportNode(List<Map<String, Object>> nodes) {
+        return nodes.stream().anyMatch(this::isReportNode);
+    }
+
+    private Map<String, Object> firstReportNode(List<Map<String, Object>> nodes) {
+        return nodes.stream().filter(this::isReportNode).findFirst().orElse(Map.of());
+    }
+
     private String nodeExecutionMode(Map<String, Object> node) {
         if (isCodeAgentNode(node)) {
             return "executed";
@@ -547,6 +750,147 @@ public class PlatformWorkflowRuntimeService {
         return "simulated";
     }
 
+    private Map<String, Object> runtimeNodeCounts(List<Map<String, Object>> workflowEvents) {
+        Set<String> executed = new HashSet<>();
+        Set<String> simulated = new HashSet<>();
+        Set<String> waiting = new HashSet<>();
+
+        for (Map<String, Object> event : workflowEvents) {
+            String mode = firstNonBlank(
+                    asString(nestedValue(event, "detail", "executionMode")),
+                    asString(nestedValue(event, "detail", "execution_mode"))
+            );
+            String nodeId = firstNonBlank(
+                    asString(nestedValue(event, "detail", "nodeId")),
+                    asString(event.get("agent")) + "_" + workflowEvents.indexOf(event)
+            );
+
+            if ("executed".equals(mode)) {
+                executed.add(nodeId);
+            } else if ("simulated".equals(mode)) {
+                simulated.add(nodeId);
+            } else if ("waiting".equals(mode)) {
+                waiting.add(nodeId);
+            }
+        }
+
+        return Map.of(
+                "executed", executed.size(),
+                "simulated", simulated.size(),
+                "waiting", waiting.size()
+        );
+    }
+
+    private String generateRuntimeReport(
+            String platformRunId,
+            Map<String, Object> template,
+            List<Map<String, Object>> nodes,
+            List<Map<String, Object>> workflowEvents,
+            String status,
+            List<String> warnings,
+            Map<String, Object> codeAgentSummary
+    ) {
+        try {
+            Path reportsDir = Path.of("reports").toAbsolutePath().normalize();
+            Files.createDirectories(reportsDir);
+            String reportName = platformRunId + "_runtime_lite_report.md";
+            Path reportPath = reportsDir.resolve(reportName).normalize();
+            String markdown = buildRuntimeReportMarkdown(platformRunId, template, nodes, workflowEvents, status, warnings, codeAgentSummary);
+            Files.writeString(reportPath, markdown, StandardCharsets.UTF_8);
+            return "reports/" + reportName;
+        } catch (IOException error) {
+            throw new IllegalStateException(error.getMessage(), error);
+        }
+    }
+
+    private String buildRuntimeReportMarkdown(
+            String platformRunId,
+            Map<String, Object> template,
+            List<Map<String, Object>> nodes,
+            List<Map<String, Object>> workflowEvents,
+            String status,
+            List<String> warnings,
+            Map<String, Object> codeAgentSummary
+    ) {
+        StringBuilder markdown = new StringBuilder();
+        markdown.append("# Workflow Runtime Lite 演示报告\n\n");
+        markdown.append("- Platform Run ID: `").append(platformRunId).append("`\n");
+        markdown.append("- Template: `").append(firstNonBlank(asString(template.get("name")), asString(template.get("templateKey")))).append("`\n");
+        markdown.append("- Status: `").append(status).append("`\n");
+        markdown.append("- Runtime Mode: `workflow_runtime_lite`\n");
+        markdown.append("- Generated At: `").append(LocalDateTime.now()).append("`\n\n");
+
+        markdown.append("## 节点顺序\n\n");
+        for (int index = 0; index < nodes.size(); index += 1) {
+            Map<String, Object> node = nodes.get(index);
+            markdown.append(index + 1)
+                    .append(". **")
+                    .append(firstNonBlank(asString(node.get("name")), asString(node.get("agentKey"))))
+                    .append("** - `")
+                    .append(nodeExecutionMode(node))
+                    .append("` - `")
+                    .append(firstNonBlank(asString(node.get("stage")), "custom"))
+                    .append("`\n");
+        }
+
+        markdown.append("\n## Runtime 事件摘要\n\n");
+        Map<String, Object> counts = runtimeNodeCounts(workflowEvents);
+        markdown.append("- Executed events: ").append(counts.get("executed")).append("\n");
+        markdown.append("- Simulated events: ").append(counts.get("simulated")).append("\n");
+        markdown.append("- Waiting events: ").append(counts.get("waiting")).append("\n");
+        markdown.append("- Total events: ").append(workflowEvents.size()).append("\n\n");
+
+        markdown.append("## 字段级输入输出映射\n\n");
+        List<Map<String, Object>> connectionMappings = buildConnectionMappings(nodes, mapList(template.get("connections")));
+        if (connectionMappings.isEmpty()) {
+            markdown.append("本次模板没有配置字段级输入输出映射。\n\n");
+        } else {
+            connectionMappings.forEach(mapping -> markdown
+                    .append("- `")
+                    .append(asString(mapping.get("fromNodeName")))
+                    .append(".")
+                    .append(asString(mapping.get("fromOutputField")))
+                    .append("` -> `")
+                    .append(asString(mapping.get("toNodeName")))
+                    .append(".")
+                    .append(asString(mapping.get("toInputField")))
+                    .append("` (")
+                    .append(asString(mapping.get("dataType")))
+                    .append(")\n"));
+            markdown.append("\n");
+        }
+
+        markdown.append("## CodeAgent 摘要\n\n");
+        if (codeAgentSummary.isEmpty()) {
+            markdown.append("本次 Runtime Lite 未执行 CodeAgent 节点。\n\n");
+        } else {
+            markdown.append("- Operation: `").append(asString(codeAgentSummary.get("operation"))).append("`\n");
+            markdown.append("- File Path: `").append(asString(codeAgentSummary.get("filePath"))).append("`\n");
+            markdown.append("- Audit Path: `").append(asString(codeAgentSummary.get("auditPath"))).append("`\n");
+            markdown.append("- Planned Changes: ").append(asString(codeAgentSummary.get("plannedChanges"))).append("\n");
+            markdown.append("- Actual Writes: ").append(asString(codeAgentSummary.get("actualWrites"))).append("\n");
+            markdown.append("- Blocked Files: ").append(asString(codeAgentSummary.get("blockedFiles"))).append("\n\n");
+        }
+
+        if (!warnings.isEmpty()) {
+            markdown.append("## Warnings\n\n");
+            warnings.forEach(warning -> markdown.append("- ").append(warning).append("\n"));
+            markdown.append("\n");
+        }
+
+        markdown.append("## 最近事件\n\n");
+        workflowEvents.stream().skip(Math.max(0, workflowEvents.size() - 12)).forEach(event -> markdown
+                .append("- `")
+                .append(asString(event.get("status")))
+                .append("` ")
+                .append(asString(event.get("event_text")))
+                .append(" - ")
+                .append(asString(event.get("message")))
+                .append("\n"));
+
+        return markdown.toString();
+    }
+
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> mapList(Object value) {
         if (!(value instanceof List<?> list)) {
@@ -557,6 +901,73 @@ public class PlatformWorkflowRuntimeService {
                 .filter(item -> item instanceof Map<?, ?>)
                 .map(item -> (Map<String, Object>) item)
                 .toList();
+    }
+
+    private List<String> stringList(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+
+        return list.stream()
+                .map(this::asString)
+                .filter(item -> !item.isBlank())
+                .toList();
+    }
+
+    private String firstStringValue(Object value) {
+        return stringList(value).stream().findFirst().orElse("");
+    }
+
+    private String classifyWorkflowField(String field) {
+        String normalized = field == null ? "" : field.toLowerCase();
+
+        if (normalized.contains("requirement") || normalized.contains("input") || normalized.contains("prompt")) {
+            return "requirement";
+        }
+
+        if (normalized.contains("product") || normalized.contains("plan") || normalized.contains("spec")) {
+            return "product";
+        }
+
+        if (normalized.contains("code") || normalized.contains("diff") || normalized.contains("patch")) {
+            return "code";
+        }
+
+        if (normalized.contains("test") || normalized.contains("pytest") || normalized.contains("coverage") || normalized.contains("quality")) {
+            return "test";
+        }
+
+        if (normalized.contains("error") || normalized.contains("stderr") || normalized.contains("exception") || normalized.contains("sentry")) {
+            return "error";
+        }
+
+        if (normalized.contains("file") || normalized.contains("path") || normalized.contains("audit") || normalized.contains("folder")) {
+            return "file";
+        }
+
+        if (normalized.contains("report") || normalized.contains("markdown") || normalized.contains("summary")) {
+            return "report";
+        }
+
+        if (normalized.contains("approval") || normalized.contains("human") || normalized.contains("approved")) {
+            return "approval";
+        }
+
+        return "custom";
+    }
+
+    private String workflowFieldColor(String dataType) {
+        return switch (firstNonBlank(dataType, "custom")) {
+            case "requirement" -> "#1a73e8";
+            case "product" -> "#4285f4";
+            case "code" -> "#34a853";
+            case "test" -> "#f9ab00";
+            case "error" -> "#ea4335";
+            case "file" -> "#0f9d58";
+            case "report" -> "#7c3aed";
+            case "approval" -> "#f97316";
+            default -> "#64748b";
+        };
     }
 
     @SuppressWarnings("unchecked")
