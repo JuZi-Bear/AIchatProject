@@ -42,6 +42,7 @@ class AgentState(TypedDict, total=False):
     _dynamic_template_key: str
     _dynamic_runtime_mode: str
     _dynamic_connection_mappings: list[dict]
+    _dynamic_runtime_context: dict
     _dynamic_current_node: str
     _dynamic_error: str
     _dynamic_pause_node: str

@@ -9,6 +9,7 @@ from core.workflow import create_initial_state
 from dynamic_workflow.graph_builder import build_connection_mappings, build_dynamic_graph, first_outgoing_target
 from dynamic_workflow.graph_validator import validate_dynamic_template
 from dynamic_workflow.resume_store import load_dynamic_run, save_dynamic_run
+from dynamic_workflow.runtime_context import summarize_runtime_context
 from dynamic_workflow.template_schema import DynamicWorkflowTemplate, parse_template
 from utils.summary_builder import build_run_summary
 from utils.ui_state_builder import build_ui_view_model
@@ -108,6 +109,44 @@ def _write_dynamic_report(run_id: str, template: DynamicWorkflowTemplate, state:
     else:
         lines.append("No field mappings configured.")
 
+    runtime_context = summarize_runtime_context(state)
+    lines.extend(["", "## Runtime Context Transfers", ""])
+
+    transfers = runtime_context.get("transfers", [])
+    if transfers:
+        for transfer in transfers:
+            lines.append(
+                "- `"
+                + str(transfer.get("fromNodeId", ""))
+                + "."
+                + str(transfer.get("fromOutputField", ""))
+                + "` -> `"
+                + str(transfer.get("toNodeId", ""))
+                + "."
+                + str(transfer.get("toInputField", ""))
+                + "` = "
+                + str((transfer.get("value") or {}).get("preview", ""))
+            )
+    else:
+        lines.append("No runtime field values were transferred.")
+
+    warnings = runtime_context.get("warnings", [])
+    if warnings:
+        lines.extend(["", "## Runtime Context Warnings", ""])
+        for warning in warnings:
+            lines.append(
+                "- "
+                + str(warning.get("fromNodeId", ""))
+                + "."
+                + str(warning.get("fromOutputField", ""))
+                + " -> "
+                + str(warning.get("toNodeId", ""))
+                + "."
+                + str(warning.get("toInputField", ""))
+                + ": "
+                + str(warning.get("message", ""))
+            )
+
     lines.extend(["", "## Recent Events", ""])
 
     for event in events[-20:] if isinstance(events, list) else []:
@@ -139,6 +178,7 @@ def _build_response(
             "report_path": report_path,
             "state_path": state_path,
             "connection_mappings": build_connection_mappings(template),
+            "runtime_context": summarize_runtime_context(state),
         }
     )
     ui_view_model = build_ui_view_model(state, run_summary)
@@ -147,6 +187,7 @@ def _build_response(
         "status": status,
         "validation_result": validation_result,
         "connection_mappings": build_connection_mappings(template),
+        "runtime_context": summarize_runtime_context(state),
         "pause_node": state.get("_dynamic_pause_node", ""),
         "resume_node": state.get("_dynamic_resume_node", ""),
         "loop_counts": state.get("_dynamic_loop_counts", {}),

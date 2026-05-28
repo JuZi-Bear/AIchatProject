@@ -156,6 +156,9 @@ def execute_human_approval_node(state: dict[str, Any], node: DynamicWorkflowNode
 
 
 def execute_condition_node(state: dict[str, Any], node: DynamicWorkflowNode) -> dict[str, Any]:
+    for field_name in node.output_fields:
+        state.setdefault(field_name, True)
+
     append_node_event(
         state,
         "STATUS_CHANGED",
@@ -169,6 +172,19 @@ def execute_condition_node(state: dict[str, Any], node: DynamicWorkflowNode) -> 
 
 
 def execute_simulated_node(state: dict[str, Any], node: DynamicWorkflowNode) -> dict[str, Any]:
+    received_inputs = [
+        f"{field_name}={as_string(state.get(field_name))[:120]}"
+        for field_name in node.input_fields
+        if state.get(field_name) not in (None, "")
+    ]
+    input_note = "; ".join(received_inputs) if received_inputs else "no mapped inputs"
+
+    for field_name in node.output_fields:
+        state.setdefault(
+            field_name,
+            f"{_node_name(node)} simulated output for {field_name}; inputs: {input_note}",
+        )
+
     append_node_event(
         state,
         "AGENT_STARTED",

@@ -8,6 +8,7 @@ from langgraph.graph import END, START, StateGraph
 from core.state import AgentState
 from dynamic_workflow.condition_evaluator import evaluate_condition
 from dynamic_workflow.node_adapters import adapter_for
+from dynamic_workflow.runtime_context import wrap_node_with_runtime_context
 from dynamic_workflow.template_schema import DynamicWorkflowEdge, DynamicWorkflowTemplate
 from utils.workflow_event_builder import append_workflow_event_from_parts
 
@@ -154,7 +155,7 @@ def build_dynamic_graph(template: DynamicWorkflowTemplate, start_node_id: str | 
     outgoing: dict[str, list[DynamicWorkflowEdge]] = defaultdict(list)
 
     for node in template.nodes:
-        graph.add_node(node.node_id, adapter_for(node))
+        graph.add_node(node.node_id, wrap_node_with_runtime_context(template, node, adapter_for(node)))
 
     for edge in _control_edges(template):
         if edge.from_node_id in node_ids and edge.to_node_id in node_ids:

@@ -116,6 +116,8 @@ npm run dev
 .\scripts\smoke_codeagent.ps1 -ApiMode java -CheckBlockedPath
 .\scripts\smoke_workflow_template.ps1
 .\scripts\smoke_workflow_runtime_lite.ps1
+.\scripts\smoke_skill_export.ps1 -RunExportedScript
+.\scripts\smoke_dynamic_runtime_context.ps1
 .\scripts\final_v2_acceptance.ps1
 ```
 
@@ -132,6 +134,14 @@ Java 构建：
 cd backend-java
 mvn -DskipTests package
 ```
+
+Skill Export 验收：
+
+```powershell
+.\scripts\smoke_skill_export.ps1 -RunExportedScript
+```
+
+该命令会创建临时 Workflow 模板、导出 Skill 包、校验 `SKILL.md` / `workflow-template.json` / `run_workflow.py`，并通过导出的脚本调用 Java Gateway 的 Dynamic LangGraph 执行接口。导出的 Skill 目录会保留在 `generated-skills/` 或本地 Java 工作目录下的 `backend-java/generated-skills/`，临时模板默认会清理。
 
 ## 项目结构
 
@@ -164,6 +174,7 @@ figma/              Figma-first UI 设计源规范
 - `docs/V2_DEMO_RELEASE_NOTES.md`：v2 演示版发布说明。
 - `docs/FIGMA_UI_WORKFLOW.md`：Figma-first UI 工作流。
 - `docs/CODEX_PROJECT_CONTEXT.md`：Codex 协作上下文。
+- `docs/SKILL_EXPORT_DEMO_GUIDE.md`：Workflow Template 导出 Codex Skill 演示和验收指南。
 
 ## 最新扩展
 
@@ -191,10 +202,10 @@ figma/              Figma-first UI 设计源规范
 
 ## 推荐下一步
 
-优先稳定 v2-only 演示版：
+优先推进 Skill 自动安装 / 启用流程：
 
-1. 复跑最终验收脚本并记录结果。
-2. 用 Workflow Editor 构造 `Product -> Coder -> Tester -> Condition -> Runner/Sentry loop -> Human Approval -> Report`，验证 Dynamic LangGraph Runtime 的分支、循环、暂停和恢复。
-3. 在动态执行图稳定后，再做 `Workflow Template -> Codex Skill Export`，先导出 Skill 包，不自动安装。
-4. 继续微调 Workflow Editor 演示体验并保持 Figma 设计源同步。
+1. 让导出的 `generated-skills/<skill-name>/` 可一键复制到 Codex skills 目录。
+2. 只安装用户确认的 Skill，不自动覆盖同名目录。
+3. 在 Vue 中展示安装状态、目标路径和安全提示。
+4. 保持 Skill 脚本只调用 Java Gateway，不绕过平台安全边界。
 5. 暂缓用户系统、权限和团队协作。

@@ -134,6 +134,15 @@ Add-Check -Name "CodeAgent smoke with blocked path" -Success $true -Detail "SSE,
 & (Join-Path $PSScriptRoot "smoke_workflow_template.ps1") -JavaApiBaseUrl $JavaApiBaseUrl
 Add-Check -Name "Workflow template smoke" -Success $true -Detail "save, version bump, instantiate, replay, delete checked"
 
+& (Join-Path $PSScriptRoot "smoke_workflow_runtime_lite.ps1") -JavaApiBaseUrl $JavaApiBaseUrl
+Add-Check -Name "Workflow Runtime Lite smoke" -Success $true -Detail "execute, approval, replay and report checked"
+
+& (Join-Path $PSScriptRoot "smoke_skill_export.ps1") -JavaApiBaseUrl $JavaApiBaseUrl -RunExportedScript
+Add-Check -Name "Workflow Skill Export smoke" -Success $true -Detail "exported files, frontmatter and run_workflow.py checked"
+
+& (Join-Path $PSScriptRoot "smoke_dynamic_runtime_context.ps1")
+Add-Check -Name "Dynamic runtime context smoke" -Success $true -Detail "field-level connection values transferred"
+
 $seedSummary = $null
 if (-not $SkipDemoSeed) {
     Write-Host ""

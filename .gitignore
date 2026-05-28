@@ -24,5 +24,8 @@ outputs/
 reports/
 runs/
 !runs/.gitkeep
+generated-skills/*
+!generated-skills/.gitignore
+backend-java/generated-skills/
 tests/test_generated_code.py
 .DS_Store

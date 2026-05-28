@@ -70,3 +70,20 @@
 | Java clean package | `cd backend-java && mvn -DskipTests clean package` | 通过 | 新增 `WorkflowSkillExportService` 编译通过 | 不适用 |
 | 前端生产构建 | `cd frontend-vue && npm run build` | 通过 | 仅 Vite chunk size / VueUse pure comment 常规警告 | 不适用 |
 | Diff 格式检查 | `git diff --check` | 通过 | 仅 LF/CRLF 提示，不影响格式检查 | 不适用 |
+
+## 2026-05-28 Skill Export 与 Dynamic Runtime 验收闭环记录
+
+| 测试项 | 命令/页面 | 结果 | 问题 | 是否修复 |
+|---|---|---|---|---|
+| Skill Export smoke 脚本 | `.\scripts\smoke_skill_export.ps1 -RunExportedScript` | 通过 | 导出 `SKILL.md`、模板 JSON、`run_workflow.py`，导出脚本执行状态 `SUCCESS` | 不适用 |
+| Runtime Lite / Skill Export 接入最终验收 | `.\scripts\final_v2_acceptance.ps1 -SkipDemoSeed` | 通过 | 脚本退出码 0，已纳入 Runtime Lite smoke 和 Skill Export smoke | 不适用 |
+| Skill Export 演示文档 | `docs/SKILL_EXPORT_DEMO_GUIDE.md` | 通过 | 新增演示路径、自动验收命令和常见问题 | 不适用 |
+
+## 2026-05-28 Dynamic LangGraph runtime context 记录
+
+| 测试项 | 命令/页面 | 结果 | 问题 | 是否修复 |
+|---|---|---|---|---|
+| 字段级 runtime context smoke | `.\scripts\smoke_dynamic_runtime_context.ps1` | 通过 | `alpha.alpha_result -> beta.beta_input` 真实传值，Beta 输出包含接收到的上游值 | 不适用 |
+| Python 编译 | `python -m compileall core/state.py dynamic_workflow` | 通过 | 无 | 不适用 |
+| 前端生产构建 | `cd frontend-vue && npm run build` | 通过 | 仅 Vite chunk size / VueUse pure comment 常规警告 | 不适用 |
+| Java 打包 | `cd backend-java && mvn -DskipTests package` | 通过 | 无 | 不适用 |
