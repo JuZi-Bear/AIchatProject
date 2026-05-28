@@ -98,13 +98,15 @@
 - [x] Vue Workflow Templates / Workflow Editor 导出 Skill 入口。
 - [x] Codex Skill 文件结构：`SKILL.md`、`references/workflow-template.json`、`scripts/run_workflow.py`。
 - [x] Docker Compose 挂载 `generated-skills` 导出目录。
+- [x] Skill Export smoke 脚本与 final acceptance 接入。
+- [x] Skill Export 演示指南。
 - [x] Replay 事件筛选和搜索。
 - [x] Dashboard 最近 CodeAgent 操作卡片增强。
 - [x] RunConsole 结构化需求构造器。
 - [x] RunConsole 运行结果高光区。
 - [x] RunConsole 结果详情紧凑化。
 - [x] 从 Runtime Lite 预研动态 LangGraph 编排。
-- [ ] Dynamic LangGraph 字段级 runtime context 真实传值。
+- [x] Dynamic LangGraph 字段级 runtime context 真实传值。
 - [x] Workflow Template 生成 Codex Skill 包。
 - [ ] 导出的 Skill 自动安装 / 启用流程。
 - [ ] 更强 CodeAgent diff 可视化。
