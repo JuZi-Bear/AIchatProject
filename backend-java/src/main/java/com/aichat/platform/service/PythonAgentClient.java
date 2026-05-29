@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -106,6 +107,31 @@ public class PythonAgentClient {
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {
                 });
+    }
+
+    public Map<String, Object> openFolder(Map<String, Object> request) {
+        return restClient.post()
+                .uri("/api/code-agent/open-folder")
+                .body(request)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+    }
+
+    public Map<String, Object> aiGenerateProject(Map<String, Object> request) {
+        return restClient.post()
+                .uri("/api/code-agent/ai-generate")
+                .body(request)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {
+                });
+    }
+
+    public ResponseEntity<byte[]> servePreviewFile(String filePath) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/code-agent/preview/serve/{filePath}").build(filePath))
+                .retrieve()
+                .toEntity(byte[].class);
     }
 
     public RunResponse createRun(RunRequest request) {

@@ -1,4 +1,4 @@
-import { apiClient, currentApiMode } from "./client";
+import { apiClient, currentApiMode, currentApiBaseUrl } from "./client";
 import { normalizeRunEvent } from "./events";
 
 import type { ApiResponse } from "@/types/api";
@@ -75,5 +75,28 @@ function normalizeCodeAgentResponse(response: RawCodeAgentResponse): CodeAgentRe
 export function executeCodeAgent(payload: CodeAgentRequest): Promise<CodeAgentResponse> {
   return apiClient
     .post<ApiResponse<RawCodeAgentResponse> | RawCodeAgentResponse>(codeAgentPath("/execute"), payload)
+    .then((response) => normalizeCodeAgentResponse(unwrapApiResponse<RawCodeAgentResponse>(response.data)));
+}
+
+export function openCodeAgentFolder(filePath: string): Promise<{ success: boolean; message: string }> {
+  return apiClient
+    .post<ApiResponse<{ success: boolean; message: string }> | { success: boolean; message: string }>(
+      codeAgentPath("/open-folder"),
+      { filePath }
+    )
+    .then((response) => unwrapApiResponse<{ success: boolean; message: string }>(response.data));
+}
+
+export function getCodeAgentPreviewUrl(filePath: string): string {
+  return `${currentApiBaseUrl}${codeAgentPath(`/preview/serve/${filePath}`)}`;
+}
+
+export function aiGenerateProject(payload: {
+  requirement: string;
+  baseDir: string;
+  modelProvider?: string;
+}): Promise<CodeAgentResponse> {
+  return apiClient
+    .post<ApiResponse<RawCodeAgentResponse> | RawCodeAgentResponse>(codeAgentPath("/ai-generate"), payload)
     .then((response) => normalizeCodeAgentResponse(unwrapApiResponse<RawCodeAgentResponse>(response.data)));
 }

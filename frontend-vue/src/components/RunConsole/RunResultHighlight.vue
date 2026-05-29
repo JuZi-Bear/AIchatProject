@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { openCodeAgentFolder } from "@/api/codeAgent";
+import { ElMessage } from "element-plus";
 
 import type { RunResultHighlight } from "@/types/runConsole";
 import type { RunEvent } from "@/types/runEvent";
@@ -105,8 +107,25 @@ const highlightMessage = computed(() => {
     return "选择模板或填写结构化需求后开始运行，结果会在这里形成一屏可讲的演示摘要。";
   }
 
-  return latestEvent.value?.message || "运行完成，可查看事件、报告和回放。";
+  return latestEvent.value?.message || "运行完成，可查看事件、报告 and 回放。";
 });
+
+const openFolderLoading = ref(false);
+async function openOutputDirectory() {
+  openFolderLoading.value = true;
+  try {
+    const res = await openCodeAgentFolder("output");
+    if (res.success) {
+      ElMessage.success(res.message || "已成功打开输出文件夹");
+    } else {
+      ElMessage.error(res.message || "打开输出文件夹失败");
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "打开输出文件夹失败");
+  } finally {
+    openFolderLoading.value = false;
+  }
+}
 </script>
 
 <template>
@@ -163,6 +182,9 @@ const highlightMessage = computed(() => {
       </router-link>
       <router-link v-if="platformRunId" :to="`/replay/${platformRunId}`">Replay 回放</router-link>
       <router-link v-if="reportPath" to="/reports">报告中心</router-link>
+      <a href="#" @click.prevent="openOutputDirectory" style="border-color: #fbd38d; color: #dd6b20;">
+        {{ openFolderLoading ? '正在打开...' : '打开输出目录' }}
+      </a>
       <span v-if="!platformRunId && isJavaMode" class="muted">运行完成后显示 Java 平台入口</span>
       <span v-if="!isJavaMode" class="muted">Python Direct 模式不展示 Java Replay 入口</span>
     </div>

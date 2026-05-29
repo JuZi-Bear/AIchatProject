@@ -8,6 +8,11 @@ import com.aichat.platform.service.RunRecordService;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -53,6 +58,31 @@ public class CodeAgentController {
         completeCodeAgentRun(platformRunId, data);
 
         return ApiResponse.ok(data);
+    }
+
+    @PostMapping("/open-folder")
+    public ApiResponse<Map<String, Object>> openFolder(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = pythonAgentClient.openFolder(request == null ? new LinkedHashMap<>() : request);
+        return ApiResponse.ok(response);
+    }
+
+    @PostMapping("/ai-generate")
+    public ApiResponse<Map<String, Object>> aiGenerateProject(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = pythonAgentClient.aiGenerateProject(request == null ? new LinkedHashMap<>() : request);
+        return ApiResponse.ok(response);
+    }
+
+    @GetMapping("/preview/serve/**")
+    public ResponseEntity<byte[]> servePreviewFile(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String targetPart = "/preview/serve/";
+        int index = uri.indexOf(targetPart);
+        if (index == -1) {
+            return ResponseEntity.badRequest().build();
+        }
+        String pathWithinController = uri.substring(index + targetPart.length());
+        String decodedPath = URLDecoder.decode(pathWithinController, StandardCharsets.UTF_8);
+        return pythonAgentClient.servePreviewFile(decodedPath);
     }
 
     @SuppressWarnings("unchecked")

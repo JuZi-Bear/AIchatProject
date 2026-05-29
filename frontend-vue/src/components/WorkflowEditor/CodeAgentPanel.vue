@@ -3,8 +3,10 @@ import { Refresh, VideoPlay } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 
-import { executeCodeAgent } from "@/api/codeAgent";
+import { executeCodeAgent, openCodeAgentFolder, getCodeAgentPreviewUrl, aiGenerateProject } from "@/api/codeAgent";
 import { currentApiMode } from "@/api/client";
+import { getModels } from "@/api/models";
+import type { ModelConfig } from "@/types/model";
 import { subscribeRunEvents, type RunEventSubscription } from "@/api/eventStream";
 import { getRunEvents } from "@/api/events";
 import { getWorkspaces } from "@/api/workspaces";
@@ -40,6 +42,7 @@ const workspaceLoading = ref(false);
 const previewLoading = ref(false);
 const auditLoading = ref(false);
 const sseStatus = ref("");
+const previewKey = ref(0);
 const result = ref<CodeAgentResponse | null>(null);
 const filePreview = ref<{ filePath: string; content: string; truncated?: boolean } | null>(null);
 const auditPreview = ref<{ path: string; content: string; lines: string[]; truncated?: boolean } | null>(null);
@@ -65,8 +68,14 @@ def my_func():
     return "created by CodeAgent"
 `;
 
-const mode = ref<"file" | "folder">("file");
+const mode = ref<"file" | "folder" | "ai_generate">("file");
 const selectedFolderTemplateKey = ref("folder_scan");
+
+const aiForm = reactive({
+  requirement: "写一个炫酷的网页版计算器，包含 HTML, CSS 和 JS，带有矩阵雨背景粒子特效",
+  baseDir: "output/code_agent_workspace",
+  modelProvider: "",
+});
 
 const form = reactive({
   operation: "read_file" as CodeAgentOperation,
@@ -171,6 +180,7 @@ const builtinFolderTemplates: CodeAgentFolderTemplate[] = [
 const workflowFolderTemplates = ref<CodeAgentFolderTemplate[]>([]);
 const workspaces = ref<WorkspaceConfig[]>([]);
 const selectedWorkspaceId = ref<number | null>(null);
+const models = ref<ModelConfig[]>([]);
 
 const operationOptions = [
   { label: "read_file", value: "read_file" },
@@ -579,6 +589,7 @@ function applyWorkspace(workspace = selectedWorkspace.value, options: { silent?:
 
   selectedWorkspaceId.value = workspace.id || null;
   folderForm.baseDir = workspace.rootPath;
+  aiForm.baseDir = workspace.rootPath;
   folderForm.dryRun = workspace.dryRunDefault;
   folderForm.backupBeforeWrite = workspace.backupBeforeWrite;
 
@@ -860,9 +871,98 @@ async function previewFile(filePath: string) {
   }
 }
 
+const htmlPreviewVisible = ref(false);
+const htmlPreviewUrl = ref("");
+const htmlPreviewTitle = ref("");
+
+function previewHtmlFile(filePath: string) {
+  htmlPreviewUrl.value = getCodeAgentPreviewUrl(filePath);
+  htmlPreviewTitle.value = filePath;
+  htmlPreviewVisible.value = true;
+}
+
+function openPreviewInNewWindow() {
+  if (htmlPreviewUrl.value) {
+    window.open(htmlPreviewUrl.value, "_blank");
+  }
+}
+
+const openFolderLoading = ref(false);
+async function openFolderByPath(path: string) {
+  if (!path) {
+    ElMessage.warning("文件夹路径为空");
+    return;
+  }
+  openFolderLoading.value = true;
+  try {
+    const res = await openCodeAgentFolder(path);
+    if (res.success) {
+      ElMessage.success(res.message || "已打开文件夹");
+    } else {
+      ElMessage.error(res.message || "打开文件夹失败");
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "打开文件夹失败");
+  } finally {
+    openFolderLoading.value = false;
+  }
+}
+
+function openWorkspaceFolder() {
+  const path = folderForm.baseDir || "output/code_agent_workspace";
+  openFolderByPath(path);
+}
+
+function openFileFolder() {
+  let path = form.filePath || "output";
+  openFolderByPath(path);
+}
+
+async function runAiGeneration() {
+  if (!aiForm.requirement.trim()) {
+    ElMessage.warning("请输入项目需求");
+    return;
+  }
+  loading.value = true;
+  resetExecutionState();
+  const platformRunId = nextPlatformRunId();
+
+  try {
+    const response = await aiGenerateProject({
+      requirement: aiForm.requirement.trim(),
+      baseDir: aiForm.baseDir.trim(),
+      modelProvider: aiForm.modelProvider || undefined,
+    });
+
+    result.value = response;
+    if (response.events && response.events.length) {
+      response.events.forEach(appendEvent);
+    }
+
+    if (response.success) {
+      ElMessage.success(response.message || "AI 项目一键生成成功！");
+    } else {
+      ElMessage.error(response.message || "AI 项目生成失败");
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "AI 生成请求失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadModels() {
+  try {
+    models.value = await getModels();
+  } catch {
+    models.value = [];
+  }
+}
+
 onMounted(() => {
   loadFolderTemplates();
   loadWorkspaces();
+  loadModels();
 });
 
 onBeforeUnmount(closeSubscription);
@@ -918,6 +1018,7 @@ onBeforeUnmount(closeSubscription);
     <el-radio-group v-model="mode" class="mode-switch">
       <el-radio-button label="file">单文件模式</el-radio-button>
       <el-radio-button label="folder">文件夹模式</el-radio-button>
+      <el-radio-button label="ai_generate">AI 一键生成项目</el-radio-button>
     </el-radio-group>
 
     <el-form v-if="mode === 'file'" label-position="top" class="code-agent-form">
@@ -949,7 +1050,7 @@ onBeforeUnmount(closeSubscription);
       </el-button>
     </el-form>
 
-    <el-form v-else label-position="top" class="code-agent-form">
+    <el-form v-else-if="mode === 'folder'" label-position="top" class="code-agent-form">
       <div class="folder-mode-note">
         <strong>安全文件夹工作区</strong>
         <span>默认 dry-run 预览 diff，确认后再应用到目录。</span>
@@ -983,6 +1084,9 @@ onBeforeUnmount(closeSubscription);
           </el-select>
           <el-button size="small" plain :disabled="!selectedWorkspace" @click="applyWorkspace()">
             使用工作区
+          </el-button>
+          <el-button size="small" type="primary" plain :loading="openFolderLoading" @click="openWorkspaceFolder">
+            打开文件夹
           </el-button>
         </div>
         <el-alert
@@ -1083,6 +1187,83 @@ onBeforeUnmount(closeSubscription);
       </div>
     </el-form>
 
+    <el-form v-else-if="mode === 'ai_generate'" label-position="top" class="code-agent-form">
+      <div class="folder-mode-note" style="border-color: #d7f5dd; background: #e6f9ec; color: #1e7e34;">
+        <strong>AI 一键项目生成</strong>
+        <span>通过自然语言描述，AI 将会在 Workspace 下自动创建多个关联的代码文件（HTML, CSS, JS），并支持一键网页预览。</span>
+      </div>
+
+      <div class="workspace-picker">
+        <div class="workspace-copy">
+          <strong>Project Workspace</strong>
+          <span>生成的项目文件将安全地写入受控工作区中，并支持白名单校验。</span>
+        </div>
+        <div class="workspace-controls">
+          <el-select
+            v-model="selectedWorkspaceId"
+            class="full-width"
+            :loading="workspaceLoading"
+            :disabled="currentApiMode !== 'java' || !enabledWorkspaces.length"
+            placeholder="选择受控 Workspace"
+            @change="() => applyWorkspace()"
+          >
+            <el-option
+              v-for="workspace in enabledWorkspaces"
+              :key="workspace.id || workspace.rootPath"
+              :label="`${workspace.isDefault ? '默认 · ' : ''}${workspace.name}`"
+              :value="workspace.id"
+            >
+              <div class="template-option">
+                <strong>{{ workspace.name }}</strong>
+                <span>{{ workspace.rootPath }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <el-button size="small" plain :disabled="!selectedWorkspace" @click="applyWorkspace()">
+            使用工作区
+          </el-button>
+          <el-button size="small" type="primary" plain :loading="openFolderLoading" @click="openWorkspaceFolder">
+            打开文件夹
+          </el-button>
+        </div>
+        <el-alert
+          :title="workspaceSafety.message"
+          :type="workspaceSafety.type"
+          show-icon
+          :closable="false"
+          class="workspace-alert"
+        />
+      </div>
+
+      <el-form-item label="生成目标路径">
+        <el-input v-model="aiForm.baseDir" placeholder="output/code_agent_workspace" />
+      </el-form-item>
+
+      <el-form-item label="项目需求">
+        <el-input
+          v-model="aiForm.requirement"
+          type="textarea"
+          :rows="6"
+          placeholder="请输入您对项目的描述，例如：写一个带有矩阵雨背景粒子特效的炫酷网页版计算器，包含 HTML, CSS 和 JS。"
+        />
+      </el-form-item>
+
+      <el-form-item label="模型选择">
+        <el-select v-model="aiForm.modelProvider" placeholder="默认模型" class="full-width" clearable>
+          <el-option
+            v-for="model in models"
+            :key="model.provider"
+            :label="`${model.name} / ${model.model}`"
+            :value="model.provider"
+          />
+        </el-select>
+      </el-form-item>
+
+      <el-button type="primary" :icon="VideoPlay" :loading="loading" class="full-width" @click="runAiGeneration">
+        开始 AI 一键生成项目
+      </el-button>
+    </el-form>
+
     <el-tag v-if="sseStatus" type="primary" effect="plain" class="sse-tag">{{ sseStatus }}</el-tag>
 
     <el-alert
@@ -1100,16 +1281,34 @@ onBeforeUnmount(closeSubscription);
     <el-collapse v-if="result" class="result-collapse">
       <el-collapse-item title="操作摘要" name="summary">
         <pre class="output-block">{{ JSON.stringify(result.results, null, 2) }}</pre>
-        <div v-if="resultFiles.length" class="preview-actions">
+        <div v-if="resultFiles.length" class="preview-actions" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+          <template v-for="item in resultFiles" :key="`${item.operation}-${item.filePath}`">
+            <el-button
+              size="small"
+              plain
+              :loading="previewLoading"
+              @click="previewFile(item.filePath)"
+            >
+              查看 {{ item.filePath }}
+            </el-button>
+            <el-button
+              v-if="item.filePath.endsWith('.html')"
+              type="primary"
+              size="small"
+              plain
+              @click="previewHtmlFile(item.filePath)"
+            >
+              网页预览
+            </el-button>
+          </template>
           <el-button
-            v-for="item in resultFiles"
-            :key="`${item.operation}-${item.filePath}`"
+            type="warning"
             size="small"
             plain
-            :loading="previewLoading"
-            @click="previewFile(item.filePath)"
+            :loading="openFolderLoading"
+            @click="openFolderByPath(result.filePath || form.filePath || folderForm.baseDir)"
           >
-            查看 {{ item.filePath }}
+            打开输出文件夹
           </el-button>
         </div>
       </el-collapse-item>
@@ -1134,16 +1333,25 @@ onBeforeUnmount(closeSubscription);
         </div>
 
         <div v-if="folderFileTree.length" class="folder-section">
-          <div class="folder-section-title">文件树摘要</div>
-          <div class="file-list">
-            <el-tag
-              v-for="file in folderFileTree.slice(0, 40)"
-              :key="`tree-${file.filePath}`"
-              effect="plain"
-              size="small"
-            >
-              {{ file.relativePath || file.filePath }}
-            </el-tag>
+          <div class="folder-section-title">文件树列表 (可预览)</div>
+          <div class="file-list-detailed">
+            <div v-for="file in folderFileTree.slice(0, 40)" :key="`tree-${file.filePath}`" class="file-tree-item">
+              <span class="file-path-text">{{ file.relativePath || file.filePath }}</span>
+              <div class="file-actions">
+                <el-button size="small" plain :loading="previewLoading" @click="previewFile(file.filePath)">
+                  查看
+                </el-button>
+                <el-button
+                  v-if="file.filePath.endsWith('.html')"
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="previewHtmlFile(file.filePath)"
+                >
+                  网页预览
+                </el-button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1185,6 +1393,15 @@ onBeforeUnmount(closeSubscription);
                 </el-tag>
                 <strong>{{ change.relativePath || change.filePath }}</strong>
                 <el-button size="small" plain @click="previewFile(change.filePath)">查看文件</el-button>
+                <el-button
+                  v-if="change.filePath.endsWith('.html') || (change.relativePath && change.relativePath.endsWith('.html'))"
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="previewHtmlFile(change.filePath)"
+                >
+                  网页预览
+                </el-button>
               </div>
               <p v-if="change.reason" class="change-reason">{{ change.reason }}</p>
               <pre class="output-block diff-pre">{{ change.diff || change.after || change.content }}</pre>
@@ -1293,6 +1510,21 @@ onBeforeUnmount(closeSubscription);
       </el-button>
     </div>
   </el-card>
+
+  <!-- HTML Web Preview Dialog -->
+  <el-dialog
+    v-model="htmlPreviewVisible"
+    :title="`网页效果预览 - ${htmlPreviewTitle}`"
+    width="85%"
+    destroy-on-close
+    append-to-body
+  >
+    <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+      <el-button type="primary" size="small" @click="openPreviewInNewWindow">在新窗口打开</el-button>
+      <el-button size="small" @click="previewKey++">刷新</el-button>
+    </div>
+    <iframe :key="previewKey" :src="htmlPreviewUrl" class="iframe-container"></iframe>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -1609,5 +1841,49 @@ onBeforeUnmount(closeSubscription);
 .event-row-danger {
   color: #b91c1c;
   font-weight: 700;
+}
+
+.file-list-detailed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+}
+
+.file-tree-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  gap: 12px;
+}
+
+.file-path-text {
+  font-size: 13px;
+  color: #334155;
+  word-break: break-all;
+  font-family: Consolas, monospace;
+}
+
+.file-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.iframe-container {
+  width: 100%;
+  height: 60vh;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
 }
 </style>
