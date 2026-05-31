@@ -158,18 +158,20 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 
 <template>
   <section class="composer-bar">
-    <el-input
-      :model-value="modelValue"
-      type="textarea"
-      :autosize="{ minRows: 1, maxRows: 5 }"
-      resize="none"
-      class="composer-input"
-      placeholder="描述你想生成或修改的项目"
-      :disabled="running"
-      @update:model-value="updateRequirement"
-      @keydown.ctrl.enter.prevent="$emit('submit')"
-      @keydown.meta.enter.prevent="$emit('submit')"
-    />
+    <div class="composer-input-shell">
+      <el-input
+        :model-value="modelValue"
+        type="textarea"
+        :autosize="{ minRows: 1, maxRows: 5 }"
+        resize="none"
+        class="composer-input"
+        placeholder="描述你想生成或修改的项目"
+        :disabled="running"
+        @update:model-value="updateRequirement"
+        @keydown.ctrl.enter.prevent="$emit('submit')"
+        @keydown.meta.enter.prevent="$emit('submit')"
+      />
+    </div>
 
     <div class="composer-control-row">
       <div class="composer-left-controls">
@@ -227,18 +229,23 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 <style scoped>
 .composer-bar {
   display: grid;
-  gap: 8px;
-  padding: 20px 18px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 24px;
+  gap: 4px;
+  padding: 14px 14px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 28px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018) 46%, transparent),
-    #242424;
+    radial-gradient(circle at 100% 100%, rgba(77, 163, 255, 0.06), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    #272727;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 20px 56px rgba(0, 0, 0, 0.36);
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 18px 46px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(12px);
+}
+
+.composer-input-shell {
+  min-height: 38px;
+  padding: 0 4px;
 }
 
 .composer-control-row,
@@ -251,7 +258,7 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 
 .composer-control-row {
   justify-content: space-between;
-  min-height: 36px;
+  min-height: 38px;
 }
 
 .composer-left-controls,
@@ -260,24 +267,29 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 }
 
 .composer-input :deep(.el-textarea__inner) {
-  min-height: 36px !important;
+  min-height: 34px !important;
   padding: 0;
   border: 0;
-  background: transparent;
-  box-shadow: none;
+  background: transparent !important;
+  box-shadow: none !important;
   color: #f4f4f5;
-  font-size: 18px;
-  font-weight: 620;
-  line-height: 1.45;
+  font-size: 15.5px;
+  font-weight: 520;
+  line-height: 1.55;
+  caret-color: #f4f4f5;
 }
 
 .composer-input :deep(.el-textarea__inner::placeholder) {
-  color: #f4f4f5;
-  opacity: 0.78;
+  color: #b7b7bd;
+  opacity: 0.9;
 }
 
 .composer-input :deep(.el-textarea__inner:focus) {
-  box-shadow: none;
+  box-shadow: none !important;
+}
+
+.composer-input :deep(.el-textarea__inner:hover) {
+  box-shadow: none !important;
 }
 
 .composer-icon-button,
@@ -297,11 +309,11 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 }
 
 .composer-icon-button {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
-  color: #d4d4d8;
-  font-size: 20px;
+  color: #c9c9ce;
+  font-size: 18px;
 }
 
 .composer-icon-button:hover:not(:disabled) {
@@ -316,11 +328,11 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 
 .access-control {
   gap: 7px;
-  min-height: 32px;
-  padding: 0 8px;
+  min-height: 30px;
+  padding: 0 7px;
   border-radius: 999px;
   color: #f97316;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 750;
 }
 
@@ -359,11 +371,11 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 }
 
 .inline-model-select {
-  width: 190px;
+  width: 176px;
 }
 
 .inline-model-select :deep(.el-select__wrapper) {
-  min-height: 32px;
+  min-height: 30px;
   border-radius: 999px;
   background: transparent !important;
   box-shadow: none !important;
@@ -382,8 +394,8 @@ function updateBackupBeforeWrite(value: string | number | boolean) {
 }
 
 .send-button {
-  width: 42px !important;
-  height: 42px !important;
+  width: 40px !important;
+  height: 40px !important;
   border-radius: 999px !important;
   background: #f4f4f5 !important;
   color: #111113 !important;

@@ -5,6 +5,11 @@ defineProps<{
   visible: boolean;
   title: string;
   subtitle?: string;
+  statusText?: string;
+  eventCount?: number;
+  outputCount?: number;
+  workspaceLabel?: string;
+  modelLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -22,6 +27,29 @@ const emit = defineEmits<{
         </div>
         <el-button :icon="Close" circle text @click="emit('close')" />
       </header>
+      <section class="side-panel-summary">
+        <div class="summary-section">
+          <span class="summary-title">进度</span>
+          <div class="progress-row complete">
+            <span class="progress-dot">✓</span>
+            <span>检查当前 Composer、Workspace 和工具状态</span>
+          </div>
+          <div class="progress-row" :class="{ complete: Boolean(outputCount) }">
+            <span class="progress-dot">{{ outputCount ? "✓" : "○" }}</span>
+            <span>产物 / 输出 {{ outputCount || 0 }}</span>
+          </div>
+          <div class="progress-row" :class="{ complete: Boolean(eventCount) }">
+            <span class="progress-dot">{{ eventCount ? "✓" : "○" }}</span>
+            <span>事件 {{ eventCount || 0 }}</span>
+          </div>
+        </div>
+        <div class="summary-section">
+          <span class="summary-title">环境信息</span>
+          <div class="env-row"><span>状态</span><strong>{{ statusText || "ready" }}</strong></div>
+          <div class="env-row"><span>工作区</span><strong>{{ workspaceLabel || "未选择" }}</strong></div>
+          <div class="env-row"><span>模型</span><strong>{{ modelLabel || "default" }}</strong></div>
+        </div>
+      </section>
       <div class="side-panel-body">
         <slot />
       </div>
@@ -77,8 +105,75 @@ const emit = defineEmits<{
 
 .side-panel-body {
   min-height: 0;
-  padding: 16px;
+  padding: 14px 16px 16px;
   overflow: auto;
+}
+
+.side-panel-summary {
+  display: grid;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.summary-section {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-title {
+  color: #8e8e95;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.progress-row,
+.env-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: #a1a1aa;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.progress-row.complete {
+  color: #d7d7dc;
+}
+
+.progress-dot {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c9c9ce;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.progress-row.complete .progress-dot {
+  background: rgba(244, 244, 245, 0.72);
+  color: #17191f;
+}
+
+.env-row {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.env-row span {
+  color: #8e8e95;
+}
+
+.env-row strong {
+  overflow: hidden;
+  color: #f4f4f5;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .side-panel-enter-active,

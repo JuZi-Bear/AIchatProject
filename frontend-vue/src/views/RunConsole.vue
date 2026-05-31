@@ -240,6 +240,15 @@ const currentTemplateName = computed(() => {
 
   return selectedFolderTemplate.value?.name || selectedFolderTemplateKey.value || "";
 });
+const selectedModelLabel = computed(() => {
+  const model = models.value.find((item) => item.provider === form.model_provider);
+
+  if (!model) {
+    return form.model_provider || "default";
+  }
+
+  return `${model.name} / ${model.model}`;
+});
 const workspaceSafety = computed<WorkspaceSafetyStatus>(() => {
   if (currentApiMode !== "java") {
     return {
@@ -1213,6 +1222,11 @@ watch(
         :visible="Boolean(activeSidePanel)"
         :title="sidePanelMeta.title"
         :subtitle="sidePanelMeta.subtitle"
+        :status-text="runStatusText"
+        :event-count="liveEvents.length"
+        :output-count="outputCount"
+        :workspace-label="selectedWorkspace?.name || folderForm.baseDir"
+        :model-label="selectedModelLabel"
         @close="closeSidePanel"
       >
         <div v-if="activeSidePanel === 'workspace'" class="side-section">
@@ -1416,7 +1430,7 @@ watch(
 .run-workbench {
   position: relative;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   padding: 0 92px 0 0;

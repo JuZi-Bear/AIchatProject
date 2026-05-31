@@ -58,7 +58,7 @@ function submitFolderPath() {
       <span>新对话</span>
     </button>
 
-    <el-input v-model="searchText" class="sidebar-search" placeholder="搜索 Workspace" clearable>
+    <el-input v-model="searchText" class="sidebar-search" placeholder="搜索" clearable>
       <template #prefix>
         <el-icon><Search /></el-icon>
       </template>
@@ -133,10 +133,10 @@ function submitFolderPath() {
   align-self: start;
   display: grid;
   gap: 8px;
-  width: 264px;
+  width: 248px;
   height: 100%;
   min-height: 0;
-  padding: 10px;
+  padding: 8px;
   border-right: 1px solid #343741;
   border-radius: 0;
   background: #1f2023;
@@ -158,15 +158,15 @@ function submitFolderPath() {
   display: flex;
   align-items: center;
   gap: 9px;
-  min-height: 32px;
-  padding: 0 8px;
+  min-height: 30px;
+  padding: 0 7px;
   font-size: 15px;
   font-weight: 800;
 }
 
 .sidebar-search :deep(.el-input__wrapper) {
-  min-height: 38px;
-  border-radius: 14px;
+  min-height: 34px;
+  border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025)),
     #2a2c32;
@@ -188,8 +188,8 @@ function submitFolderPath() {
   display: flex;
   align-items: center;
   gap: 9px;
-  min-height: 32px;
-  padding: 7px 8px;
+  min-height: 30px;
+  padding: 5px 7px;
   border-radius: 10px;
   color: #e8eaed;
   font-weight: 700;
@@ -204,7 +204,7 @@ function submitFolderPath() {
 .folder-create {
   display: grid;
   gap: 7px;
-  padding: 3px 0 8px;
+  padding: 2px 0 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -213,8 +213,8 @@ function submitFolderPath() {
   align-items: center;
   gap: 9px;
   width: 100%;
-  min-height: 32px;
-  padding: 7px 8px;
+  min-height: 30px;
+  padding: 5px 7px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -238,7 +238,7 @@ function submitFolderPath() {
 }
 
 .section-title {
-  margin: 7px 8px 2px;
+  margin: 5px 7px 1px;
   color: #9aa0a6;
   font-size: 12px;
   font-weight: 900;
@@ -265,12 +265,12 @@ function submitFolderPath() {
 
 .workspace-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  gap: 7px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 6px;
   align-items: center;
   width: 100%;
-  min-height: 40px;
-  padding: 6px 8px;
+  min-height: 34px;
+  padding: 5px 7px;
   border-radius: 10px;
   text-align: left;
   color: #bdc1c6;
@@ -300,7 +300,7 @@ function submitFolderPath() {
 
 .workspace-main small {
   color: #9aa0a6;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .workspace-row em {
