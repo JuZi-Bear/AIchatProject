@@ -197,26 +197,31 @@ async function openOutputDirectory() {
   gap: 14px;
   margin-bottom: 16px;
   padding: 16px;
-  border: 1px solid #dbe4ef;
+  border: 1px solid rgba(77, 163, 255, 0.18);
   border-radius: 14px;
   background:
-    linear-gradient(135deg, rgba(232, 240, 254, 0.9), rgba(255, 255, 255, 0.72)),
-    #ffffff;
-  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.08);
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 46px rgba(0, 0, 0, 0.26);
 }
 
 .result-highlight.state-success {
-  border-color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.28);
   background:
-    linear-gradient(135deg, rgba(230, 244, 234, 0.95), rgba(255, 255, 255, 0.72)),
-    #ffffff;
+    radial-gradient(circle at 100% 0%, rgba(74, 222, 128, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
 }
 
 .result-highlight.state-danger {
-  border-color: #fecaca;
+  border-color: rgba(251, 113, 133, 0.28);
   background:
-    linear-gradient(135deg, rgba(252, 232, 230, 0.95), rgba(255, 255, 255, 0.76)),
-    #ffffff;
+    radial-gradient(circle at 100% 0%, rgba(251, 113, 133, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
 }
 
 .highlight-main,
@@ -237,18 +242,18 @@ async function openOutputDirectory() {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 28px;
-  background: #1a73e8;
-  color: #ffffff;
+  background: linear-gradient(135deg, #56b6ff 0%, #4da3ff 52%, #7dd3fc 100%);
+  color: #06121f;
   box-shadow: 0 18px 34px rgba(26, 115, 232, 0.28);
 }
 
 .state-success .status-badge {
-  background: #34a853;
+  background: linear-gradient(135deg, #86efac, #4ade80);
   box-shadow: 0 18px 34px rgba(52, 168, 83, 0.24);
 }
 
 .state-danger .status-badge {
-  background: #ea4335;
+  background: linear-gradient(135deg, #fda4af, #fb7185);
   box-shadow: 0 18px 34px rgba(234, 67, 53, 0.22);
 }
 
@@ -275,20 +280,20 @@ async function openOutputDirectory() {
 }
 
 .highlight-title strong {
-  color: #0f172a;
+  color: var(--codex-text);
   font-size: 18px;
 }
 
 .highlight-copy p {
   margin: 0;
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.55;
 }
 
 .requirement-snippet {
   display: -webkit-box;
   overflow: hidden;
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 13px;
   line-height: 1.5;
   -webkit-box-orient: vertical;
@@ -305,19 +310,19 @@ async function openOutputDirectory() {
   display: grid;
   gap: 4px;
   padding: 10px;
-  border: 1px solid rgba(203, 213, 225, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .metric-item span {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
 }
 
 .metric-item strong {
   overflow: hidden;
-  color: #0f172a;
+  color: var(--codex-text);
   font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -330,10 +335,10 @@ async function openOutputDirectory() {
 
 .shortcut-row a {
   padding: 7px 10px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid rgba(77, 163, 255, 0.18);
   border-radius: 999px;
-  background: #ffffff;
-  color: #1a73e8;
+  background: rgba(77, 163, 255, 0.1);
+  color: #9bd4ff;
   font-size: 12px;
   font-weight: 800;
   text-decoration: none;
@@ -344,7 +349,7 @@ async function openOutputDirectory() {
 }
 
 .muted {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
 }
 

@@ -289,8 +289,8 @@ onBeforeUnmount(() => {
   <section class="page-stack replay-page">
     <div class="page-header">
       <div>
-        <h1>Workflow Replay</h1>
-        <p>按事件时间线回放一次 AI 多智能体工作流</p>
+        <h1>Execution Transcript</h1>
+        <p>按 Codex 风执行记录查看事件、当前节点、产物和人工确认。</p>
       </div>
       <div class="header-actions">
         <el-button :icon="ArrowLeft" @click="router.push('/history')">返回历史</el-button>
@@ -453,6 +453,27 @@ onBeforeUnmount(() => {
             <ReplayEventCard v-if="currentEvent" :event="currentEvent" active />
             <el-empty v-else description="暂无当前事件" />
           </section>
+          <section class="panel replay-artifact-panel">
+            <div class="panel-title">Replay Artifacts</div>
+            <div class="artifact-list">
+              <router-link class="artifact-link" :to="`/replay/${replay.platformRunId}`">
+                <strong>Replay</strong>
+                <span>{{ replay.platformRunId }}</span>
+              </router-link>
+              <router-link v-if="runtimeSummary.reportPath" class="artifact-link" to="/reports">
+                <strong>Report</strong>
+                <span>{{ runtimeSummary.reportPath }}</span>
+              </router-link>
+              <div v-if="runtimeSummary.codeAgent.auditPath" class="artifact-link static">
+                <strong>Audit</strong>
+                <span>{{ runtimeSummary.codeAgent.auditPath }}</span>
+              </div>
+              <div v-if="runtimeSummary.connectionMappings.length" class="artifact-link static">
+                <strong>Field mapping</strong>
+                <span>{{ runtimeSummary.connectionMappings.length }} links</span>
+              </div>
+            </div>
+          </section>
         </el-col>
       </el-row>
     </template>
@@ -488,29 +509,31 @@ onBeforeUnmount(() => {
   gap: 5px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
 }
 
 .summary-grid span {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
 }
 
 .summary-grid strong {
   overflow-wrap: anywhere;
-  color: #0f172a;
+  color: var(--codex-text);
   font-size: 14px;
 }
 
 .requirement-block {
   margin-top: 12px;
   padding: 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 14px;
+  background: #17191f;
+  color: #d4d4d8;
   line-height: 1.55;
 }
 
@@ -536,20 +559,22 @@ onBeforeUnmount(() => {
   gap: 5px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
-  background: #eff6ff;
+  border: 1px solid rgba(77, 163, 255, 0.22);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.12), transparent 38%),
+    #17191f;
 }
 
 .runtime-summary-grid span {
-  color: #1d4ed8;
+  color: #9bd4ff;
   font-size: 12px;
   font-weight: 700;
 }
 
 .runtime-summary-grid strong {
   overflow-wrap: anywhere;
-  color: #0f172a;
+  color: var(--codex-text);
   font-size: 14px;
 }
 
@@ -572,10 +597,10 @@ onBeforeUnmount(() => {
   max-width: 100%;
   overflow: hidden;
   padding: 5px 9px;
-  border: 1px solid color-mix(in srgb, var(--mapping-color) 32%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--mapping-color) 32%, #17191f);
   border-left: 4px solid var(--mapping-color);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--mapping-color) 8%, #ffffff);
+  background: color-mix(in srgb, var(--mapping-color) 8%, #17191f);
   color: #334155;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11px;
@@ -639,11 +664,11 @@ onBeforeUnmount(() => {
 }
 
 .filter-title strong {
-  color: #0f172a;
+  color: var(--codex-text);
 }
 
 .filter-title span {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
 }
 
@@ -655,6 +680,40 @@ onBeforeUnmount(() => {
 .replay-main-panel,
 .current-event-panel {
   min-height: 520px;
+}
+
+.replay-artifact-panel {
+  margin-top: 16px;
+}
+
+.artifact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.artifact-link {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 12px;
+  background: #17191f;
+}
+
+.artifact-link strong {
+  color: #1a73e8;
+}
+
+.artifact-link span {
+  overflow: hidden;
+  color: #5f6368;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-link.static strong {
+  color: #202124;
 }
 
 @media (max-width: 1280px) {

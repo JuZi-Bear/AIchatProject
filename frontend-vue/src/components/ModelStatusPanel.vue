@@ -96,7 +96,7 @@ function enabledCount(models: ModelConfig[]) {
 .current-model {
   padding: 10px 12px;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #101218;
   color: #475569;
 }
 
@@ -110,7 +110,7 @@ function enabledCount(models: ModelConfig[]) {
   padding: 10px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .model-title {

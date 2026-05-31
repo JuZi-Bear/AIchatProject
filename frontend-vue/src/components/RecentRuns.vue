@@ -102,7 +102,7 @@ function openHistory(runId: string) {
   padding: 11px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background: #fbfdff;
+  background: #17191f;
   cursor: pointer;
 }
 

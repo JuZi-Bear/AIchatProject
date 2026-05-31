@@ -324,7 +324,9 @@ onMounted(loadWorkspaces);
   padding: 10px 12px;
   border: 1px solid #d2e3fc;
   border-radius: 10px;
-  background: #e8f0fe;
+  background:
+    linear-gradient(135deg, rgba(77, 163, 255, 0.14), transparent 42%),
+    #17191f;
   color: #174ea6;
   font-family: Consolas, "Liberation Mono", monospace;
   font-size: 13px;

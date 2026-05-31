@@ -882,10 +882,12 @@ async function executeCurrentDynamicLangGraph() {
 
 <style scoped>
 .toolbar-card {
-  border: 1px solid #dadce0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(60, 64, 67, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
 }
 
 .toolbar-grid {
@@ -902,7 +904,7 @@ async function executeCurrentDynamicLangGraph() {
 }
 
 .group-label {
-  color: #5f6368;
+  color: #a1a1aa;
   font-size: 12px;
   font-weight: 800;
 }

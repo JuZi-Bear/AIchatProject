@@ -216,9 +216,11 @@ function resetBuilder() {
   display: grid;
   gap: 12px;
   padding: 12px;
-  border: 1px solid #dbe4ef;
-  border-radius: 10px;
-  background: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
+    #17191f;
 }
 
 .builder-head,
@@ -235,12 +237,12 @@ function resetBuilder() {
 }
 
 .builder-head strong {
-  color: #0f172a;
+  color: #f4f4f5;
   font-size: 14px;
 }
 
 .builder-head span {
-  color: #64748b;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
@@ -266,15 +268,15 @@ function resetBuilder() {
 }
 
 .builder-preview {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: #101218;
 }
 
 .preview-title {
   padding: 8px 10px;
-  border-bottom: 1px solid #e2e8f0;
-  color: #334155;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f4f4f5;
   font-weight: 800;
 }
 
@@ -283,7 +285,7 @@ function resetBuilder() {
   margin: 0;
   overflow: auto;
   padding: 10px;
-  color: #475569;
+  color: #d4d4d8;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
   line-height: 1.55;

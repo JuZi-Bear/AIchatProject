@@ -87,7 +87,7 @@ function isFrontendEnabled(plugin: PluginConfig, enabledPlugins: string[]) {
   padding: 10px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background: #fbfdff;
+  background: #17191f;
 }
 
 .plugin-title {

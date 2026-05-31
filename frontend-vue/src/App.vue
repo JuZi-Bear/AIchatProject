@@ -2,112 +2,111 @@
 import {
   Connection,
   DataAnalysis,
-  Expand,
   Files,
-  Fold,
+  Folder,
   House,
   List,
   Operation,
-  Share,
+  Plus,
+  Search,
   SetUp,
+  Setting,
+  Share,
 } from "@element-plus/icons-vue";
 import { computed, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 
+const route = useRoute();
 const sidebarCollapsed = ref(localStorage.getItem("ai-agent-pipeline.sidebar-collapsed") === "true");
-const sidebarWidth = computed(() => (sidebarCollapsed.value ? "72px" : "248px"));
+
+const navItems = [
+  { path: "/", label: "Dashboard", icon: House },
+  { path: "/runs/new", label: "Run", icon: Operation },
+  { path: "/workflows/templates", label: "Workflow", icon: Operation },
+  { path: "/workflows/editor", label: "Editor", icon: DataAnalysis },
+  { path: "/reports", label: "Artifacts", icon: Files },
+  { path: "/history", label: "History", icon: List },
+  { path: "/models", label: "Models", icon: Connection },
+  { path: "/workspace", label: "Workspace", icon: Folder },
+  { path: "/plugins", label: "Plugins", icon: SetUp },
+  { path: "/agents", label: "Agents", icon: Share },
+];
+
+const activeTitle = computed(() => navItems.find((item) => item.path === route.path)?.label || "Workspace");
+const isRunWorkbench = computed(() => route.path === "/runs/new");
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value;
   localStorage.setItem("ai-agent-pipeline.sidebar-collapsed", String(sidebarCollapsed.value));
 }
+
+function isActive(path: string) {
+  if (path === "/") {
+    return route.path === "/";
+  }
+
+  return route.path === path || route.path.startsWith(`${path}/`);
+}
 </script>
 
 <template>
-  <el-container class="app-shell">
-    <el-aside class="sidebar" :class="{ collapsed: sidebarCollapsed }" :width="sidebarWidth">
-      <div class="brand">
-        <div class="brand-mark">AI</div>
-        <div class="brand-copy">
-          <div class="brand-title">Agent Pipeline</div>
-          <div class="brand-subtitle">Vue3 Console</div>
+  <section class="codex-app-shell" :class="{ 'is-collapsed': sidebarCollapsed, 'is-workbench-route': isRunWorkbench }">
+    <aside v-if="!isRunWorkbench" class="codex-global-sidebar">
+      <button class="sidebar-icon-button new-chat-button" type="button" title="新对话" @click="$router.push('/runs/new')">
+        <el-icon><Plus /></el-icon>
+        <span>新对话</span>
+      </button>
+
+      <button class="sidebar-search" type="button" title="搜索">
+        <el-icon><Search /></el-icon>
+        <span>搜索</span>
+        <kbd>Ctrl+G</kbd>
+      </button>
+
+      <nav class="codex-nav" aria-label="main navigation">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.path"
+          class="codex-nav-item"
+          :class="{ active: isActive(item.path) }"
+          :to="item.path"
+          :title="item.label"
+        >
+          <el-icon><component :is="item.icon" /></el-icon>
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+
+      <div class="sidebar-spacer" />
+
+      <button class="sidebar-icon-button settings-button" type="button" title="设置" @click="$router.push('/workspace')">
+        <el-icon><Setting /></el-icon>
+        <span>设置</span>
+      </button>
+    </aside>
+
+    <main class="codex-main-shell">
+      <header v-if="!isRunWorkbench" class="codex-route-header">
+        <button
+          class="sidebar-collapse-button"
+          type="button"
+          :title="sidebarCollapsed ? '显示侧边栏' : '隐藏侧边栏'"
+          @click="toggleSidebar"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <div>
+          <div class="codex-route-title">{{ activeTitle }}</div>
+          <div class="codex-route-subtitle">Run -> Tools -> Artifacts -> Replay</div>
         </div>
-      </div>
+        <el-tag class="codex-version-tag" type="success" effect="plain">v2 Codex-style</el-tag>
+      </header>
 
-      <el-menu
-        router
-        class="nav-menu"
-        :collapse="sidebarCollapsed"
-        :collapse-transition="false"
-        :default-active="$route.path"
-      >
-        <el-menu-item index="/">
-          <el-icon><House /></el-icon>
-          <span>Dashboard</span>
-        </el-menu-item>
-        <el-menu-item index="/runs/new">
-          <el-icon><Operation /></el-icon>
-          <span>RunConsole</span>
-        </el-menu-item>
-        <el-menu-item index="/history">
-          <el-icon><List /></el-icon>
-          <span>RunHistory</span>
-        </el-menu-item>
-        <el-menu-item index="/reports">
-          <el-icon><Files /></el-icon>
-          <span>Reports</span>
-        </el-menu-item>
-        <el-menu-item index="/models">
-          <el-icon><Connection /></el-icon>
-          <span>Models</span>
-        </el-menu-item>
-        <el-menu-item index="/workspace">
-          <el-icon><Files /></el-icon>
-          <span>Workspace</span>
-        </el-menu-item>
-        <el-menu-item index="/plugins">
-          <el-icon><SetUp /></el-icon>
-          <span>Plugins</span>
-        </el-menu-item>
-        <el-menu-item index="/agents">
-          <el-icon><Share /></el-icon>
-          <span>Agents</span>
-        </el-menu-item>
-        <el-menu-item index="/workflows/templates">
-          <el-icon><Operation /></el-icon>
-          <span>Workflows</span>
-        </el-menu-item>
-        <el-menu-item index="/workflows/editor">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>Workflow Editor</span>
-        </el-menu-item>
-      </el-menu>
-    </el-aside>
-
-    <el-container>
-      <el-header class="topbar">
-        <div class="topbar-left">
-          <el-tooltip :content="sidebarCollapsed ? '显示侧边栏' : '隐藏侧边栏'" placement="bottom">
-            <el-button
-              class="sidebar-toggle"
-              :icon="sidebarCollapsed ? Expand : Fold"
-              circle
-              @click="toggleSidebar"
-            />
-          </el-tooltip>
-          <div>
-            <div class="topbar-title">Python Agent Engine Control Plane</div>
-            <div class="topbar-subtitle">FastAPI + Vue3 + TypeScript preview</div>
-          </div>
-        </div>
-        <el-tag type="success" effect="plain">
-          <el-icon><DataAnalysis /></el-icon>
-          v2 Frontend Skeleton
-        </el-tag>
-      </el-header>
-
-      <el-main class="main-content">
+      <section class="codex-route-body">
         <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+      </section>
+    </main>
+  </section>
 </template>

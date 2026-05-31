@@ -449,12 +449,12 @@ onMounted(() => {
 
 .page-header h1 {
   margin: 0;
-  color: #202124;
+  color: #f4f4f5;
 }
 
 .page-header p {
   margin: 4px 0 0;
-  color: #5f6368;
+  color: #a1a1aa;
 }
 
 .header-meta {
@@ -477,11 +477,11 @@ onMounted(() => {
   min-height: 42px;
   min-width: 0;
   padding: 8px 10px;
-  border: 1px solid #dadce0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: #ffffff;
-  color: #5f6368;
-  box-shadow: 0 6px 16px rgba(60, 64, 67, 0.06);
+  background: #17191f;
+  color: #a1a1aa;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
 }
 
 .guide-step span {
@@ -491,8 +491,8 @@ onMounted(() => {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
-  background: #f1f3f4;
-  color: #5f6368;
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
   font-weight: 800;
 }
 
@@ -504,26 +504,28 @@ onMounted(() => {
 }
 
 .guide-step.done span {
-  background: #e6f4ea;
-  color: #188038;
+  background: rgba(74, 222, 128, 0.18);
+  color: #9af4ba;
 }
 
 .guide-step.active {
-  border-color: #8ab4f8;
-  background: #e8f0fe;
-  color: #174ea6;
+  border-color: rgba(77, 163, 255, 0.28);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.16), transparent 44%),
+    #17191f;
+  color: #9bd4ff;
 }
 
 .guide-step.active span {
-  background: #1a73e8;
-  color: #ffffff;
+  background: #4da3ff;
+  color: #06121f;
 }
 
 .code-agent-hint {
-  border: 1px solid #dadce0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  background: #ffffff;
-  box-shadow: 0 8px 18px rgba(60, 64, 67, 0.06);
+  background: #17191f;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .hint-toggle {
@@ -545,7 +547,7 @@ onMounted(() => {
 }
 
 .hint-toggle strong {
-  color: #202124;
+  color: #f4f4f5;
 }
 
 .hint-toggle span,
@@ -579,10 +581,10 @@ onMounted(() => {
   width: 260px;
   padding: 10px;
   overflow: hidden;
-  border: 1px solid rgba(218, 220, 224, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 46px rgba(60, 64, 67, 0.14);
+  background: rgba(23, 25, 31, 0.94);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(14px);
   transition:
     width 220ms cubic-bezier(0.2, 0, 0, 1),
@@ -602,10 +604,10 @@ onMounted(() => {
   gap: 6px;
   width: 100%;
   height: 34px;
-  border: 1px solid #d2e3fc;
+  border: 1px solid rgba(77, 163, 255, 0.2);
   border-radius: 999px;
-  background: #e8f0fe;
-  color: #1a73e8;
+  background: rgba(77, 163, 255, 0.12);
+  color: #9bd4ff;
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -615,7 +617,7 @@ onMounted(() => {
 }
 
 .palette-toggle:hover {
-  background: #d2e3fc;
+  background: rgba(77, 163, 255, 0.2);
   transform: translateY(-1px);
 }
 
@@ -629,7 +631,7 @@ onMounted(() => {
   align-content: center;
   gap: 12px;
   min-height: 0;
-  color: #1a73e8;
+  color: #9bd4ff;
 }
 
 .palette-rail strong {
@@ -644,8 +646,8 @@ onMounted(() => {
   height: 28px;
   place-items: center;
   border-radius: 50%;
-  background: #e8f0fe;
-  color: #1a73e8;
+  background: rgba(77, 163, 255, 0.14);
+  color: #9bd4ff;
   font-weight: 900;
 }
 
@@ -670,12 +672,12 @@ onMounted(() => {
 }
 
 .palette-head strong {
-  color: #202124;
+  color: #f4f4f5;
   font-size: 15px;
 }
 
 .palette-head span {
-  color: #5f6368;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
@@ -698,9 +700,9 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   padding: 10px 11px;
-  border: 1px solid #dadce0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: #ffffff;
+  background: #17191f;
   cursor: grab;
   transition:
     transform 160ms ease,
@@ -720,28 +722,30 @@ onMounted(() => {
 
 .palette-agent.branch {
   border-color: #fbbc04;
-  background: #fffdf4;
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, 0.12), transparent 46%),
+    #17191f;
 }
 
 .palette-agent.approval {
   border-color: #a78bfa;
   background:
-    linear-gradient(90deg, #f3e8ff 0, #f3e8ff 5px, transparent 5px),
-    #ffffff;
+    linear-gradient(90deg, rgba(167, 139, 250, 0.34) 0, rgba(167, 139, 250, 0.34) 5px, transparent 5px),
+    #17191f;
 }
 
 .palette-agent.custom {
   border-color: #94a3b8;
   background:
-    linear-gradient(90deg, #f1f5f9 0, #f1f5f9 5px, transparent 5px),
-    #ffffff;
+    linear-gradient(90deg, rgba(148, 163, 184, 0.28) 0, rgba(148, 163, 184, 0.28) 5px, transparent 5px),
+    #17191f;
 }
 
 .palette-agent.code {
   border-color: #8ab4f8;
   background:
-    linear-gradient(90deg, #e8f0fe 0, #e8f0fe 5px, transparent 5px),
-    #ffffff;
+    linear-gradient(90deg, rgba(77, 163, 255, 0.34) 0, rgba(77, 163, 255, 0.34) 5px, transparent 5px),
+    #17191f;
 }
 
 .palette-agent-main {
@@ -752,7 +756,7 @@ onMounted(() => {
 
 .palette-agent strong {
   overflow: hidden;
-  color: #202124;
+  color: #f4f4f5;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -760,7 +764,7 @@ onMounted(() => {
 
 .palette-agent span {
   overflow: hidden;
-  color: #5f6368;
+  color: #a1a1aa;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11px;
   text-overflow: ellipsis;
@@ -772,7 +776,7 @@ onMounted(() => {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  color: #5f6368;
+  color: #a1a1aa;
   font-size: 12px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
@@ -789,10 +793,10 @@ onMounted(() => {
   grid-template-rows: auto minmax(0, 1fr);
   width: min(320px, calc(100% - 104px));
   overflow: hidden;
-  border: 1px solid rgba(218, 220, 224, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 22px 58px rgba(60, 64, 67, 0.18);
+  background: rgba(23, 25, 31, 0.96);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(16px);
 }
 
@@ -802,7 +806,7 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid #dadce0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .inspector-head div:first-child {
@@ -812,7 +816,7 @@ onMounted(() => {
 }
 
 .inspector-head span {
-  color: #5f6368;
+  color: #a1a1aa;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -820,7 +824,7 @@ onMounted(() => {
 
 .inspector-head strong {
   overflow: hidden;
-  color: #202124;
+  color: #f4f4f5;
   font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -871,5 +875,94 @@ onMounted(() => {
   .editor-guide {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.workflow-editor-page {
+  color: var(--codex-text);
+}
+
+.workflow-editor-page :deep(.page-header h1),
+.page-header h1 {
+  color: var(--codex-text);
+}
+
+.workflow-editor-page :deep(.page-header p),
+.page-header p,
+.palette-head span,
+.palette-agent span,
+.palette-agent p,
+.hint-toggle span,
+.hint-body span,
+.inspector-head span {
+  color: var(--codex-muted);
+}
+
+.guide-step,
+.code-agent-hint,
+.floating-palette,
+.inspector-panel,
+.palette-agent {
+  border-color: var(--codex-border);
+  background: rgba(23, 25, 31, 0.94);
+  color: var(--codex-text);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.32);
+}
+
+.guide-step span,
+.palette-rail span {
+  background: var(--codex-elevated);
+  color: var(--codex-muted);
+}
+
+.guide-step.active,
+.palette-toggle {
+  border-color: rgba(77, 163, 255, 0.48);
+  background: rgba(77, 163, 255, 0.14);
+  color: var(--codex-accent);
+}
+
+.guide-step.active span {
+  background: var(--codex-accent);
+  color: #06121f;
+}
+
+.hint-toggle strong,
+.palette-head strong,
+.palette-agent strong,
+.inspector-head strong {
+  color: var(--codex-text);
+}
+
+.palette-agent:hover {
+  border-color: var(--codex-accent);
+  box-shadow: 0 14px 30px rgba(77, 163, 255, 0.14);
+}
+
+.palette-agent.branch {
+  border-color: rgba(250, 204, 21, 0.42);
+  background: linear-gradient(90deg, rgba(250, 204, 21, 0.22) 0, rgba(250, 204, 21, 0.22) 5px, transparent 5px),
+    rgba(23, 25, 31, 0.94);
+}
+
+.palette-agent.approval {
+  border-color: rgba(167, 139, 250, 0.44);
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.24) 0, rgba(167, 139, 250, 0.24) 5px, transparent 5px),
+    rgba(23, 25, 31, 0.94);
+}
+
+.palette-agent.custom {
+  border-color: rgba(148, 163, 184, 0.5);
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.22) 0, rgba(148, 163, 184, 0.22) 5px, transparent 5px),
+    rgba(23, 25, 31, 0.94);
+}
+
+.palette-agent.code {
+  border-color: rgba(77, 163, 255, 0.52);
+  background: linear-gradient(90deg, rgba(77, 163, 255, 0.24) 0, rgba(77, 163, 255, 0.24) 5px, transparent 5px),
+    rgba(23, 25, 31, 0.94);
+}
+
+.inspector-head {
+  border-bottom-color: var(--codex-border);
 }
 </style>

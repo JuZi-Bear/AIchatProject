@@ -91,7 +91,9 @@ function compactText(value?: string, fallback = "暂无摘要") {
   padding: 16px;
   border: 1px solid #facc15;
   border-radius: 8px;
-  background: #fffbeb;
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, 0.12), transparent 42%),
+    #17191f;
 }
 
 .highlight-head {
@@ -118,7 +120,7 @@ function compactText(value?: string, fallback = "暂无摘要") {
   padding: 12px;
   border: 1px solid #fde68a;
   border-radius: 8px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .highlight-card span {
@@ -151,12 +153,16 @@ function compactText(value?: string, fallback = "暂无摘要") {
 
 .highlight-card.warning {
   border-color: #fde68a;
-  background: #fffbeb;
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, 0.12), transparent 42%),
+    #17191f;
 }
 
 .highlight-card.primary {
   border-color: #bfdbfe;
-  background: #eff6ff;
+  background:
+    linear-gradient(135deg, rgba(77, 163, 255, 0.12), transparent 42%),
+    #17191f;
 }
 
 .highlight-card.success {
@@ -166,6 +172,8 @@ function compactText(value?: string, fallback = "暂无摘要") {
 
 .highlight-card.active {
   border-color: #bfdbfe;
-  background: #eff6ff;
+  background:
+    linear-gradient(135deg, rgba(77, 163, 255, 0.12), transparent 42%),
+    #17191f;
 }
 </style>

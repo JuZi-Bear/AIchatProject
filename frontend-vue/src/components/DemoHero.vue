@@ -61,7 +61,10 @@ function statusType() {
   padding: 18px;
   border: 1px solid #c7d2fe;
   border-radius: 8px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 58%, #f0fdfa 100%);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.14), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.014)),
+    #17191f;
 }
 
 .eyebrow {

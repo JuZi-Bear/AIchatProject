@@ -427,15 +427,17 @@ onMounted(loadTemplates);
   gap: 10px;
   padding: 14px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .template-card.active {
-  border-color: #409eff;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.12);
+  border-color: rgba(77, 163, 255, 0.48);
+  box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.12);
 }
 
 .template-head,
@@ -452,21 +454,21 @@ onMounted(loadTemplates);
 }
 
 .template-name {
-  color: #0f172a;
+  color: var(--codex-text);
   font-size: 16px;
   font-weight: 800;
 }
 
 .template-key {
   margin-top: 3px;
-  color: #64748b;
+  color: var(--codex-muted);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
 
 .template-card p {
   margin: 0;
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.55;
 }
 
@@ -485,8 +487,8 @@ onMounted(loadTemplates);
   padding: 3px 8px;
   border: 1px solid #dbeafe;
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: rgba(77, 163, 255, 0.12);
+  color: #9bd4ff;
   font-size: 12px;
   font-weight: 700;
 }
@@ -508,7 +510,7 @@ onMounted(loadTemplates);
 }
 
 .detail-section > span {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
   font-weight: 800;
 }
@@ -530,7 +532,7 @@ onMounted(loadTemplates);
   max-height: 360px;
   margin: 0;
   overflow: auto;
-  color: #334155;
+  color: #e4e4e7;
   white-space: pre-wrap;
   word-break: break-word;
   font-family: "Cascadia Code", Consolas, monospace;
@@ -587,9 +589,11 @@ onMounted(loadTemplates);
   display: grid;
   gap: 10px;
   padding: 14px;
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
-  background: #f8fbff;
+  border: 1px solid rgba(77, 163, 255, 0.2);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.12), transparent 38%),
+    #17191f;
   cursor: pointer;
 }
 
@@ -600,7 +604,7 @@ onMounted(loadTemplates);
 
 .platform-template-card p {
   margin: 0;
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.55;
 }
 

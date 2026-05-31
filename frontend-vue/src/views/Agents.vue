@@ -174,9 +174,12 @@ onMounted(loadAgents);
   display: grid;
   gap: 10px;
   padding: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .agent-card-head,
@@ -192,14 +195,14 @@ onMounted(loadAgents);
 }
 
 .agent-name {
-  color: #0f172a;
+  color: var(--codex-text);
   font-size: 16px;
   font-weight: 800;
 }
 
 .agent-key {
   margin-top: 3px;
-  color: #64748b;
+  color: var(--codex-muted);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
@@ -212,7 +215,7 @@ onMounted(loadAgents);
 
 .agent-card p {
   margin: 0;
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.55;
 }
 
@@ -222,7 +225,7 @@ onMounted(loadAgents);
 }
 
 .field-block span {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
   font-weight: 700;
 }

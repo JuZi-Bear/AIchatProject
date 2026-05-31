@@ -133,7 +133,7 @@ function statusIcon(status: DemoStageStatus) {
   padding: 16px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .stage-grid {
@@ -150,7 +150,7 @@ function statusIcon(status: DemoStageStatus) {
   border: 1px solid #e2e8f0;
   border-left-width: 5px;
   border-radius: 8px;
-  background: #fbfdff;
+  background: #101218;
 }
 
 .stage-icon {
@@ -208,6 +208,6 @@ function statusIcon(status: DemoStageStatus) {
 .status-skipped,
 .status-waiting {
   border-left-color: #94a3b8;
-  background: #f8fafc;
+  background: #101218;
 }
 </style>

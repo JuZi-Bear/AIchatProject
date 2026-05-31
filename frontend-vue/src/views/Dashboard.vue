@@ -591,20 +591,22 @@ onMounted(() => {
   justify-content: space-between;
   gap: 18px;
   padding: 18px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  background: #ffffff;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.12), transparent 34%),
+    #17191f;
 }
 
 .dashboard-hero h1 {
   margin: 0;
-  color: #0f172a;
+  color: #f4f4f5;
   font-size: 25px;
 }
 
 .dashboard-hero p {
   margin: 6px 0 0;
-  color: #64748b;
+  color: #a1a1aa;
 }
 
 .hero-meta {
@@ -621,13 +623,13 @@ onMounted(() => {
 }
 
 .api-base {
-  color: #64748b;
+  color: #a1a1aa;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
 
 .api-mode-line {
-  color: #475569;
+  color: #d4d4d8;
   font-size: 13px;
   font-weight: 600;
 }
@@ -672,9 +674,9 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  background: #f8fafc;
+  background: #17191f;
 }
 
 .platform-event-item {
@@ -682,13 +684,13 @@ onMounted(() => {
   grid-template-columns: minmax(220px, 1fr) 2fr;
   gap: 12px;
   padding: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  background: #f8fafc;
+  background: #17191f;
 }
 
 .platform-run-id {
-  color: #0f172a;
+  color: #f4f4f5;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 13px;
   font-weight: 700;
@@ -696,7 +698,7 @@ onMounted(() => {
 
 .platform-run-subtitle {
   margin-top: 3px;
-  color: #64748b;
+  color: #a1a1aa;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
@@ -712,13 +714,17 @@ onMounted(() => {
 }
 
 .code-agent-card {
-  border-color: #fde68a;
-  background: #fffbeb;
+  border-color: rgba(250, 204, 21, 0.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(250, 204, 21, 0.12), transparent 36%),
+    #17191f;
 }
 
 .workflow-template-card {
-  border-color: #bfdbfe;
-  background: #eff6ff;
+  border-color: rgba(77, 163, 255, 0.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.12), transparent 36%),
+    #17191f;
 }
 
 .workflow-template-list {
@@ -731,9 +737,9 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 10px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid rgba(77, 163, 255, 0.18);
   border-radius: 8px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .code-agent-grid {
@@ -759,15 +765,17 @@ onMounted(() => {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid #fde68a;
+  border: 1px solid rgba(250, 204, 21, 0.18);
   border-radius: 8px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .code-agent-run-item.blocked,
 .code-agent-event-item.blocked {
-  border-color: #fecaca;
-  background: #fff1f2;
+  border-color: rgba(251, 113, 133, 0.28);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(251, 113, 133, 0.14), transparent 38%),
+    #17191f;
 }
 
 .code-agent-time {
@@ -788,6 +796,63 @@ onMounted(() => {
   gap: 8px;
   color: #334155;
   font-size: 13px;
+}
+
+.dashboard-hero,
+.platform-run-item,
+.platform-event-item,
+.workflow-template-item,
+.code-agent-run-item,
+.code-agent-event-item {
+  border-color: rgba(255, 255, 255, 0.075);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.dashboard-hero h1,
+.platform-run-id {
+  color: var(--codex-text);
+}
+
+.dashboard-hero p,
+.api-base,
+.api-mode-line,
+.platform-run-subtitle,
+.platform-event-main {
+  color: var(--codex-muted);
+}
+
+.code-agent-card {
+  border-color: rgba(250, 204, 21, 0.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(250, 204, 21, 0.12), transparent 36%),
+    #17191f;
+}
+
+.workflow-template-card {
+  border-color: rgba(77, 163, 255, 0.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.12), transparent 36%),
+    #17191f;
+}
+
+.code-agent-run-item.blocked,
+.code-agent-event-item.blocked {
+  border-color: rgba(251, 113, 133, 0.28);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(251, 113, 133, 0.14), transparent 38%),
+    #17191f;
+}
+
+.code-agent-column-title,
+.code-agent-time {
+  color: #fde68a;
+}
+
+.blocked .code-agent-time {
+  color: #fecdd3;
 }
 
 @media (max-width: 980px) {

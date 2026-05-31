@@ -248,9 +248,11 @@ onMounted(async () => {
 
 .report-item {
   padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
   cursor: pointer;
   transition:
     border-color 0.15s ease,
@@ -259,8 +261,8 @@ onMounted(async () => {
 
 .report-item:hover,
 .report-item.active {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  border-color: rgba(77, 163, 255, 0.42);
+  box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.12);
 }
 
 .report-item-head,
@@ -274,19 +276,19 @@ onMounted(async () => {
 
 .report-name {
   overflow-wrap: anywhere;
-  color: #0f172a;
+  color: var(--codex-text);
   font-weight: 800;
 }
 
 .report-meta {
   margin-top: 10px;
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
 }
 
 .requirement-text,
 .requirement-detail {
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.55;
 }
 
@@ -301,7 +303,7 @@ onMounted(async () => {
 }
 
 .created-at {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
 }
 
@@ -313,7 +315,7 @@ onMounted(async () => {
 .report-path {
   margin-top: 8px;
   overflow-wrap: anywhere;
-  color: #64748b;
+  color: var(--codex-muted);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
@@ -324,7 +326,7 @@ onMounted(async () => {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #0f172a;
+  color: #e4e4e7;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 13px;
   line-height: 1.65;

@@ -162,13 +162,18 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
   z-index: 2;
   display: grid;
   box-sizing: border-box;
-  width: 288px;
+  width: 416px;
+  min-height: 176px;
   gap: 8px;
-  padding: 14px 38px;
-  border: 1px solid #dadce0;
-  border-radius: 14px;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(60, 64, 67, 0.08);
+  padding: 14px 134px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 32%),
+    #272d36;
+  box-shadow:
+    0 14px 34px rgba(15, 23, 42, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
   cursor: grab;
   user-select: none;
 }
@@ -179,7 +184,10 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
 
 .agent-node.selected {
   border-color: #1a73e8;
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.14), 0 14px 30px rgba(26, 115, 232, 0.12);
+  box-shadow:
+    0 0 0 3px rgba(26, 115, 232, 0.22),
+    0 18px 42px rgba(26, 115, 232, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .port-stack {
@@ -187,33 +195,33 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
   z-index: 5;
   top: 52px;
   display: grid;
-  gap: 7px;
+  gap: 6px;
   pointer-events: none;
 }
 
 .input-stack {
-  left: -7px;
+  left: 12px;
 }
 
 .output-stack {
-  right: -7px;
+  right: 12px;
   justify-items: end;
 }
 
 .field-port {
   display: grid;
-  max-width: 116px;
-  min-height: 19px;
+  width: 124px;
+  min-height: 24px;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 6px;
-  border: 1px solid rgba(218, 220, 224, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.48);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #5f6368;
+  background: rgba(17, 24, 39, 0.78);
+  color: #cbd5e1;
   cursor: crosshair;
-  opacity: 0;
-  pointer-events: none;
+  opacity: 0.9;
+  pointer-events: auto;
   transition:
     opacity 160ms ease,
     transform 160ms ease,
@@ -238,22 +246,25 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
   height: 9px;
   border-radius: 999px;
   background: var(--port-color);
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px color-mix(in srgb, var(--port-color) 34%, transparent);
+  box-shadow:
+    0 0 0 2px #313842,
+    0 0 0 3px color-mix(in srgb, var(--port-color) 40%, transparent),
+    0 0 12px color-mix(in srgb, var(--port-color) 38%, transparent);
 }
 
 .port-name {
   overflow: hidden;
-  color: #202124;
+  color: #f8fafc;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .field-port small {
-  color: #64748b;
-  font-size: 9px;
+  color: #94a3b8;
+  font-size: 8.5px;
   font-weight: 850;
 }
 
@@ -266,8 +277,8 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
   width: max-content;
   padding: 2px 6px;
   border-radius: 999px;
-  background: #f1f3f4;
-  color: #64748b;
+  background: rgba(15, 23, 42, 0.76);
+  color: #cbd5e1;
   font-size: 10px;
   font-weight: 850;
 }
@@ -294,8 +305,8 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
 
 .field-port:hover,
 .field-port.active {
-  border-color: color-mix(in srgb, var(--port-color) 52%, #ffffff);
-  background: color-mix(in srgb, var(--port-color) 10%, #ffffff);
+  border-color: color-mix(in srgb, var(--port-color) 72%, #ffffff);
+  background: color-mix(in srgb, var(--port-color) 18%, #111827);
   box-shadow: 0 8px 18px color-mix(in srgb, var(--port-color) 22%, transparent);
   color: var(--port-color);
   transform: translateY(-1px);
@@ -308,50 +319,51 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
 .agent-node.branch {
   border-color: #fbbc04;
   background:
-    linear-gradient(135deg, rgba(251, 188, 4, 0.12), transparent 42%),
-    #ffffff;
+    linear-gradient(135deg, rgba(251, 188, 4, 0.22), transparent 42%),
+    #313842;
 }
 
 .agent-node.code {
   border-color: #8ab4f8;
   background:
-    linear-gradient(90deg, #e8f0fe 0, #e8f0fe 6px, transparent 6px),
-    #ffffff;
+    linear-gradient(90deg, #1a73e8 0, #1a73e8 6px, transparent 6px),
+    linear-gradient(135deg, rgba(26, 115, 232, 0.18), transparent 48%),
+    #272d36;
 }
 
 .agent-node.code .node-order {
-  background: #e8f0fe;
-  color: #1a73e8;
+  background: rgba(77, 163, 255, 0.18);
+  color: #9bd4ff;
 }
 
 .agent-node.approval {
   border-color: #a78bfa;
   background:
-    linear-gradient(90deg, #f3e8ff 0, #f3e8ff 6px, transparent 6px),
-    #ffffff;
+    linear-gradient(90deg, #a78bfa 0, #a78bfa 6px, transparent 6px),
+    #272d36;
 }
 
 .agent-node.approval .node-order {
-  background: #f3e8ff;
-  color: #7c3aed;
+  background: rgba(167, 139, 250, 0.2);
+  color: #c4b5fd;
 }
 
 .agent-node.custom {
   border-color: #cbd5e1;
   background:
-    linear-gradient(90deg, #f1f5f9 0, #f1f5f9 6px, transparent 6px),
-    #ffffff;
+    linear-gradient(90deg, #94a3b8 0, #94a3b8 6px, transparent 6px),
+    #272d36;
 }
 
 .agent-node.custom .node-order {
-  background: #f1f5f9;
-  color: #475569;
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
 }
 
 .agent-node.branch .node-order {
   border-radius: 8px;
-  background: #fef3c7;
-  color: #92400e;
+  background: rgba(250, 204, 21, 0.18);
+  color: #fde68a;
   transform: rotate(45deg);
 }
 
@@ -360,7 +372,7 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
 }
 
 .agent-node.disabled {
-  background: #f8fafc;
+  background: #475569;
   opacity: 0.72;
 }
 
@@ -372,17 +384,17 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
 }
 
 .node-header {
-  gap: 10px;
+  gap: 8px;
 }
 
 .node-order {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   place-items: center;
   border-radius: 50%;
-  background: #dbeafe;
-  color: #1e40af;
+  background: rgba(248, 250, 252, 0.12);
+  color: #e2e8f0;
   font-weight: 800;
 }
 
@@ -404,36 +416,42 @@ const hiddenOutputCount = computed(() => Math.max(0, props.node.output_fields.le
 }
 
 .node-title strong {
-  color: #202124;
-  font-size: 14px;
+  color: #f8fafc;
+  font-size: 13px;
 }
 
 .node-title span {
   margin-top: 2px;
-  color: #5f6368;
+  color: #cbd5e1;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .agent-node p {
-  min-height: 22px;
+  min-height: 18px;
   margin: 0;
   overflow: hidden;
-  color: #5f6368;
+  color: #cbd5e1;
   display: -webkit-box;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.4;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
 }
 
 .node-tags {
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .node-actions {
   justify-content: flex-end;
   gap: 6px;
+}
+
+.agent-node :deep(.el-tag) {
+  border-color: rgba(226, 232, 240, 0.28);
+  background: rgba(15, 23, 42, 0.34);
+  color: #e2e8f0;
 }
 </style>

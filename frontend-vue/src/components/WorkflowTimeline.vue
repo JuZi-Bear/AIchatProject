@@ -140,7 +140,7 @@ function statusIcon(status: string) {
   border: 1px solid #e2e8f0;
   border-left-width: 5px;
   border-radius: 8px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .timeline-step.active {
@@ -204,7 +204,7 @@ function statusIcon(status: string) {
 }
 
 .status-failed .timeline-icon {
-  background: #fee2e2;
+  background: rgba(251, 113, 133, 0.14);
   color: #b91c1c;
 }
 
@@ -231,6 +231,6 @@ function statusIcon(status: string) {
 .status-waiting,
 .status-skipped {
   border-left-color: #94a3b8;
-  background: #f8fafc;
+  background: #101218;
 }
 </style>

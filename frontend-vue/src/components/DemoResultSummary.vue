@@ -124,7 +124,7 @@ const runnerLabel = computed(() => runnerDisplayLabel(summary.value?.runner_mode
   margin-top: 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .report-line code {

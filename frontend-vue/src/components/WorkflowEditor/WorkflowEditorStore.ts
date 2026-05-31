@@ -29,8 +29,8 @@ const MIN_SCALE = 0.4;
 const MAX_SCALE = 1.8;
 const LAYOUT_START_X = 320;
 const LAYOUT_START_Y = 196;
-const LAYOUT_COLUMN_GAP = 336;
-const LAYOUT_ROW_GAP = 220;
+const LAYOUT_COLUMN_GAP = 500;
+const LAYOUT_ROW_GAP = 236;
 
 const agentLabels: Record<string, string> = {
   product: "Product Agent",

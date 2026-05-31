@@ -31,6 +31,10 @@ const props = withDefaults(
     embedded: false,
   },
 );
+const emit = defineEmits<{
+  executed: [response: CodeAgentResponse];
+  event: [event: RunEvent];
+}>();
 
 const store = useWorkflowEditorStore();
 const selectedNode = computed(() => store.selectedNode);
@@ -283,6 +287,7 @@ function appendEvent(event: RunEvent) {
 
   if (!currentKeys.has(eventKey(event))) {
     events.value.push(event);
+    emit("event", event);
   }
 }
 
@@ -513,6 +518,7 @@ async function runCodeAgent() {
     });
 
     result.value = response;
+    emit("executed", response);
     response.events.forEach(appendEvent);
     await loadHistoryEvents(response.platformRunId || platformRunId);
 
@@ -652,6 +658,7 @@ async function runFolderOperation(operation: CodeAgentOperation, options: { appl
     });
 
     result.value = response;
+    emit("executed", response);
     response.events.forEach(appendEvent);
     await loadHistoryEvents(response.platformRunId || platformRunId);
 
@@ -935,6 +942,7 @@ async function runAiGeneration() {
     });
 
     result.value = response;
+    emit("executed", response);
     if (response.events && response.events.length) {
       response.events.forEach(appendEvent);
     }
@@ -1593,10 +1601,12 @@ onBeforeUnmount(closeSubscription);
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  border: 1px solid #d2e3fc;
+  border: 1px solid rgba(77, 163, 255, 0.2);
   border-radius: 10px;
-  background: #e8f0fe;
-  color: #174ea6;
+  background:
+    linear-gradient(135deg, rgba(77, 163, 255, 0.18), transparent 48%),
+    #17191f;
+  color: #9bd4ff;
   font-size: 12px;
 }
 
@@ -1605,9 +1615,9 @@ onBeforeUnmount(closeSubscription);
   gap: 8px;
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #e8eaed;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .workspace-picker {
@@ -1615,9 +1625,11 @@ onBeforeUnmount(closeSubscription);
   gap: 8px;
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #d2e3fc;
+  border: 1px solid rgba(77, 163, 255, 0.18);
   border-radius: 10px;
-  background: #f8fbff;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.12), transparent 42%),
+    #17191f;
 }
 
 .workspace-copy {
@@ -1626,11 +1638,11 @@ onBeforeUnmount(closeSubscription);
 }
 
 .workspace-copy strong {
-  color: #174ea6;
+  color: #9bd4ff;
 }
 
 .workspace-copy span {
-  color: #64748b;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
@@ -1657,12 +1669,12 @@ onBeforeUnmount(closeSubscription);
 }
 
 .folder-template-copy strong {
-  color: #202124;
+  color: #f4f4f5;
 }
 
 .folder-template-copy span,
 .template-option span {
-  color: #64748b;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
@@ -1734,17 +1746,17 @@ onBeforeUnmount(closeSubscription);
 }
 
 .folder-stat span {
-  color: #64748b;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
 .folder-stat strong {
-  color: #1a73e8;
+  color: #8ab4f8;
   font-size: 20px;
 }
 
 .folder-stat.danger strong {
-  color: #ea4335;
+  color: #fb7185;
 }
 
 .folder-section {
@@ -1753,7 +1765,7 @@ onBeforeUnmount(closeSubscription);
 
 .folder-section-title {
   margin-bottom: 8px;
-  color: #334155;
+  color: #f4f4f5;
   font-weight: 800;
 }
 
@@ -1766,9 +1778,9 @@ onBeforeUnmount(closeSubscription);
 
 .change-item {
   padding: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .change-title {
@@ -1781,7 +1793,7 @@ onBeforeUnmount(closeSubscription);
 
 .change-reason {
   margin: 0 0 8px;
-  color: #64748b;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
@@ -1791,9 +1803,9 @@ onBeforeUnmount(closeSubscription);
 
 .diff-view {
   overflow: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  background: #f8fafc;
+  background: #101218;
   font-family: Consolas, "Liberation Mono", monospace;
   font-size: 12px;
 }
@@ -1808,28 +1820,28 @@ onBeforeUnmount(closeSubscription);
 }
 
 .diff-added {
-  background: #dcfce7;
-  color: #166534;
+  background: rgba(74, 222, 128, 0.14);
+  color: #9af4ba;
 }
 
 .diff-removed {
-  background: #fee2e2;
-  color: #991b1b;
+  background: rgba(251, 113, 133, 0.14);
+  color: #fecdd3;
 }
 
 .diff-unchanged {
-  color: #475569;
+  color: #d4d4d8;
 }
 
 .diff-mark,
 .diff-number {
-  color: #64748b;
+  color: #a1a1aa;
   user-select: none;
 }
 
 .section-title {
   margin-bottom: 10px;
-  color: #475569;
+  color: #f4f4f5;
   font-weight: 800;
 }
 
@@ -1839,7 +1851,7 @@ onBeforeUnmount(closeSubscription);
 }
 
 .event-row-danger {
-  color: #b91c1c;
+  color: #fb7185;
   font-weight: 700;
 }
 
@@ -1849,10 +1861,10 @@ onBeforeUnmount(closeSubscription);
   gap: 6px;
   max-height: 250px;
   overflow-y: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 8px;
-  background: #f8fafc;
+  background: #101218;
 }
 
 .file-tree-item {
@@ -1860,15 +1872,15 @@ onBeforeUnmount(closeSubscription);
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: #17191f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   gap: 12px;
 }
 
 .file-path-text {
   font-size: 13px;
-  color: #334155;
+  color: #d4d4d8;
   word-break: break-all;
   font-family: Consolas, monospace;
 }
@@ -1882,8 +1894,8 @@ onBeforeUnmount(closeSubscription);
 .iframe-container {
   width: 100%;
   height: 60vh;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  background: #ffffff;
+  background: #101218;
 }
 </style>

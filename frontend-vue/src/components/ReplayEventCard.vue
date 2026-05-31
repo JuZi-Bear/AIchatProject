@@ -170,21 +170,28 @@ function agentTagType(agent?: string) {
   display: grid;
   gap: 8px;
   padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-left: 5px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-left: 4px solid rgba(148, 163, 184, 0.62);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .replay-event-card.active {
-  border-color: #2563eb;
-  border-left-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  border-color: rgba(77, 163, 255, 0.5);
+  border-left-color: #4da3ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 3px rgba(77, 163, 255, 0.14);
 }
 
 .replay-event-card.code-agent {
-  border-left-color: #f59e0b;
-  background: #fffbeb;
+  border-left-color: #facc15;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(250, 204, 21, 0.14), transparent 36%),
+    #17191f;
 }
 
 .replay-event-card.code-agent.active {
@@ -193,9 +200,11 @@ function agentTagType(agent?: string) {
 }
 
 .replay-event-card.blocked {
-  border-color: #ef4444;
-  border-left-color: #dc2626;
-  background: #fff1f2;
+  border-color: rgba(251, 113, 133, 0.38);
+  border-left-color: #fb7185;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(251, 113, 133, 0.16), transparent 38%),
+    #17191f;
 }
 
 .replay-event-card.blocked.active {
@@ -220,14 +229,14 @@ function agentTagType(agent?: string) {
 }
 
 .event-time {
-  color: #64748b;
+  color: var(--codex-muted);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
 
 p {
   margin: 0;
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.5;
 }
 
@@ -241,11 +250,11 @@ p {
   max-width: 100%;
   overflow: hidden;
   padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--mapping-color) 32%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--mapping-color) 38%, #17191f);
   border-left: 4px solid var(--mapping-color);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--mapping-color) 8%, #ffffff);
-  color: #334155;
+  background: color-mix(in srgb, var(--mapping-color) 18%, #17191f);
+  color: #e4e4e7;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11px;
   font-weight: 800;
@@ -254,7 +263,7 @@ p {
 }
 
 .event-mapping-list em {
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
   font-style: normal;
   font-weight: 800;
@@ -266,8 +275,8 @@ p {
   overflow: auto;
   padding: 10px;
   border-radius: 8px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #111318;
+  color: #e4e4e7;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
   white-space: pre-wrap;

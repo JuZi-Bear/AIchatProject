@@ -101,7 +101,7 @@ const runnerLabel = computed(() => runnerDisplayLabel(summary.value?.runner_mode
   padding: 10px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  background: #f8fafc;
+  background: #101218;
 }
 
 .overview-item.wide {
@@ -122,7 +122,7 @@ const runnerLabel = computed(() => runnerDisplayLabel(summary.value?.runner_mode
 
 .overview-collapse {
   border-radius: 10px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .inline-long {

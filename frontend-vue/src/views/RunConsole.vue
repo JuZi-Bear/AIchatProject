@@ -2,31 +2,41 @@
 import { ElMessage } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 
-import AgentOutputTabs from "@/components/AgentOutputTabs.vue";
-import DemoHero from "@/components/DemoHero.vue";
-import DemoNarrationPanel from "@/components/DemoNarrationPanel.vue";
-import DemoResultSummary from "@/components/DemoResultSummary.vue";
-import DemoWorkflowStage from "@/components/DemoWorkflowStage.vue";
-import CodeAgentPanel from "@/components/WorkflowEditor/CodeAgentPanel.vue";
-import RepairHighlight from "@/components/RepairHighlight.vue";
-import ReportPreview from "@/components/ReportPreview.vue";
+import ArtifactPanel from "@/components/Workbench/ArtifactPanel.vue";
+import CodeAgentToolDrawer from "@/components/Workbench/CodeAgentToolDrawer.vue";
+import ComposerBar from "@/components/Workbench/ComposerBar.vue";
+import TaskTimeline from "@/components/Workbench/TaskTimeline.vue";
+import WorkspaceActionPanel from "@/components/Workbench/WorkspaceActionPanel.vue";
+import WorkspaceProjectSidebar from "@/components/Workbench/WorkspaceProjectSidebar.vue";
+import WorkbenchSidePanel from "@/components/Workbench/WorkbenchSidePanel.vue";
+import WorkbenchSideRail from "@/components/Workbench/WorkbenchSideRail.vue";
 import RequirementBuilder from "@/components/RunConsole/RequirementBuilder.vue";
-import ResultOverview from "@/components/ResultOverview.vue";
 import RunResultHighlight from "@/components/RunConsole/RunResultHighlight.vue";
-import SummaryCards from "@/components/SummaryCards.vue";
-import WorkflowTimeline from "@/components/WorkflowTimeline.vue";
 import { currentApiMode, getApiModeLabel } from "@/api/client";
+import { aiGenerateProject, executeCodeAgent } from "@/api/codeAgent";
 import { getRunEvents } from "@/api/events";
 import { subscribeRunEvents, type RunEventSubscription } from "@/api/eventStream";
 import { getModels } from "@/api/models";
 import { getPlugins } from "@/api/plugins";
 import { postRun } from "@/api/runs";
+import { createWorkspace, getWorkspaces, updateWorkspace } from "@/api/workspaces";
+import {
+  executePlatformDynamicLangGraphTemplate,
+  executePlatformWorkflowTemplate,
+  getPlatformWorkflowTemplates,
+  getWorkflowTemplates,
+} from "@/api/workflows";
 import { useSettingsStore } from "@/stores/settings";
+import type { CodeAgentFolderChange, CodeAgentFolderTemplate, CodeAgentOperation, CodeAgentResponse } from "@/types/codeAgent";
 import type { DemoCase, DemoCaseKey } from "@/types/demo";
+import type { FolderWorkflowContext, FolderWorkflowRunMode, WorkbenchSidePanelName, WorkspaceAction, WorkspaceExtendedSettings } from "@/types/interaction";
 import type { ModelConfig } from "@/types/model";
 import type { PluginConfig } from "@/types/plugin";
 import type { RunRequest, RunResponse } from "@/types/run";
 import type { RunEvent } from "@/types/runEvent";
+import { createDefaultWorkspace, type WorkspaceConfig, type WorkspaceSafetyStatus } from "@/types/workspace";
+import type { WorkflowTemplate } from "@/types/workflow";
+import type { WorkflowTemplateData } from "@/types/workflowEditor";
 
 const demoCases: DemoCase[] = [
   {
@@ -55,23 +65,128 @@ const demoCases: DemoCase[] = [
   },
 ];
 
+const demoFolderPath = "output/code_agent_workspace";
+
+const builtinFolderTemplates: CodeAgentFolderTemplate[] = [
+  {
+    key: "folder_scan",
+    name: "文件夹扫描模板",
+    description: "扫描受控工作区，输出文件树、跳过项和安全摘要。",
+    source: "builtin",
+    baseDir: demoFolderPath,
+    includePatterns: "**/*.md, **/*.txt, **/*.py, **/*.ts, **/*.vue",
+    excludePatterns: ".env, .git/**, node_modules/**, dist/**, target/**",
+    outputFile: "code_agent_folder_inventory.md",
+    content: "# CodeAgent folder inventory\n\n- Scan controlled workspace.\n- Highlight blocked paths and skipped files.\n",
+    recursive: true,
+    dryRun: true,
+    backupBeforeWrite: true,
+    recommendedOperation: "scan_folder",
+  },
+  {
+    key: "folder_markdown_summary",
+    name: "生成 Markdown 汇总",
+    description: "把文件夹读取结果整合为一个 Markdown 结果文件。",
+    source: "builtin",
+    baseDir: demoFolderPath,
+    includePatterns: "**/*.md, **/*.txt, **/*.py",
+    excludePatterns: ".env, .git/**, node_modules/**, dist/**, target/**",
+    outputFile: "code_agent_folder_summary.md",
+    content: "# Folder Summary\n\n## What changed\n- Summarize the controlled workspace.\n\n## Next steps\n- Review diff before applying.\n",
+    recursive: true,
+    dryRun: true,
+    backupBeforeWrite: true,
+    recommendedOperation: "plan_folder_changes",
+  },
+  {
+    key: "folder_dry_run_diff",
+    name: "dry-run diff 预览",
+    description: "只生成变更计划和 diff，不写入磁盘。",
+    source: "builtin",
+    baseDir: demoFolderPath,
+    includePatterns: "**/*.md, **/*.txt",
+    excludePatterns: ".env, .git/**, node_modules/**, dist/**, target/**",
+    outputFile: "code_agent_dry_run_result.md",
+    content: "# Dry-run result\n\nThis plan should be reviewed before any folder write.\n",
+    recursive: true,
+    dryRun: true,
+    backupBeforeWrite: true,
+    recommendedOperation: "plan_folder_changes",
+  },
+  {
+    key: "folder_apply_with_backup",
+    name: "应用到文件夹模板",
+    description: "基于已生成计划应用变更，默认写入前备份。",
+    source: "builtin",
+    baseDir: demoFolderPath,
+    includePatterns: "**/*.md, **/*.txt",
+    excludePatterns: ".env, .git/**, node_modules/**, dist/**, target/**",
+    outputFile: "code_agent_apply_result.md",
+    content: "# Applied folder result\n\n- This file is applied after reviewing the generated plan.\n",
+    recursive: true,
+    dryRun: false,
+    backupBeforeWrite: true,
+    recommendedOperation: "apply_folder_changes",
+  },
+  {
+    key: "folder_blocked_path_check",
+    name: "阻断路径安全测试",
+    description: "演示 .env / .git / node_modules 等敏感路径阻断。",
+    source: "builtin",
+    baseDir: ".",
+    includePatterns: ".env, .git/**, node_modules/**",
+    excludePatterns: "",
+    outputFile: "blocked_path_result.md",
+    content: "# Blocked path check\n\nThis template intentionally targets blocked paths for safety demonstration.\n",
+    recursive: true,
+    dryRun: true,
+    backupBeforeWrite: true,
+    recommendedOperation: "scan_folder",
+  },
+];
+
 const settingsStore = useSettingsStore();
 const apiModeLabel = getApiModeLabel();
 const isJavaMode = currentApiMode === "java";
+const runModeOptions: Array<{ label: string; value: FolderWorkflowRunMode }> = [
+  { label: "CodeAgent AI 一键生成", value: "code_agent_ai_generate" },
+  { label: "文件夹工作流", value: "folder_workflow" },
+  { label: "普通 Agent", value: "agent_run" },
+  { label: "Runtime Lite", value: "runtime_lite" },
+  { label: "Dynamic LangGraph", value: "dynamic_langgraph" },
+];
 const models = ref<ModelConfig[]>([]);
 const plugins = ref<PluginConfig[]>([]);
+const workspaces = ref<WorkspaceConfig[]>([]);
+const platformWorkflowTemplates = ref<WorkflowTemplateData[]>([]);
+const workflowFolderTemplates = ref<CodeAgentFolderTemplate[]>([]);
 const loadingOptions = ref(false);
+const workspaceLoading = ref(false);
+const templateLoading = ref(false);
 const running = ref(false);
 const result = ref<RunResponse | null>(null);
+const codeAgentResult = ref<CodeAgentResponse | null>(null);
 const errorDetail = ref("");
 const lastRequirement = ref("");
 const selectedDemoCaseKey = ref<DemoCaseKey>("auto_repair");
-const controlPanelMode = ref<"workflow" | "codeAgent">("workflow");
+const runMode = ref<FolderWorkflowRunMode>("code_agent_ai_generate");
+const selectedWorkspaceId = ref<number | null>(null);
+const selectedFolderTemplateKey = ref("folder_scan");
+const selectedPlatformTemplateKey = ref("");
+const activeSidePanel = ref<WorkbenchSidePanelName | null>(null);
 const liveEvents = ref<RunEvent[]>([]);
 const liveEventError = ref("");
 const liveEventStreaming = ref(false);
 const liveEventConnected = ref(false);
 let liveEventSubscription: RunEventSubscription | null = null;
+const defaultWorkspacePolicy = createDefaultWorkspace();
+const workspaceActionTemplateMap: Record<WorkspaceAction, string> = {
+  scan: "folder_scan",
+  markdown_summary: "folder_markdown_summary",
+  dry_run_diff: "folder_dry_run_diff",
+  apply: "folder_apply_with_backup",
+  blocked_check: "folder_blocked_path_check",
+};
 
 const form = reactive<RunRequest>({
   requirement: "",
@@ -83,34 +198,256 @@ const form = reactive<RunRequest>({
   offline_mode: settingsStore.offlineMode,
 });
 
+const folderForm = reactive({
+  baseDir: demoFolderPath,
+  includePatterns: "**/*.md, **/*.txt, **/*.py, **/*.ts, **/*.vue",
+  excludePatterns: ".env, .git/**, node_modules/**, dist/**, target/**",
+  outputFile: "code_agent_folder_result.md",
+  content: `# CodeAgent folder result
+
+- This file is generated from the controlled folder workspace mode.
+- Review the diff before applying changes.
+`,
+  recursive: true,
+  dryRun: true,
+  backupBeforeWrite: true,
+});
+
 const selectedSummary = computed(() => result.value?.run_summary || null);
-const workflowSteps = computed(() => result.value?.ui_view_model.workflow_steps || []);
-const workflowEvents = computed(() => result.value?.ui_view_model.workflow_events || []);
-const reportView = computed(() => result.value?.ui_view_model.report || {});
 const resultPlatformRunId = computed(() => result.value?.platform_run_id || result.value?.platformRunId || "");
-const showLiveEvents = computed(() => isJavaMode && (Boolean(resultPlatformRunId.value) || liveEvents.value.length > 0));
 const selectedDemoCase = computed(
   () => demoCases.find((demoCase) => demoCase.key === selectedDemoCaseKey.value) || demoCases[0],
 );
-const demoCaseLabel = computed(() => selectedDemoCase.value.label);
-const currentRunStepHint = computed(() => {
+const activePluginCount = computed(() => form.enabled_plugins.length);
+const folderTemplateOptions = computed(() => [...builtinFolderTemplates, ...workflowFolderTemplates.value]);
+const enabledWorkspaces = computed(() => workspaces.value.filter((workspace) => workspace.enabled));
+const selectedWorkspace = computed(
+  () =>
+    enabledWorkspaces.value.find((workspace) => workspace.id === selectedWorkspaceId.value) ||
+    enabledWorkspaces.value.find((workspace) => workspace.isDefault) ||
+    enabledWorkspaces.value[0],
+);
+const selectedFolderTemplate = computed(() =>
+  folderTemplateOptions.value.find((template) => template.key === selectedFolderTemplateKey.value),
+);
+const selectedPlatformTemplate = computed(() =>
+  platformWorkflowTemplates.value.find((template) => template.workflowTemplateKey === selectedPlatformTemplateKey.value),
+);
+const currentTemplateName = computed(() => {
+  if (runMode.value === "runtime_lite" || runMode.value === "dynamic_langgraph") {
+    return selectedPlatformTemplate.value?.name || selectedPlatformTemplateKey.value || "";
+  }
+
+  return selectedFolderTemplate.value?.name || selectedFolderTemplateKey.value || "";
+});
+const workspaceSafety = computed<WorkspaceSafetyStatus>(() => {
+  if (currentApiMode !== "java") {
+    return {
+      mode: "python-direct",
+      message: "Python Direct：由 Python CodeAgent 白名单做最终校验",
+      type: "info",
+    };
+  }
+
+  if (!enabledWorkspaces.value.length) {
+    return {
+      mode: "unavailable",
+      message: "尚未配置 Workspace",
+      type: "warning",
+    };
+  }
+
+  const targetPath = normalizePath(folderForm.baseDir);
+  const matched = enabledWorkspaces.value.find((workspace) => pathInsideRoot(targetPath, workspace.rootPath));
+
+  if (!matched) {
+    return {
+      mode: "outside",
+      message: "路径不在已配置 Workspace 内",
+      type: "warning",
+    };
+  }
+
+  return {
+    mode: "configured",
+    workspace: matched,
+    message: `Workspace：${matched.name}`,
+    type: "success",
+  };
+});
+const folderContext = computed<FolderWorkflowContext>(() => ({
+  runMode: runMode.value,
+  workspaceId: selectedWorkspaceId.value,
+  folderPath: folderForm.baseDir,
+  folderTemplateKey: selectedFolderTemplateKey.value,
+  platformTemplateKey: selectedPlatformTemplateKey.value,
+  modelProvider: form.model_provider,
+  outputFile: folderForm.outputFile,
+  includePatterns: folderForm.includePatterns,
+  excludePatterns: folderForm.excludePatterns,
+  recursive: folderForm.recursive,
+  dryRun: folderForm.dryRun,
+  backupBeforeWrite: folderForm.backupBeforeWrite,
+  safety: workspaceSafety.value,
+}));
+const artifactCount = computed(() => {
+  const reportCount = selectedSummary.value?.report_path ? 1 : 0;
+  const replayCount = resultPlatformRunId.value ? 1 : 0;
+  const codeAgentCount =
+    codeAgentResult.value?.results.reduce((total, item) => {
+      return total + Number(Boolean(item.filePath)) + (item.changes?.length || 0) + Number(Boolean(item.auditPath));
+    }, 0) || 0;
+
+  return reportCount + replayCount + codeAgentCount;
+});
+const outputCount = computed(() => artifactCount.value + Number(Boolean(result.value || errorDetail.value)));
+const sidePanelMeta = computed(() => {
+  const meta: Record<WorkbenchSidePanelName, { title: string; subtitle: string }> = {
+    settings: {
+      title: "运行设置",
+      subtitle: "模型、插件、演示模式和审批开关。",
+    },
+    workspace: {
+      title: "Workspace 功能区",
+      subtitle: "文件夹权限、扫描范围、Markdown 输出和快捷动作。",
+    },
+    builder: {
+      title: "需求构造器",
+      subtitle: "用结构化字段拼出自然语言任务。",
+    },
+    tools: {
+      title: "CodeAgent 工具",
+      subtitle: "高级模式：单文件、文件夹、AI 项目生成和审计预览。",
+    },
+    output: {
+      title: "Output",
+      subtitle: "文件、diff、审计日志、报告、Replay 和运行结果。",
+    },
+    events: {
+      title: "运行事件",
+      subtitle: "Java RunEvent / SSE 事件流。",
+    },
+  };
+
+  return activeSidePanel.value ? meta[activeSidePanel.value] : { title: "", subtitle: "" };
+});
+const runStatusText = computed(() => {
   if (running.value) {
-    return "当前阶段提示：AI 工作流执行中，等待后端返回完整运行结果。";
+    return "running";
   }
-
   if (errorDetail.value) {
-    return `当前阶段提示：演示运行失败，请检查 ${apiModeLabel} 是否启动。`;
+    return "failed";
   }
-
+  if (codeAgentResult.value) {
+    return codeAgentResult.value.success ? "success" : "failed";
+  }
   if (result.value) {
-    return "当前阶段提示：运行完成，正在展示工作流回放、修复高光、质量评分和报告结果。";
+    return selectedSummary.value?.success ? "success" : "completed";
   }
-
-  return "当前阶段提示：选择演示案例后点击一键开始演示。";
+  return "ready";
 });
 
 function pluginValue(plugin: PluginConfig) {
   return plugin.display_name || plugin.name;
+}
+
+function toggleSidePanel(panel: WorkbenchSidePanelName) {
+  activeSidePanel.value = activeSidePanel.value === panel ? null : panel;
+}
+
+function closeSidePanel() {
+  activeSidePanel.value = null;
+}
+
+function eventTagType(event: RunEvent) {
+  if (event.status === "FAILED" || event.eventType.includes("FAILED") || event.eventType === "ERROR_OCCURRED") {
+    return "danger";
+  }
+
+  if (event.status === "SUCCESS" || event.eventType.includes("SUCCESS") || event.eventType === "REPORT_INDEXED") {
+    return "success";
+  }
+
+  if (event.status === "RUNNING" || event.eventType.includes("STARTED")) {
+    return "primary";
+  }
+
+  if (event.status === "WAITING_FOR_HUMAN" || event.eventType.includes("APPROVAL")) {
+    return "warning";
+  }
+
+  return "info";
+}
+
+function nextPlatformRunId() {
+  return `folder_workflow_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function splitPatternInput(value: string) {
+  return value
+    .replace(/;/g, ",")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizePath(value: string) {
+  return value.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+function pathInsideRoot(targetPath: string, rootPath: string) {
+  const normalizedRoot = normalizePath(rootPath);
+
+  return targetPath === normalizedRoot || targetPath.startsWith(`${normalizedRoot}/`);
+}
+
+function workflowTemplateToFolderTemplate(
+  template: (WorkflowTemplate | WorkflowTemplateData) & {
+    agentSequence?: string[];
+    agent_sequence?: string[];
+    markdown?: string;
+  },
+): CodeAgentFolderTemplate | null {
+  const agentSequence = "agent_sequence" in template ? template.agent_sequence || [] : template.agentSequence || [];
+  const nodes = "nodes" in template ? template.nodes || [] : [];
+  const hasCodeAgent = agentSequence.includes("code_agent") || nodes.some((node) => node.agentKey === "code_agent");
+
+  if (!hasCodeAgent) {
+    return null;
+  }
+
+  const firstConfig = (nodes.find((node) => node.agentKey === "code_agent")?.codeAgentConfig || {}) as Record<
+    string,
+    unknown
+  >;
+  const key = "workflowTemplateKey" in template ? template.workflowTemplateKey : template.key;
+  const content = String(
+    firstConfig.content ||
+      ("markdown" in template ? template.markdown : "") ||
+      `# ${template.name || key}\n\n${template.description || "Generated from Workflow Template."}\n`,
+  );
+
+  return {
+    key: `workflow_${key}`,
+    name: `Workflow · ${template.name || key}`,
+    description: template.description || "从 Workflow Template 提取 CodeAgent 文件夹参数。",
+    source: "workflowTemplateKey" in template ? "platform" : "api",
+    baseDir: String(firstConfig.baseDir || firstConfig.target_path || demoFolderPath),
+    includePatterns: String(firstConfig.includePatterns || "**/*.md, **/*.txt, **/*.py"),
+    excludePatterns: String(firstConfig.excludePatterns || ".env, .git/**, node_modules/**, dist/**, target/**"),
+    outputFile: String(firstConfig.outputFile || "code_agent_workflow_result.md"),
+    content,
+    recursive: firstConfig.recursive === false ? false : true,
+    dryRun: firstConfig.dryRun === false ? false : true,
+    backupBeforeWrite: firstConfig.backupBeforeWrite === false ? false : true,
+    recommendedOperation: "plan_folder_changes",
+  };
+}
+
+function handleWorkbenchKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    closeSidePanel();
+  }
 }
 
 function normalizeError(error: unknown) {
@@ -137,58 +474,6 @@ function normalizeError(error: unknown) {
   }
 
   return possibleError.message || "运行失败";
-}
-
-function eventTagType(eventType: string) {
-  if (eventType === "RUN_SUCCESS" || eventType === "REPORT_INDEXED") {
-    return "success";
-  }
-
-  if (eventType === "RUN_FAILED" || eventType === "ERROR_OCCURRED") {
-    return "danger";
-  }
-
-  if (eventType === "RUN_CANCELLED") {
-    return "warning";
-  }
-
-  if (eventType === "RUN_STARTED" || eventType === "PYTHON_REQUEST_SENT" || eventType === "PYTHON_RESPONSE_RECEIVED") {
-    return "primary";
-  }
-
-  return "info";
-}
-
-function agentLabel(agent?: string) {
-  const labels: Record<string, string> = {
-    product: "Product",
-    coder: "Coder",
-    tester: "Tester",
-    sentry: "Sentry",
-    runner: "Runner",
-    quality: "Quality",
-    report: "Report",
-    workflow: "Workflow",
-    code_agent: "CodeAgent",
-  };
-
-  return labels[agent || ""] || agent || "";
-}
-
-function agentTagType(agent?: string) {
-  const types: Record<string, string> = {
-    product: "primary",
-    coder: "success",
-    tester: "warning",
-    sentry: "danger",
-    runner: "info",
-    quality: "success",
-    report: "primary",
-    workflow: "info",
-    code_agent: "warning",
-  };
-
-  return types[agent || ""] || "info";
 }
 
 function isTerminalEvent(event: RunEvent) {
@@ -291,7 +576,240 @@ function handleRequirementTemplateApplied(payload: {
   codeAgentOperation: string;
 }) {
   if (payload.useCodeAgent || payload.key.startsWith("code_agent")) {
-    controlPanelMode.value = "codeAgent";
+    activeSidePanel.value = "tools";
+  }
+}
+
+function handleCodeAgentExecuted(response: CodeAgentResponse) {
+  codeAgentResult.value = response;
+  response.events.forEach(appendLiveEvent);
+  activeSidePanel.value = "output";
+}
+
+function startNewConversation() {
+  form.requirement = "";
+  result.value = null;
+  codeAgentResult.value = null;
+  liveEvents.value = [];
+  errorDetail.value = "";
+  lastRequirement.value = "";
+  closeLiveEventStream();
+}
+
+function workspaceNameFromPath(rootPath: string) {
+  const normalized = rootPath.replace(/\\/g, "/").replace(/\/+$/, "");
+  const name = normalized.split("/").filter(Boolean).pop() || "Workspace";
+  return name.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function applyWorkspace(workspace = selectedWorkspace.value, options: { silent?: boolean } = {}) {
+  if (!workspace) {
+    return;
+  }
+
+  selectedWorkspaceId.value = workspace.id || null;
+  folderForm.baseDir = workspace.rootPath;
+  folderForm.dryRun = workspace.dryRunDefault;
+  folderForm.backupBeforeWrite = workspace.backupBeforeWrite;
+
+  if (!options.silent) {
+    ElMessage.success(`已选择文件夹：${workspace.name}`);
+  }
+}
+
+function selectWorkspace(workspace: WorkspaceConfig) {
+  applyWorkspace(workspace);
+  activeSidePanel.value = "workspace";
+}
+
+async function createWorkspaceFromPath(rootPath: string) {
+  const nextRootPath = rootPath.trim();
+  if (!nextRootPath) {
+    ElMessage.warning("请先输入文件夹路径");
+    return;
+  }
+
+  folderForm.baseDir = nextRootPath;
+
+  if (!isJavaMode) {
+    activeSidePanel.value = "workspace";
+    ElMessage.info("Python Direct 模式使用本地白名单，不创建 Java Workspace。");
+    return;
+  }
+
+  const existing = workspaces.value.find((workspace) => normalizePath(workspace.rootPath) === normalizePath(nextRootPath));
+  if (existing) {
+    applyWorkspace(existing);
+    activeSidePanel.value = "workspace";
+    return;
+  }
+
+  workspaceLoading.value = true;
+  try {
+    const created = await createWorkspace({
+      ...createDefaultWorkspace(),
+      name: workspaceNameFromPath(nextRootPath),
+      rootPath: nextRootPath,
+      isDefault: !workspaces.value.some((workspace) => workspace.enabled),
+    });
+    workspaces.value = [...workspaces.value, created];
+    applyWorkspace(created);
+    activeSidePanel.value = "workspace";
+    ElMessage.success(`已创建 Workspace：${created.name}`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "创建 Workspace 失败");
+  } finally {
+    workspaceLoading.value = false;
+  }
+}
+
+function applyFolderTemplate(
+  templateKey = selectedFolderTemplateKey.value,
+  options: { silent?: boolean; preserveFolder?: boolean } = {},
+) {
+  const template = folderTemplateOptions.value.find((item) => item.key === templateKey);
+
+  if (!template) {
+    if (!options.silent) {
+      ElMessage.warning("请选择文件夹工作流模板");
+    }
+    return;
+  }
+
+  selectedFolderTemplateKey.value = template.key;
+  const currentBaseDir = folderForm.baseDir;
+  folderForm.baseDir = options.preserveFolder
+    ? currentBaseDir
+    : template.baseDir === demoFolderPath && selectedWorkspace.value
+      ? selectedWorkspace.value.rootPath
+      : template.baseDir;
+  folderForm.includePatterns = template.includePatterns;
+  folderForm.excludePatterns = template.excludePatterns;
+  folderForm.outputFile = template.outputFile;
+  folderForm.content = template.content;
+  folderForm.recursive = template.recursive;
+  folderForm.dryRun = template.dryRun;
+  folderForm.backupBeforeWrite = template.backupBeforeWrite;
+
+  if (!options.silent) {
+    ElMessage.success(`已应用模板：${template.name}`);
+  }
+}
+
+async function saveWorkspaceSettings(settings: WorkspaceExtendedSettings & { rootPath: string }) {
+  folderForm.baseDir = settings.rootPath;
+  folderForm.includePatterns = settings.includePatterns;
+  folderForm.excludePatterns = settings.excludePatterns;
+  folderForm.outputFile = settings.outputFile;
+  folderForm.dryRun = settings.dryRunDefault;
+  folderForm.backupBeforeWrite = settings.backupBeforeWrite;
+
+  if (!isJavaMode) {
+    ElMessage.info("Python Direct 模式仅更新当前页面设置。");
+    return;
+  }
+
+  workspaceLoading.value = true;
+  try {
+    const base = selectedWorkspace.value || {
+      ...createDefaultWorkspace(),
+      name: workspaceNameFromPath(settings.rootPath),
+      rootPath: settings.rootPath,
+      isDefault: !workspaces.value.some((workspace) => workspace.enabled),
+    };
+    const payload: WorkspaceConfig = {
+      ...base,
+      rootPath: settings.rootPath,
+      maxFiles: settings.maxFiles,
+      maxReadChars: settings.maxReadChars,
+      dryRunDefault: settings.dryRunDefault,
+      backupBeforeWrite: settings.backupBeforeWrite,
+    };
+    const saved = payload.id ? await updateWorkspace(payload.id, payload) : await createWorkspace(payload);
+    const existingIndex = workspaces.value.findIndex((workspace) => workspace.id === saved.id);
+    if (existingIndex >= 0) {
+      workspaces.value.splice(existingIndex, 1, saved);
+    } else {
+      workspaces.value.push(saved);
+    }
+    applyWorkspace(saved, { silent: true });
+    ElMessage.success("Workspace 设置已保存");
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "保存 Workspace 失败");
+  } finally {
+    workspaceLoading.value = false;
+  }
+}
+
+async function runWorkspaceAction(action: WorkspaceAction) {
+  const templateKey = workspaceActionTemplateMap[action];
+  selectedFolderTemplateKey.value = templateKey;
+  applyFolderTemplate(templateKey, { silent: true, preserveFolder: action !== "blocked_check" });
+  if (action === "markdown_summary") {
+    folderForm.outputFile = folderForm.outputFile || "code_agent_folder_summary.md";
+  }
+  runMode.value = "folder_workflow";
+  await submitFolderWorkflow();
+}
+
+async function loadWorkspaces() {
+  if (!isJavaMode) {
+    workspaces.value = [];
+    return;
+  }
+
+  workspaceLoading.value = true;
+  try {
+    workspaces.value = await getWorkspaces();
+    const defaultWorkspace = workspaces.value.find((workspace) => workspace.enabled && workspace.isDefault);
+    if (defaultWorkspace) {
+      applyWorkspace(defaultWorkspace, { silent: true });
+    }
+  } catch (error) {
+    workspaces.value = [];
+    ElMessage.warning(error instanceof Error ? error.message : "加载 Workspace 失败");
+  } finally {
+    workspaceLoading.value = false;
+  }
+}
+
+async function loadWorkflowTemplates() {
+  templateLoading.value = true;
+  try {
+    const [apiTemplates, platformTemplates] = await Promise.allSettled([
+      getWorkflowTemplates(),
+      getPlatformWorkflowTemplates(),
+    ]);
+    const nextFolderTemplates: CodeAgentFolderTemplate[] = [];
+
+    if (apiTemplates.status === "fulfilled") {
+      apiTemplates.value
+        .map((template) => workflowTemplateToFolderTemplate(template))
+        .filter((template): template is CodeAgentFolderTemplate => Boolean(template))
+        .forEach((template) => nextFolderTemplates.push(template));
+    }
+
+    if (platformTemplates.status === "fulfilled") {
+      platformWorkflowTemplates.value = platformTemplates.value;
+      platformTemplates.value
+        .map((template) => workflowTemplateToFolderTemplate(template))
+        .filter((template): template is CodeAgentFolderTemplate => Boolean(template))
+        .forEach((template) => nextFolderTemplates.push(template));
+
+      if (!selectedPlatformTemplateKey.value && platformTemplates.value.length) {
+        selectedPlatformTemplateKey.value = platformTemplates.value[0].workflowTemplateKey;
+      }
+    } else {
+      platformWorkflowTemplates.value = [];
+    }
+
+    workflowFolderTemplates.value = nextFolderTemplates;
+    if (!selectedFolderTemplateKey.value || !folderTemplateOptions.value.some((item) => item.key === selectedFolderTemplateKey.value)) {
+      selectedFolderTemplateKey.value = folderTemplateOptions.value[0]?.key || "";
+    }
+    applyFolderTemplate(selectedFolderTemplateKey.value, { silent: true });
+  } finally {
+    templateLoading.value = false;
   }
 }
 
@@ -319,6 +837,8 @@ async function loadOptions() {
     form.enabled_plugins = settingsStore.enabledPlugins.length
       ? [...settingsStore.enabledPlugins]
       : pluginRows.filter((plugin) => plugin.enabled).map((plugin) => pluginValue(plugin));
+
+    await Promise.all([loadWorkspaces(), loadWorkflowTemplates()]);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : "加载模型和插件失败");
   } finally {
@@ -326,7 +846,21 @@ async function loadOptions() {
   }
 }
 
-async function submitRun() {
+function latestPlannedChanges(): CodeAgentFolderChange[] {
+  const changes =
+    codeAgentResult.value?.results.flatMap((item) =>
+      (item.changes || []).map((change) => ({
+        filePath: change.relativePath || change.filePath,
+        content: change.after || change.content || "",
+        action: change.action,
+        reason: change.reason,
+      })),
+    ) || [];
+
+  return changes;
+}
+
+async function submitAgentRun() {
   if (running.value) {
     return;
   }
@@ -359,6 +893,7 @@ async function submitRun() {
     if (resultPlatformRunId.value) {
       startLiveEventStream(resultPlatformRunId.value);
     }
+    activeSidePanel.value = "output";
     ElMessage.success("运行完成");
   } catch (error) {
     errorDetail.value = normalizeError(error);
@@ -368,8 +903,201 @@ async function submitRun() {
   }
 }
 
+async function submitFolderWorkflow() {
+  if (running.value) {
+    return;
+  }
+
+  if (!folderForm.baseDir.trim()) {
+    ElMessage.warning("请先选择或输入文件夹路径");
+    return;
+  }
+
+  const template = selectedFolderTemplate.value;
+  let operation: CodeAgentOperation = template?.recommendedOperation || "plan_folder_changes";
+  let plannedChanges = operation === "apply_folder_changes" ? latestPlannedChanges() : undefined;
+
+  if (operation === "apply_folder_changes" && !plannedChanges?.length) {
+    operation = "plan_folder_changes";
+    plannedChanges = undefined;
+    ElMessage.info("尚未生成变更计划，已先切换为 dry-run 计划。");
+  }
+
+  running.value = true;
+  result.value = null;
+  codeAgentResult.value = null;
+  errorDetail.value = "";
+  liveEvents.value = [];
+  liveEventError.value = "";
+  lastRequirement.value = form.requirement.trim() || `${template?.name || "文件夹工作流"}：${folderForm.baseDir}`;
+  const platformRunId = nextPlatformRunId();
+  closeLiveEventStream();
+  startLiveEventStream(platformRunId);
+
+  try {
+    const response = await executeCodeAgent({
+      operation,
+      filePath: folderForm.baseDir.trim(),
+      includePatterns: splitPatternInput(folderForm.includePatterns),
+      excludePatterns: splitPatternInput(folderForm.excludePatterns),
+      outputFile: folderForm.outputFile.trim(),
+      content:
+        form.requirement.trim() || folderForm.content
+          ? `${folderForm.content}\n\n## User task\n${form.requirement.trim()}`
+          : folderForm.content,
+      recursive: folderForm.recursive,
+      dryRun: operation === "apply_folder_changes" ? false : folderForm.dryRun,
+      backupBeforeWrite: folderForm.backupBeforeWrite,
+      changes: plannedChanges,
+      platformRunId,
+    });
+
+    codeAgentResult.value = response;
+    response.events.forEach(appendLiveEvent);
+    if (response.platformRunId || platformRunId) {
+      await loadLiveEventHistory(response.platformRunId || platformRunId);
+    }
+    activeSidePanel.value = "output";
+    if (response.success) {
+      ElMessage.success(response.message || "文件夹工作流完成");
+    } else {
+      ElMessage.error(response.message || "文件夹工作流失败");
+    }
+  } catch (error) {
+    errorDetail.value = normalizeError(error);
+    ElMessage.error(errorDetail.value);
+  } finally {
+    running.value = false;
+    closeLiveEventStream();
+  }
+}
+
+async function submitAiProjectGeneration() {
+  if (running.value) {
+    return;
+  }
+
+  if (!form.requirement.trim()) {
+    ElMessage.warning("请先输入你想生成或修改的项目目标");
+    return;
+  }
+
+  if (!folderForm.baseDir.trim()) {
+    ElMessage.warning("请先选择或输入 Workspace 文件夹");
+    return;
+  }
+
+  running.value = true;
+  result.value = null;
+  codeAgentResult.value = null;
+  errorDetail.value = "";
+  liveEvents.value = [];
+  liveEventError.value = "";
+  lastRequirement.value = form.requirement.trim();
+  closeLiveEventStream();
+
+  try {
+    const response = await aiGenerateProject({
+      requirement: form.requirement.trim(),
+      baseDir: folderForm.baseDir.trim(),
+      modelProvider: form.model_provider || undefined,
+    });
+
+    codeAgentResult.value = response;
+    response.events.forEach(appendLiveEvent);
+    if (response.platformRunId) {
+      await loadLiveEventHistory(response.platformRunId);
+    }
+    activeSidePanel.value = "output";
+    if (response.success) {
+      ElMessage.success(response.message || "AI 一键生成完成");
+    } else {
+      ElMessage.error(response.message || "AI 一键生成失败");
+    }
+  } catch (error) {
+    errorDetail.value = normalizeError(error);
+    ElMessage.error(errorDetail.value);
+  } finally {
+    running.value = false;
+  }
+}
+
+async function submitPlatformWorkflow() {
+  if (!isJavaMode) {
+    ElMessage.warning("模板执行仅 Java Gateway 模式支持");
+    return;
+  }
+
+  if (!selectedPlatformTemplateKey.value) {
+    ElMessage.warning("请先选择平台工作流模板");
+    return;
+  }
+
+  running.value = true;
+  result.value = null;
+  codeAgentResult.value = null;
+  errorDetail.value = "";
+  liveEvents.value = [];
+  liveEventError.value = "";
+  lastRequirement.value = form.requirement.trim() || selectedPlatformTemplate.value?.name || "平台工作流模板";
+  closeLiveEventStream();
+
+  const inputData = {
+    requirement: form.requirement.trim(),
+    folderPath: folderForm.baseDir,
+    workspaceId: selectedWorkspaceId.value,
+    folderTemplateKey: selectedFolderTemplateKey.value,
+    modelProvider: form.model_provider,
+    includePatterns: splitPatternInput(folderForm.includePatterns),
+    excludePatterns: splitPatternInput(folderForm.excludePatterns),
+    outputFile: folderForm.outputFile,
+    dryRun: folderForm.dryRun,
+    backupBeforeWrite: folderForm.backupBeforeWrite,
+  };
+
+  try {
+    const response =
+      runMode.value === "dynamic_langgraph"
+        ? await executePlatformDynamicLangGraphTemplate(selectedPlatformTemplateKey.value, inputData)
+        : await executePlatformWorkflowTemplate(selectedPlatformTemplateKey.value, inputData);
+
+    result.value = response as unknown as RunResponse;
+    if (resultPlatformRunId.value) {
+      startLiveEventStream(resultPlatformRunId.value);
+      await loadLiveEventHistory(resultPlatformRunId.value);
+    }
+    activeSidePanel.value = "output";
+    ElMessage.success("平台工作流已执行");
+  } catch (error) {
+    errorDetail.value = normalizeError(error);
+    ElMessage.error(errorDetail.value);
+  } finally {
+    running.value = false;
+  }
+}
+
+async function submitRun() {
+  if (runMode.value === "code_agent_ai_generate") {
+    await submitAiProjectGeneration();
+    return;
+  }
+
+  if (runMode.value === "agent_run") {
+    await submitAgentRun();
+    return;
+  }
+
+  if (runMode.value === "runtime_lite" || runMode.value === "dynamic_langgraph") {
+    await submitPlatformWorkflow();
+    return;
+  }
+
+  await submitFolderWorkflow();
+}
+
 async function startDemoRun() {
   form.demo_mode = true;
+  runMode.value = "agent_run";
   applyDemoCase();
 
   if (selectedDemoCaseKey.value === "custom" && !form.requirement.trim()) {
@@ -381,6 +1109,7 @@ async function startDemoRun() {
 }
 
 onMounted(async () => {
+  window.addEventListener("keydown", handleWorkbenchKeydown);
   await loadOptions();
 
   if (form.demo_mode && !form.requirement.trim()) {
@@ -389,6 +1118,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleWorkbenchKeydown);
   closeLiveEventStream();
 });
 
@@ -406,38 +1136,151 @@ watch(
 </script>
 
 <template>
-  <section class="page-stack">
-    <div class="page-header">
-      <div>
-        <h1>RunConsole</h1>
-        <p>提交一次 AI 工作流运行请求</p>
-      </div>
-    </div>
+  <section class="codex-run-page">
+    <main class="run-workbench">
+      <WorkspaceProjectSidebar
+        :workspaces="enabledWorkspaces"
+        :selected-workspace-id="selectedWorkspaceId"
+        :folder-path="folderForm.baseDir"
+        :is-java-mode="isJavaMode"
+        :loading="workspaceLoading"
+        @new-chat="startNewConversation"
+        @select-workspace="selectWorkspace"
+        @create-workspace="createWorkspaceFromPath"
+        @update-folder-path="folderForm.baseDir = $event"
+        @open-workspace-panel="activeSidePanel = 'workspace'"
+        @open-tools="activeSidePanel = 'tools'"
+        @open-settings="activeSidePanel = 'settings'"
+      />
 
-    <el-row :gutter="16">
-      <el-col :lg="8" :md="24">
-        <section class="panel run-control-panel">
-          <div class="control-head">
-            <div>
-              <div class="panel-title">运行控制台</div>
-              <p>{{ controlPanelMode === "workflow" ? "配置并提交 AI 工作流任务" : "执行受控文件操作并查看审计事件" }}</p>
-            </div>
-            <el-tag type="primary" effect="plain">
-              {{ controlPanelMode === "workflow" ? "Workflow" : "CodeAgent" }}
-            </el-tag>
-          </div>
+      <WorkbenchSideRail
+        :active-panel="activeSidePanel"
+        :event-count="liveEvents.length"
+        :output-count="outputCount"
+        @toggle="toggleSidePanel"
+      />
 
-          <el-radio-group v-model="controlPanelMode" class="control-mode-switch">
-            <el-radio-button label="workflow">AI 工作流运行</el-radio-button>
-            <el-radio-button label="codeAgent">CodeAgent 文件操作</el-radio-button>
-          </el-radio-group>
+      <section class="session-column">
+        <TaskTimeline
+          :requirement="lastRequirement || form.requirement"
+          :folder-context="folderContext"
+          :template-name="currentTemplateName"
+          :running="running"
+          :error-detail="errorDetail"
+          :response="result"
+          :live-events="liveEvents"
+          :code-agent-response="codeAgentResult"
+        />
 
-          <el-form v-if="controlPanelMode === 'workflow'" label-position="top" :disabled="running" class="control-body">
-            <el-form-item label="演示模式">
-              <el-switch v-model="form.demo_mode" active-text="启用比赛演示模式" />
+        <div class="composer-shell">
+          <ComposerBar
+            v-model="form.requirement"
+            v-model:model-provider="form.model_provider"
+            v-model:run-mode="runMode"
+            v-model:workspace-id="selectedWorkspaceId"
+            v-model:folder-path="folderForm.baseDir"
+            v-model:folder-template-key="selectedFolderTemplateKey"
+            v-model:platform-template-key="selectedPlatformTemplateKey"
+            v-model:output-file="folderForm.outputFile"
+            v-model:dry-run="folderForm.dryRun"
+            v-model:backup-before-write="folderForm.backupBeforeWrite"
+            :running="running"
+            :demo-mode="form.demo_mode"
+            :api-mode-label="apiModeLabel"
+            :status-text="runStatusText"
+            :models="models"
+            :loading-options="loadingOptions"
+            :active-plugin-count="activePluginCount"
+            :workspaces="enabledWorkspaces"
+            :workspace-loading="workspaceLoading"
+            :workspace-safety="workspaceSafety"
+            :folder-templates="folderTemplateOptions"
+            :platform-templates="platformWorkflowTemplates"
+            :template-loading="templateLoading"
+            @submit="submitRun"
+            @start-demo="startDemoRun"
+            @open-builder="activeSidePanel = 'builder'"
+            @open-tools="activeSidePanel = 'tools'"
+            @open-output="activeSidePanel = 'output'"
+            @open-workspace="activeSidePanel = 'workspace'"
+            @workspace-change="applyWorkspace()"
+            @template-change="applyFolderTemplate()"
+          />
+        </div>
+      </section>
+
+      <WorkbenchSidePanel
+        :visible="Boolean(activeSidePanel)"
+        :title="sidePanelMeta.title"
+        :subtitle="sidePanelMeta.subtitle"
+        @close="closeSidePanel"
+      >
+        <div v-if="activeSidePanel === 'workspace'" class="side-section">
+          <WorkspaceActionPanel
+            :workspace="selectedWorkspace"
+            :folder-path="folderForm.baseDir"
+            :include-patterns="folderForm.includePatterns"
+            :exclude-patterns="folderForm.excludePatterns"
+            :output-file="folderForm.outputFile"
+            :max-files="selectedWorkspace?.maxFiles || defaultWorkspacePolicy.maxFiles"
+            :max-read-chars="selectedWorkspace?.maxReadChars || defaultWorkspacePolicy.maxReadChars"
+            :dry-run-default="folderForm.dryRun"
+            :backup-before-write="folderForm.backupBeforeWrite"
+            :safety="workspaceSafety"
+            :loading="workspaceLoading || running"
+            @update:folder-path="folderForm.baseDir = $event"
+            @update:include-patterns="folderForm.includePatterns = $event"
+            @update:exclude-patterns="folderForm.excludePatterns = $event"
+            @update:output-file="folderForm.outputFile = $event"
+            @save-workspace="saveWorkspaceSettings"
+            @run-action="runWorkspaceAction"
+          />
+        </div>
+
+        <div v-else-if="activeSidePanel === 'settings'" class="side-section settings-panel">
+          <el-form label-position="top" :disabled="running">
+            <el-form-item label="运行模式">
+              <el-select v-model="runMode" class="full-width" placeholder="选择运行模式">
+                <el-option v-for="option in runModeOptions" :key="option.value" :label="option.label" :value="option.value" />
+              </el-select>
             </el-form-item>
-
-            <el-form-item v-if="form.demo_mode" label="演示案例选择">
+            <el-form-item label="工作流模板">
+              <el-select
+                v-if="runMode === 'runtime_lite' || runMode === 'dynamic_langgraph'"
+                v-model="selectedPlatformTemplateKey"
+                class="full-width"
+                :loading="templateLoading"
+                placeholder="选择平台模板"
+              >
+                <el-option
+                  v-for="template in platformWorkflowTemplates"
+                  :key="template.workflowTemplateKey"
+                  :label="template.name"
+                  :value="template.workflowTemplateKey"
+                />
+              </el-select>
+              <el-select
+                v-else
+                v-model="selectedFolderTemplateKey"
+                class="full-width"
+                :loading="templateLoading"
+                placeholder="选择文件夹模板"
+                @change="applyFolderTemplate()"
+              >
+                <el-option
+                  v-for="template in folderTemplateOptions"
+                  :key="template.key"
+                  :label="template.name"
+                  :value="template.key"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="演示模式">
+              <div class="setting-line">
+                <el-switch v-model="form.demo_mode" active-text="启用 Demo" />
+              </div>
+            </el-form-item>
+            <el-form-item v-if="form.demo_mode" label="演示案例">
               <el-select
                 v-model="selectedDemoCaseKey"
                 class="full-width"
@@ -449,50 +1292,29 @@ watch(
                   :key="demoCase.key"
                   :label="demoCase.label"
                   :value="demoCase.key"
-                >
-                  <div class="demo-case-option">
-                    <strong>{{ demoCase.label }}</strong>
-                    <span>{{ demoCase.description }}</span>
-                  </div>
-                </el-option>
+                />
               </el-select>
-              <div class="form-help">{{ selectedDemoCase.description }}</div>
+              <p class="side-help">{{ selectedDemoCase.description }}</p>
             </el-form-item>
-
-            <el-form-item label="需求构造">
-              <RequirementBuilder
-                v-model="form.requirement"
-                :disabled="running"
-                @template-applied="handleRequirementTemplateApplied"
-              />
-            </el-form-item>
-
-            <el-form-item label="需求输入">
-              <el-input
-                v-model="form.requirement"
-                type="textarea"
-                :rows="8"
-                placeholder="例如：写一个函数 get_second_largest(nums)，返回第二大的不同数字"
-              />
-            </el-form-item>
-
-            <el-form-item label="模型选择">
-              <el-select v-model="form.model_provider" class="full-width" :loading="loadingOptions">
+            <el-form-item label="模型">
+              <el-select v-model="form.model_provider" class="full-width" :loading="loadingOptions" placeholder="模型">
                 <el-option
                   v-for="model in models"
                   :key="model.provider"
-                  :label="`${model.name} / ${model.model}${model.provider === settingsStore.selectedModelProvider ? '（前端默认）' : ''}`"
+                  :label="`${model.name} / ${model.model}`"
                   :value="model.provider"
                 />
               </el-select>
             </el-form-item>
-
-            <el-form-item label="插件选择">
+            <el-form-item label="插件">
               <el-select
                 v-model="form.enabled_plugins"
                 multiple
+                collapse-tags
+                collapse-tags-tooltip
                 class="full-width"
                 :loading="loadingOptions"
+                placeholder="插件"
               >
                 <el-option
                   v-for="plugin in plugins"
@@ -502,319 +1324,253 @@ watch(
                 />
               </el-select>
             </el-form-item>
-
             <el-form-item label="最大修复次数">
-              <el-input-number v-model="form.max_retry_count" :min="0" :max="10" />
+              <el-input-number v-model="form.max_retry_count" :min="0" :max="10" controls-position="right" />
             </el-form-item>
-
-            <div class="switch-grid">
+            <div class="settings-switches">
               <el-switch v-model="form.require_human_approval" active-text="人工审批" />
               <el-switch v-model="form.offline_mode" active-text="离线模式" />
             </div>
-
-            <el-button
-              v-if="form.demo_mode"
-              type="warning"
-              class="full-width action-button"
-              :loading="running"
-              :disabled="running"
-              @click="startDemoRun"
-            >
-              一键开始演示
-            </el-button>
-
-            <el-button
-              type="primary"
-              class="full-width action-button"
-              :loading="running"
-              :disabled="running"
-              @click="submitRun"
-            >
-              开始运行
-            </el-button>
           </el-form>
+        </div>
 
-          <div v-else class="control-body">
-            <CodeAgentPanel always-visible embedded />
-          </div>
-        </section>
-      </el-col>
+        <div v-else-if="activeSidePanel === 'builder'" class="side-section">
+          <RequirementBuilder
+            v-model="form.requirement"
+            :disabled="running"
+            @template-applied="handleRequirementTemplateApplied"
+          />
+        </div>
 
-      <el-col :lg="16" :md="24">
-        <el-alert
-          v-if="running"
-          title="AI 工作流执行中"
-          :description="currentRunStepHint"
-          type="info"
-          show-icon
-          :closable="false"
-          class="run-alert"
-        />
+        <div v-else-if="activeSidePanel === 'tools'" class="side-section">
+          <CodeAgentToolDrawer @executed="handleCodeAgentExecuted" />
+        </div>
 
-        <el-alert
-          v-if="errorDetail"
-          :title="form.demo_mode ? '演示运行失败' : '运行失败'"
-          :description="`${errorDetail}。请检查 ${apiModeLabel} 是否启动。`"
-          type="error"
-          show-icon
-          :closable="false"
-          class="run-alert"
-        />
-
-        <el-alert
-          v-if="isJavaMode && resultPlatformRunId"
-          title="Java 平台事件记录已生成"
-          type="success"
-          show-icon
-          :closable="false"
-          class="run-alert"
-        >
-          <template #default>
-            <router-link class="event-link" :to="{ path: '/history', query: { run_id: resultPlatformRunId } }">
-              查看事件记录：{{ resultPlatformRunId }}
-            </router-link>
-          </template>
-        </el-alert>
-
-        <RunResultHighlight
-          :response="result"
-          :requirement="lastRequirement || form.requirement"
-          :live-events="liveEvents"
-          :is-java-mode="isJavaMode"
-          :running="running"
-          :error-detail="errorDetail"
-        />
-
-        <section v-if="showLiveEvents" class="panel live-event-panel">
-          <div class="live-event-head">
-            <div>
-              <div class="panel-title">实时事件日志</div>
-              <p>
-                {{ liveEventStreaming ? "正在订阅 Java 平台 SSE 事件流" : "事件流已关闭，展示已收到的事件记录" }}
-              </p>
-            </div>
-            <div class="live-event-tags">
-              <el-tag :type="liveEventConnected ? 'success' : 'info'" effect="plain">
-                {{ liveEventConnected ? "SSE 已连接" : "SSE 未连接" }}
-              </el-tag>
-              <el-tag effect="plain">事件 {{ liveEvents.length }}</el-tag>
-            </div>
+        <div v-else-if="activeSidePanel === 'events'" class="side-section events-panel">
+          <div class="event-status-row">
+            <el-tag :type="liveEventConnected ? 'success' : 'info'" effect="plain">
+              {{ liveEventConnected ? "SSE 已连接" : "SSE 未连接" }}
+            </el-tag>
+            <el-tag v-if="liveEventStreaming" type="primary" effect="plain">streaming</el-tag>
+            <el-tag effect="plain">{{ liveEvents.length }} events</el-tag>
           </div>
           <el-alert
             v-if="liveEventError"
-            :title="`${liveEventError}，已回退查询历史事件`"
+            :title="liveEventError"
             type="warning"
             show-icon
             :closable="false"
-            class="run-alert"
           />
-          <el-empty v-if="!liveEvents.length" description="暂无实时事件" />
-          <el-timeline v-else>
-            <el-timeline-item
-              v-for="event in liveEvents"
-              :key="event.id || `${event.eventType}-${event.createdAt}`"
-              :timestamp="event.createdAt"
-              placement="top"
-            >
-              <div class="live-event-item">
-                <div class="live-event-line">
-                  <el-tag v-if="event.agent" :type="agentTagType(event.agent)" effect="plain" size="small">
-                    {{ agentLabel(event.agent) }}
-                  </el-tag>
-                  <el-tag :type="eventTagType(event.eventType)" effect="plain" size="small">
-                    {{ event.eventText || event.eventType }}
-                  </el-tag>
-                  <el-tag effect="plain" size="small">{{ event.status || "UNKNOWN" }}</el-tag>
-                </div>
-                <div class="live-event-message">{{ event.message || "无事件描述" }}</div>
+          <el-empty v-if="!liveEvents.length" description="暂无事件，运行后会显示 SSE / RunEvent" />
+          <div v-else class="event-list">
+            <article v-for="event in liveEvents" :key="event.id || `${event.eventType}-${event.createdAt}`" class="event-card">
+              <div class="event-card-head">
+                <el-tag :type="eventTagType(event)" effect="plain" size="small">
+                  {{ event.eventText || event.eventType }}
+                </el-tag>
+                <span>{{ event.status || "UNKNOWN" }}</span>
               </div>
-            </el-timeline-item>
-          </el-timeline>
-        </section>
-
-        <div v-if="form.demo_mode" class="demo-mode-stack">
-          <DemoHero
-            :model-provider="form.model_provider"
-            :demo-case-label="demoCaseLabel"
-            :running="running"
-            :success="selectedSummary?.success"
-            :has-result="Boolean(result)"
-            :error-detail="errorDetail"
-          />
-
-          <DemoWorkflowStage :response="result" :running="running" :error-detail="errorDetail" />
-          <RepairHighlight :response="result" :running="running" :error-detail="errorDetail" />
-          <DemoResultSummary :response="result" />
-          <DemoNarrationPanel
-            :response="result"
-            :requirement="lastRequirement || form.requirement"
-            :enabled-plugins="form.enabled_plugins"
-            :error-detail="errorDetail"
-          />
-
-          <el-collapse class="demo-collapse">
-            <el-collapse-item title="Agent 输出详情" name="agent-outputs">
-              <AgentOutputTabs :response="result" />
-            </el-collapse-item>
-            <el-collapse-item title="报告入口" name="report-preview">
-              <ReportPreview :report="reportView" />
-            </el-collapse-item>
-          </el-collapse>
+              <p>{{ event.message || event.detailJson || "无事件描述" }}</p>
+              <small>{{ event.createdAt }}</small>
+            </article>
+          </div>
         </div>
 
-        <template v-else>
-          <section class="panel">
-            <div class="panel-title">顶部状态摘要</div>
-            <SummaryCards :summary="selectedSummary" />
-          </section>
-
-          <section class="panel">
-            <div class="panel-title">Agent 工作流节点</div>
-            <WorkflowTimeline :workflow-steps="workflowSteps" :workflow-events="workflowEvents" />
-          </section>
-
-          <section class="panel">
-            <div class="panel-title">最终结果总览</div>
-            <ResultOverview :response="result" :requirement="lastRequirement || form.requirement" />
-          </section>
-
-          <section class="panel">
-            <div class="panel-title">Agent 输出详情</div>
-            <AgentOutputTabs :response="result" />
-          </section>
-
-          <section class="panel">
-            <div class="panel-title">报告入口</div>
-            <ReportPreview :report="reportView" />
-          </section>
-        </template>
-      </el-col>
-    </el-row>
+        <div v-else-if="activeSidePanel === 'output'" class="side-section output-panel">
+          <RunResultHighlight
+            :response="result"
+            :requirement="lastRequirement || form.requirement"
+            :live-events="liveEvents"
+            :is-java-mode="isJavaMode"
+            :running="running"
+            :error-detail="errorDetail"
+          />
+          <ArtifactPanel
+            :run-response="result"
+            :code-agent-response="codeAgentResult"
+            :live-events="liveEvents"
+            :is-java-mode="isJavaMode"
+          />
+        </div>
+      </WorkbenchSidePanel>
+    </main>
   </section>
 </template>
 
 <style scoped>
-.run-alert {
-  margin-bottom: 16px;
-}
-
-.run-control-panel {
+.codex-run-page {
   display: grid;
-  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  background: #0f1115;
+  color: #f4f4f5;
 }
 
-.control-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+.run-workbench {
+  border: 0;
+  border-radius: 0;
 }
 
-.control-head p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.45;
+.run-workbench {
+  position: relative;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  padding: 0 92px 0 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 55% 0%, rgba(77, 163, 255, 0.08), transparent 34%),
+    #0f1115;
 }
 
-.control-mode-switch {
-  width: 100%;
+.session-column {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+  width: min(960px, 100%);
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  min-width: 0;
+  padding: 18px 0 0;
 }
 
-.control-mode-switch :deep(.el-radio-button) {
-  flex: 1;
+.composer-shell {
+  z-index: 18;
+  align-self: end;
+  padding: 10px 0 10px;
+  background: linear-gradient(180deg, rgba(15, 17, 21, 0), #0f1115 22%, #0f1115 100%);
 }
 
-.control-mode-switch :deep(.el-radio-button__inner) {
-  width: 100%;
-  border-color: #d2e3fc;
-  color: #1a73e8;
-  font-weight: 700;
+.session-column :deep(.task-timeline) {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 0 24px;
+  scrollbar-color: #343741 transparent;
 }
 
-.control-mode-switch :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  border-color: #1a73e8;
-  background: #1a73e8;
-  box-shadow: -1px 0 0 0 #1a73e8;
+.session-column :deep(.task-timeline::-webkit-scrollbar) {
+  width: 10px;
 }
 
-.control-body {
+.session-column :deep(.task-timeline::-webkit-scrollbar-thumb) {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #343741;
+  background-clip: padding-box;
+}
+
+.side-section {
   min-width: 0;
 }
 
-.demo-case-option {
-  display: grid;
-  gap: 2px;
-  padding: 4px 0;
+.settings-panel :deep(.el-form-item) {
+  margin-bottom: 14px;
 }
 
-.demo-case-option span,
-.form-help {
-  color: #64748b;
-  font-size: 12px;
+.settings-panel :deep(.el-form-item__label) {
+  color: #d4d4d8;
 }
 
-.form-help {
-  margin-top: 6px;
-  line-height: 1.45;
+.settings-panel :deep(.el-input__wrapper),
+.settings-panel :deep(.el-select__wrapper),
+.settings-panel :deep(.el-input-number__decrease),
+.settings-panel :deep(.el-input-number__increase) {
+  border-color: #343741;
+  background: #17191f;
+  box-shadow: 0 0 0 1px #343741 inset;
 }
 
-.demo-mode-stack {
-  display: grid;
-  gap: 14px;
+.settings-panel :deep(.el-input__inner),
+.settings-panel :deep(.el-select__placeholder),
+.settings-panel :deep(.el-select__selected-item) {
+  color: #f4f4f5;
 }
 
-.demo-collapse {
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.event-link {
-  color: #2563eb;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.event-link:hover {
-  text-decoration: underline;
-}
-
-.live-event-panel {
-  margin-bottom: 16px;
-}
-
-.live-event-head,
-.live-event-tags,
-.live-event-line {
+.setting-line,
+.settings-switches,
+.event-status-row {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
 }
 
-.live-event-head {
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.live-event-head p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.live-event-tags,
-.live-event-line {
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.live-event-item {
+.settings-switches {
   display: grid;
+  gap: 12px;
+}
+
+.side-help {
+  margin: 8px 0 0;
+  color: #a1a1aa;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.events-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.output-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.event-card {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid #343741;
+  border-radius: 14px;
+  background: #17191f;
+}
+
+.event-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.live-event-message {
-  color: #334155;
+.event-card-head span,
+.event-card small {
+  color: #a1a1aa;
+  font-size: 12px;
+}
+
+.event-card p {
+  margin: 0;
+  color: #d4d4d8;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .codex-run-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .run-workbench {
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+    padding: 14px 14px 0;
+    overflow: visible;
+  }
+
+  .session-column {
+    min-height: calc(100vh - 100px);
+  }
 }
 </style>

@@ -605,12 +605,12 @@ function saveNode() {
 }
 
 .mapping-title strong {
-  color: #202124;
+  color: #f4f4f5;
   font-size: 13px;
 }
 
 .mapping-title span {
-  color: #5f6368;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
@@ -618,9 +618,9 @@ function saveNode() {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: #ffffff;
+  background: #17191f;
 }
 
 .field-map-head {
@@ -630,7 +630,7 @@ function saveNode() {
 .field-map-head strong {
   flex: 1;
   overflow: hidden;
-  color: #202124;
+  color: #f4f4f5;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
   text-overflow: ellipsis;
@@ -642,7 +642,7 @@ function saveNode() {
   height: 10px;
   flex: 0 0 auto;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px rgba(100, 116, 139, 0.18);
+  box-shadow: 0 0 0 2px #17191f, 0 0 0 3px rgba(148, 163, 184, 0.2);
 }
 
 .mapping-row {
@@ -650,13 +650,13 @@ function saveNode() {
   gap: 6px;
   padding: 7px;
   border-radius: 10px;
-  background: #f8fafd;
-  color: #5f6368;
+  background: #101218;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
 .mapping-row > span {
-  color: #334155;
+  color: #d4d4d8;
   font-weight: 700;
 }
 
@@ -667,8 +667,8 @@ function saveNode() {
 .unbound-text {
   padding: 7px 9px;
   border-radius: 10px;
-  background: #f8fafc;
-  color: #94a3b8;
+  background: #101218;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
@@ -683,18 +683,18 @@ function saveNode() {
   justify-content: space-between;
   gap: 12px;
   padding: 12px;
-  border: 1px solid #dadce0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: #f8fafd;
+  background: #17191f;
 }
 
 .preview-card span {
-  color: #5f6368;
+  color: #a1a1aa;
   font-size: 12px;
 }
 
 .preview-card strong {
-  color: #1a73e8;
+  color: #8ab4f8;
   font-size: 18px;
 }
 

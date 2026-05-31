@@ -52,15 +52,15 @@ const props = defineProps<{
 const WORLD_WIDTH = 6000;
 const WORLD_HEIGHT = 4200;
 const GRID_SIZE = 24;
-const NODE_WIDTH = 288;
-const NODE_HEIGHT = 190;
-const PORT_START_Y = 61;
-const PORT_GAP = 26;
+const NODE_WIDTH = 416;
+const NODE_HEIGHT = 176;
+const PORT_START_Y = 64;
+const PORT_GAP = 30;
 const FANOUT_OFFSET = 12;
 const MINIMAP_WIDTH = 176;
 const MINIMAP_HEIGHT = 120;
 const STAGE_START_X = 320;
-const STAGE_COLUMN_GAP = 336;
+const STAGE_COLUMN_GAP = 500;
 const STAGE_LANES = [
   { key: "analysis", label: "Analysis" },
   { key: "implementation", label: "Implementation" },
@@ -1129,12 +1129,12 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 640px;
   overflow: hidden;
-  border: 1px solid #dbe4ef;
+  border: 1px solid #343741;
   border-radius: 12px;
   background:
-    linear-gradient(rgba(232, 234, 237, 0.42) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(232, 234, 237, 0.42) 1px, transparent 1px),
-    #ffffff;
+    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    #101218;
   background-position: var(--grid-x) var(--grid-y);
   background-size: var(--grid-size) var(--grid-size);
   cursor: default;
@@ -1161,9 +1161,9 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 96px;
   z-index: 0;
-  width: 256px;
+  width: 416px;
   height: 0;
-  border-top: 1px solid rgba(218, 220, 224, 0.62);
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
   opacity: 0.56;
   pointer-events: none;
   transition:
@@ -1172,7 +1172,7 @@ onBeforeUnmount(() => {
 }
 
 .stage-lane.active {
-  border-color: rgba(26, 115, 232, 0.32);
+  border-color: rgba(77, 163, 255, 0.34);
   opacity: 1;
 }
 
@@ -1181,24 +1181,26 @@ onBeforeUnmount(() => {
   top: -36px;
   left: 0;
   display: inline-flex;
-  max-width: 232px;
+  max-width: 304px;
   align-items: center;
   gap: 7px;
   padding: 7px 10px 7px 8px;
-  border: 1px solid rgba(218, 220, 224, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #5f6368;
+  background: rgba(23, 25, 31, 0.9);
+  color: #a1a1aa;
   font-size: 12px;
   letter-spacing: 0;
-  box-shadow: 0 8px 20px rgba(60, 64, 67, 0.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(8px);
 }
 
 .stage-lane.active .stage-lane-label {
-  border-color: rgba(26, 115, 232, 0.28);
-  background: rgba(232, 240, 254, 0.92);
-  box-shadow: 0 10px 24px rgba(26, 115, 232, 0.12);
+  border-color: rgba(77, 163, 255, 0.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.16), transparent 44%),
+    rgba(23, 25, 31, 0.94);
+  box-shadow: 0 10px 24px rgba(77, 163, 255, 0.12);
 }
 
 .stage-index {
@@ -1208,19 +1210,19 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
-  background: #f1f3f4;
-  color: #5f6368;
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
   font-size: 11px;
   font-weight: 900;
 }
 
 .stage-lane.active .stage-index {
-  background: #1a73e8;
-  color: #ffffff;
+  background: #4da3ff;
+  color: #06121f;
 }
 
 .stage-lane-label strong {
-  color: #202124;
+  color: #f4f4f5;
   font-size: 12px;
   font-weight: 850;
   white-space: nowrap;
@@ -1228,7 +1230,7 @@ onBeforeUnmount(() => {
 
 .stage-lane-label em {
   overflow: hidden;
-  color: #5f6368;
+  color: #a1a1aa;
   font-size: 11px;
   font-style: normal;
   text-overflow: ellipsis;
@@ -1242,15 +1244,15 @@ onBeforeUnmount(() => {
   display: grid;
   place-content: center;
   gap: 8px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed rgba(148, 163, 184, 0.34);
   border-radius: 10px;
-  color: #64748b;
+  color: #a1a1aa;
   text-align: center;
   pointer-events: none;
 }
 
 .canvas-empty strong {
-  color: #334155;
+  color: #f4f4f5;
   font-size: 16px;
 }
 
@@ -1315,8 +1317,8 @@ g:hover .connection-path {
 
 .connection-label {
   paint-order: stroke;
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 5px;
+  stroke: rgba(15, 17, 21, 0.92);
+  stroke-width: 4px;
   fill: #1a73e8;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
@@ -1340,7 +1342,7 @@ g:hover .connection-path {
   border: 1px solid #2563eb;
   border-radius: 8px;
   background: rgba(37, 99, 235, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 0 0 1px rgba(77, 163, 255, 0.24);
   pointer-events: none;
 }
 
@@ -1351,10 +1353,10 @@ g:hover .connection-path {
   z-index: 6;
   width: 196px;
   padding: 8px;
-  border: 1px solid #dbe4ef;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  background: rgba(23, 25, 31, 0.92);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
   cursor: crosshair;
   backdrop-filter: blur(12px);
 }
@@ -1365,14 +1367,14 @@ g:hover .connection-path {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
-  color: #64748b;
+  color: #a1a1aa;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .minimap-title strong {
-  color: #1d4ed8;
+  color: #8ab4f8;
   text-transform: none;
 }
 
@@ -1381,12 +1383,12 @@ g:hover .connection-path {
   width: 176px;
   height: 120px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   background:
-    linear-gradient(#eff6ff 1px, transparent 1px),
-    linear-gradient(90deg, #eff6ff 1px, transparent 1px),
-    #f8fafc;
+    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    #101218;
   background-size: 12px 12px;
 }
 
@@ -1445,10 +1447,10 @@ g:hover .connection-path {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid rgba(77, 163, 255, 0.24);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 38px rgba(30, 64, 175, 0.16);
+  background: rgba(23, 25, 31, 0.94);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
   transform: translateX(-50%);
   backdrop-filter: blur(12px);
 }
@@ -1462,21 +1464,21 @@ g:hover .connection-path {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid rgba(77, 163, 255, 0.24);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 38px rgba(30, 64, 175, 0.16);
+  background: rgba(23, 25, 31, 0.94);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
   transform: translateX(-50%);
   backdrop-filter: blur(12px);
 }
 
 .connection-toolbar strong {
-  color: #1e40af;
+  color: #8ab4f8;
   font-size: 12px;
 }
 
 .selection-toolbar strong {
-  color: #1e40af;
+  color: #8ab4f8;
   font-size: 12px;
 }
 
@@ -1489,16 +1491,16 @@ g:hover .connection-path {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border: 1px solid #dbe4ef;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12);
+  background: rgba(23, 25, 31, 0.92);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(10px);
 }
 
 .zoom-value {
   min-width: 48px;
-  color: #334155;
+  color: #d4d4d8;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
   font-weight: 800;
@@ -1511,10 +1513,10 @@ g:hover .connection-path {
   bottom: 18px;
   z-index: 7;
   padding: 7px 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
-  background: rgba(248, 250, 252, 0.88);
-  color: #64748b;
+  background: rgba(23, 25, 31, 0.86);
+  color: #a1a1aa;
   font-size: 12px;
   backdrop-filter: blur(8px);
 }

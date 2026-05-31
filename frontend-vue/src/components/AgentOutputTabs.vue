@@ -66,7 +66,7 @@ const rawJson = computed(() => JSON.stringify(props.response || viewModel.value,
   padding: 12px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #101218;
   white-space: pre-wrap;
   word-break: break-word;
   color: #0f172a;

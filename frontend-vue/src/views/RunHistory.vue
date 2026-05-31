@@ -581,9 +581,11 @@ onBeforeUnmount(() => {
 
 .history-item {
   padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    #17191f;
   cursor: pointer;
   transition:
     border-color 0.15s ease,
@@ -592,8 +594,8 @@ onBeforeUnmount(() => {
 
 .history-item:hover,
 .history-item.active {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  border-color: rgba(77, 163, 255, 0.42);
+  box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.12);
 }
 
 .history-item-head {
@@ -604,21 +606,21 @@ onBeforeUnmount(() => {
 }
 
 .run-id {
-  color: #0f172a;
+  color: var(--codex-text);
   font-family: "Cascadia Code", Consolas, monospace;
   font-weight: 800;
 }
 
 .python-run-id {
   margin-top: 5px;
-  color: #64748b;
+  color: var(--codex-muted);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
 
 .requirement-text {
   margin-top: 8px;
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.55;
 }
 
@@ -640,14 +642,14 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   margin-top: 10px;
-  color: #64748b;
+  color: var(--codex-muted);
   font-size: 12px;
 }
 
 .report-path {
   margin-top: 8px;
   overflow-wrap: anywhere;
-  color: #64748b;
+  color: var(--codex-muted);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
@@ -700,9 +702,9 @@ onBeforeUnmount(() => {
 .event-timeline-panel {
   margin-bottom: 14px;
   padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 15px;
+  background: #17191f;
 }
 
 .event-timeline-item {
@@ -717,12 +719,12 @@ onBeforeUnmount(() => {
 }
 
 .event-message {
-  color: #334155;
+  color: #d4d4d8;
   line-height: 1.5;
 }
 
 .event-python-run {
-  color: #64748b;
+  color: var(--codex-muted);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
 }
@@ -736,10 +738,10 @@ onBeforeUnmount(() => {
   margin: 0;
   overflow: auto;
   padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 12px;
+  background: #111318;
+  color: #e4e4e7;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
   line-height: 1.6;
